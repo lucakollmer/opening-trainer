@@ -1,6 +1,0 @@
-project=PRJ-CHESS-OPENING-TRAINER
-operation=install-exact-verified-pack
-expected_archive_sha256=5b43724389656fc75f144f77b541446eea9132f9d702307f1884d815c4aba0a3
-expected_manifest_entries=30
-expected_total_files=31
-stop_after=pack-only-main-baseline
