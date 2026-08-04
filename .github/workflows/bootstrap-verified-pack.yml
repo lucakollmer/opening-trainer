@@ -1,0 +1,77 @@
+name: Bootstrap verified Opening Trainer pack
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - opening-trainer-codex-pack.zip
+      - .github/workflows/bootstrap-verified-pack.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: opening-trainer-pack-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  install-pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out bootstrap commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Verify expected bootstrap base
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_parent='9e89752123e80d3f209b1a953992460880f1ef76'
+          actual_parent="$(git rev-parse HEAD^)"
+          test "$actual_parent" = "$expected_parent"
+          test "$(git branch --show-current)" = "main"
+
+      - name: Verify archive checksum and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha='5b43724389656fc75f144f77b541446eea9132f9d702307f1884d815c4aba0a3'
+          printf '%s  %s\n' "$expected_sha" opening-trainer-codex-pack.zip | sha256sum --check --strict
+          extract_dir="$RUNNER_TEMP/opening-trainer-pack"
+          rm -rf "$extract_dir"
+          mkdir -p "$extract_dir"
+          unzip -q opening-trainer-codex-pack.zip -d "$extract_dir"
+          pack_root="$extract_dir/opening-trainer-codex-pack"
+          test -d "$pack_root"
+          cd "$pack_root"
+          node scripts/verify-pack.mjs
+          file_count="$(find . -type f | wc -l | tr -d ' ')"
+          test "$file_count" = '30'
+
+      - name: Install exact pack-only tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          pack_root="$RUNNER_TEMP/opening-trainer-pack/opening-trainer-codex-pack"
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a "$pack_root"/. .
+          node scripts/verify-pack.mjs
+          file_count="$(find . -path './.git' -prune -o -type f -print | wc -l | tr -d ' ')"
+          test "$file_count" = '30'
+          test ! -e opening-trainer-codex-pack.zip
+          test ! -e .github/workflows/bootstrap-verified-pack.yml
+
+      - name: Commit verified pack baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'No pack changes to commit'; exit 1; }
+          git commit -m 'Install verified Opening Trainer Codex pack'
+          git push origin HEAD:main
