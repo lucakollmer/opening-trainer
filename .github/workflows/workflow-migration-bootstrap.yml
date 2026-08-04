@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: phase-0-foundation
-          fetch-depth: 5
+          fetch-depth: 0
           persist-credentials: true
 
       - name: Set up Node 24
@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          expected_bootstrap_parent='0ae85076491306f40b85321c5c1f0306c1e1c0cf'
+          expected_bootstrap_parent='946da777b24a0537ea5b3cae47db7301a0cf081e'
           baseline='5477419fce1f13f4265ab82d6ee3058d851b5019'
           expected_overlay_sha='28f7e548c03a2f5126a736e81b94d05f7337ecaee19a96e610d2af3cfdcf63ad'
           expected_part_00_sha='a0c059e386b1169207f06f993bb6b1164ccc1e0deb1f2e6966a29c2000d4aedd'
@@ -190,6 +190,7 @@ jobs:
           pnpm validate
           git diff --check "$baseline" --
 
+          git add -A
           expected_paths="$(mktemp)"
           actual_paths="$(mktemp)"
           cat > "$expected_paths" <<'EXPECTED_PATHS'
@@ -229,7 +230,6 @@ jobs:
           diff -u "$expected_paths" "$actual_paths"
           test "$(wc -l < "$actual_paths" | tr -d ' ')" = '30'
 
-          git add -A
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'Migrate workflow authority to ChatGPT and Actions'
