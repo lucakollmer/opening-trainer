@@ -1,9 +1,9 @@
 name: Apply workflow migration
 
 on:
-  push:
+  pull_request:
     branches:
-      - phase-0-foundation
+      - main
     paths:
       - .github/workflows/workflow-migration-bootstrap.yml
       - .github/bootstrap/migration-overlay.part-00
@@ -23,14 +23,17 @@ concurrency:
 
 jobs:
   migrate:
-    if: github.repository == 'lucakollmer/opening-trainer' && github.ref == 'refs/heads/phase-0-foundation'
+    if: github.repository == 'lucakollmer/opening-trainer' && github.event.pull_request.head.ref == 'phase-0-foundation'
     runs-on: ubuntu-latest
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
     timeout-minutes: 20
     steps:
-      - name: Check out exact bootstrap commit
+      - name: Check out exact trigger commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          ref: phase-0-foundation
+          fetch-depth: 3
           persist-credentials: true
 
       - name: Set up Node 24
@@ -44,7 +47,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          expected_parent='5477419fce1f13f4265ab82d6ee3058d851b5019'
+          expected_bootstrap_parent='8600e1fa5c74c52e3a899c478850a29251068f37'
+          baseline='5477419fce1f13f4265ab82d6ee3058d851b5019'
           expected_overlay_sha='28f7e548c03a2f5126a736e81b94d05f7337ecaee19a96e610d2af3cfdcf63ad'
           expected_part_00_sha='a0c059e386b1169207f06f993bb6b1164ccc1e0deb1f2e6966a29c2000d4aedd'
           expected_part_01_sha='cadfd62f110497f879fd0876b89664c21e5bac2608c007325d48b0cc27c7bdc5'
@@ -56,9 +60,9 @@ jobs:
           archive='/tmp/opening-trainer-migration-overlay.tar.xz'
 
           test "$GITHUB_REPOSITORY" = 'lucakollmer/opening-trainer'
-          test "$GITHUB_REF_NAME" = 'phase-0-foundation'
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git rev-parse HEAD^)" = "$expected_parent"
+          test "$GITHUB_HEAD_REF" = 'phase-0-foundation'
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git rev-parse HEAD^)" = "$expected_bootstrap_parent"
           test "$(sha256sum .github/bootstrap/migration-overlay.part-00 | cut -d' ' -f1)" = "$expected_part_00_sha"
           test "$(sha256sum .github/bootstrap/migration-overlay.part-01 | cut -d' ' -f1)" = "$expected_part_01_sha"
           test "$(sha256sum .github/bootstrap/migration-overlay.part-02 | cut -d' ' -f1)" = "$expected_part_02_sha"
@@ -179,7 +183,7 @@ jobs:
           npm install --global "$package_manager"
           pnpm install --frozen-lockfile
           pnpm validate
-          git diff --check "$expected_parent" --
+          git diff --check "$baseline" --
 
           expected_paths="$(mktemp)"
           actual_paths="$(mktemp)"
@@ -216,7 +220,7 @@ jobs:
           scripts/verify-pack.mjs
           EXPECTED_PATHS
           sort -o "$expected_paths" "$expected_paths"
-          git diff --name-only "$expected_parent" -- | sort > "$actual_paths"
+          git diff --name-only "$baseline" -- | sort > "$actual_paths"
           diff -u "$expected_paths" "$actual_paths"
           test "$(wc -l < "$actual_paths" | tr -d ' ')" = '30'
 
@@ -231,8 +235,8 @@ jobs:
           {
             echo '## Opening Trainer workflow migration'
             echo
-            echo "- bootstrap SHA: $GITHUB_SHA"
-            echo "- expected parent: $expected_parent"
+            echo "- trigger SHA: $EXPECTED_HEAD"
+            echo "- PHASE-0 baseline: $baseline"
             echo "- validated final SHA: $final_sha"
             echo "- validated final tree: $final_tree"
             echo '- changed files: 30'
