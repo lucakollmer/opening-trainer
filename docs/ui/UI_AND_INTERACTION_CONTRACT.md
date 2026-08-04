@@ -163,4 +163,4 @@ Luca verifies:
 - focus and keyboard feel;
 - installed/offline experience in real browsers.
 
-Codex supplies exact actions, expected visible results, expected persisted results and failure evidence for each item.
+The ChatGPT/Actions structured report supplies exact actions, expected visible results, expected persisted results and failure evidence for each item. Automated screenshots are evidence only; Luca owns acceptance.

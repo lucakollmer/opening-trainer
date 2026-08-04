@@ -239,4 +239,4 @@ A destructive replacement import requires explicit confirmation and a verified b
 
 ## 15. Acceptance boundary
 
-Codex can establish technical completeness and provide a manual checklist. Luca accepts visual density, touch feel, tree masking, feedback clarity and overall training rhythm.
+ChatGPT authors bounded changes and GitHub Actions establishes technical evidence for the exact candidate tree. Luca accepts visual density, touch feel, tree masking, feedback clarity and overall training rhythm. Technical success never implies visible acceptance, merge or continuation.

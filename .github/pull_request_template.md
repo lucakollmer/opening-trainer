@@ -1,36 +1,47 @@
-## Phase
+## Operation
 
-- Phase:
+- Project: `PRJ-CHESS-OPENING-TRAINER`
+- Phase or migration:
 - Base SHA:
+- Branch:
 - Head SHA:
-- Prompt ID:
+- Status: `IN_PROGRESS | COMPLETE_FOR_MANUAL_REVIEW | BLOCKED | INCOMPLETE`
 
 ## Scope
 
-Describe the bounded phase work and explicit non-scope.
+State the exact accepted phase or governance operation and its explicit non-scope.
 
-## Validation
+## Changed files
 
-List exact local commands and observed results. GitHub Actions is not the acceptance source for this programme.
+State `changed_file_count` and list every changed repository-relative path exactly once, grouped by responsibility.
 
-## Data/schema effects
+## Dependencies, licences and data
 
-State database, migration, backup, import/export, service-worker or no-data effects.
+Record exact dependency/licence changes and all database, migration, import/export, service-worker or user-data effects. Write `none` explicitly where applicable.
 
-## Manual acceptance
+## GitHub Actions evidence
 
-- Local automated validation: pass / fail
-- Manual UI/interaction validation by Luca: pending / pass / fail
-- Link or paste the numbered manual checklist.
+For each required run, state workflow, run ID, tested SHA, commands/checks, conclusion, failed step/error tail where applicable, and artifact IDs/digests/expiry.
 
-## Reuse and duplication
+## Preview and responsive evidence
 
-State reused/composed/extended/created UI and the duplication audit.
+State production-preview smoke and desktop/tablet/phone evidence. Automated screenshots are technical evidence, not Luca's acceptance.
 
-## Rollback
+## Reuse and duplication audit
 
-Give the safe rollback and user-data preservation path.
+State reused MUI/project primitives, justified additions, and duplicate-state/component/listener/theme audits.
 
-## Acceptance gate
+## Manual checklist for Luca
 
-This draft PR must not be merged and the next phase must not begin until Luca explicitly accepts the phase.
+For each item include:
+
+1. action;
+2. expected visible result;
+3. expected domain/persistence result;
+4. failure evidence to return.
+
+## Risks, deferred work and rollback
+
+Include exact rollback and confirm that continuation requires Luca's explicit acceptance.
+
+Do not auto-merge and do not begin the next phase.

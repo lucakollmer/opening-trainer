@@ -1,39 +1,50 @@
-# AGENTS.md — Opening Trainer repository rules
+# AGENTS.md - Opening Trainer repository operating rules
 
 ## 0. Purpose
 
 This repository builds **Opening Trainer**, a lightweight offline-first chess-opening learning application. The accepted product combines a responsive chessboard, a visible repertoire tree, complete-line replay from the initial position, and spaced repetition at individual contextual decision points.
 
-The first implementation is a browser-first progressive web application. Desktop and mobile browsers are first-class targets. Native wrappers are deferred until the PWA is accepted.
+The implementation is a browser-first progressive web application. Desktop and mobile browsers are first-class targets. Native wrappers remain deferred until the PWA is accepted.
 
-Before changing the repository, Codex must read these files in order:
+This repository uses the accepted **ChatGPT + GitHub Actions coding workflow**. ChatGPT authors bounded repository changes through the connected GitHub application. GitHub Actions executes and validates the exact candidate tree, publishes structured evidence, and provides preview/screenshot artifacts. Luca retains phase acceptance, merge, and continuation authority.
+
+## 1. Mandatory authority read order
+
+Before any repository mutation, the active ChatGPT project chat must read the Google Drive project entrypoint and follow its current read sequence. Google Drive Assistant Memory remains the durable source of truth.
+
+Then read the repository execution copy in this order:
 
 ```text
 AGENTS.md
 context.md
 plans.md
-CODEX_START_HERE.md
-CODEX_PROMPT_PROFILE.md
+CHATGPT_START_HERE.md
+CHATGPT_WORKFLOW_PROFILE.md
+docs/workflow/CHATGPT_GITHUB_ACTIONS_CODING.md
 docs/product/PRODUCT_CONTRACT.md
 docs/architecture/ARCHITECTURE.md
 ```
 
-For a named phase, also read every focused document listed in that phase's `Required reading` section and no unrelated archive by default.
+For a named phase, also read every focused document listed in that phase's `Required reading` section. Do not search unrelated Drive folders or repository archives by default.
 
-## 1. Authority and conflicts
+If Google Drive is unavailable, do not infer project state from chat history alone. Stop before mutation, report the limitation, and return a bounded memory patch.
+
+## 2. Authority and conflict handling
 
 Use this precedence order:
 
-1. Luca's current explicit instruction in the active Codex chat.
-2. `AGENTS.md`.
-3. `context.md`.
-4. Accepted focused contracts under `docs/`.
-5. `plans.md`.
-6. Current implementation and comments.
+1. Applicable platform safety requirements.
+2. Luca's current explicit instruction in the active chat.
+3. Current authoritative Google Drive project records and accepted decisions.
+4. `AGENTS.md`.
+5. `context.md`.
+6. Accepted focused contracts under `docs/`.
+7. `plans.md`.
+8. Current implementation and comments.
 
-Google Drive Assistant Memory is the durable project source of truth. These repository files are the execution copy. Codex is not required to access Drive. When Luca supplies a newer pack or an explicit correction, install it through a bounded documentation change. When repository authority conflicts with a newer accepted record supplied by Luca, stop before mutation and report the conflict rather than inventing a compromise.
+Repository documents are the execution copy, not a replacement for Drive memory. If repository authority conflicts with a newer accepted Drive record, stop before mutation and report the exact conflict. Do not invent a compromise or silently update product decisions.
 
-## 2. Accepted product baseline
+## 3. Accepted product baseline
 
 The following are accepted unless Luca explicitly supersedes them:
 
@@ -42,7 +53,7 @@ The following are accepted unless Luca explicitly supersedes them:
 - Move recall is primary. Opening-name recall is a separate secondary learning stream.
 - The visible repertoire is a branching tree. Internal storage may use a transposition-aware graph.
 - The main surface is board-dominant, with a repertoire-tree panel and a context-sensitive task/feedback panel.
-- In training mode, already-played moves remain visible while future answer-bearing move labels are masked.
+- In Train mode, already-played moves remain visible while future answer-bearing move labels are masked.
 - Any move accepted by the active repertoire context is valid. The route replans from the resulting position.
 - Illegal moves, legal moves outside the active repertoire, and moves belonging to a wrong sibling variation are distinct outcomes.
 - Each exercise has one or more targeted decision items. Other decisions traversed during a complete-line replay provide incidental evidence.
@@ -51,7 +62,7 @@ The following are accepted unless Luca explicitly supersedes them:
 - Repeated sibling-variation confusion may generate contrast drills.
 - The MVP is local-first and preserves data through documented JSON export/import. PGN is a repertoire interchange format, not the complete backup format.
 
-## 3. Accepted implementation direction
+## 4. Accepted implementation direction
 
 Use a single TypeScript web application rather than separate native codebases.
 
@@ -75,7 +86,7 @@ native_packaging: deferred; consider Capacitor only after PWA acceptance
 
 Do not add Redux, React Query, a router, a backend, authentication, cloud sync, Electron, Tauri, Capacitor, an engine, a social system, a marketplace, or coach administration unless a named accepted phase explicitly authorises it.
 
-## 4. Architecture boundaries
+## 5. Architecture boundaries
 
 Keep domain behaviour independent from React and browser widgets.
 
@@ -112,20 +123,20 @@ src/test/
 
 Rules:
 
-- React components render state and emit typed commands. They do not own repertoire mutation, transposition identity, scheduling calculations, import transactions or database normalisation.
+- React components render state and emit typed commands. They do not own repertoire mutation, transposition identity, scheduling calculations, import transactions, or database normalisation.
 - `react-chessboard` is a presentation/input adapter. `chess.js` is authoritative for legal move state and notation, not repertoire correctness.
 - Domain services expose deterministic pure functions wherever practical.
 - Dexie repositories own persistence transactions. UI code must not issue scattered table writes.
-- `ts-fsrs` is accessed only through a project-owned scheduling port. Domain code must retain raw chess evidence so scheduler mapping can change without losing history.
+- `ts-fsrs` is accessed only through a project-owned scheduling port. Domain code retains raw chess evidence so scheduler mapping can change without losing history.
 - Machine move identity uses UCI-compatible coordinates. SAN is derived for display and PGN.
-- A position identity excludes halfmove/fullmove clocks. It includes board placement, side to move, castling rights and an en-passant target only when an en-passant capture is legally available.
-- Transposed positions may share a graph node. Training memory is shared only when repertoire context, prompt mode and accepted move set are pedagogically equivalent.
+- A position identity excludes halfmove/fullmove clocks. It includes board placement, side to move, castling rights, and an en-passant target only when an en-passant capture is legally available.
+- Transposed positions may share a graph node. Training memory is shared only when repertoire context, prompt mode, and accepted move set are pedagogically equivalent.
 
-## 5. UI implementation rules
+## 6. UI implementation rules
 
 Material UI is the default source of ordinary controls and layout primitives.
 
-Use MUI components for buttons, forms, dialogs, drawers, menus, toolbars, cards, alerts, progress, switches, chips and ordinary feedback whenever an equivalent exists. Use MUI X Tree View Community for the repertoire tree. Do not use Pro or Premium features.
+Use MUI components for buttons, forms, dialogs, drawers, menus, toolbars, cards, alerts, progress, switches, chips, and ordinary feedback whenever an equivalent exists. Use MUI X Tree View Community for the repertoire tree. Do not use Pro or Premium features.
 
 Custom UI code is allowed for:
 
@@ -134,41 +145,41 @@ Custom UI code is allowed for:
 - repertoire-tree item labels and masking semantics;
 - chess-specific status markers;
 - task-panel state composition;
-- accessibility glue that the selected libraries do not provide.
+- accessibility glue that selected libraries do not provide.
 
-Do not create a bespoke design system, dashboard, onboarding sequence, animation framework, custom button family, custom modal framework or feature-specific duplicate of an existing MUI pattern.
+Do not create a bespoke design system, dashboard, onboarding sequence, animation framework, custom button family, custom modal framework, or feature-specific duplicate of an existing MUI pattern.
 
-Every UI phase must include a section in its completion report titled:
+Every UI phase report must include:
 
 ```text
 ## Reusable UI/UX implementation
 ## Reuse and duplication audit
 ```
 
-The report must identify what was reused, composed, extended or created; why any new primitive was necessary; and what component and host-surface tests prove the decision.
+The report identifies what was reused, composed, extended, or created; why any new primitive was necessary; and which focused and host-surface tests prove the decision.
 
-## 6. Responsive and accessibility rules
+## 7. Responsive and accessibility rules
 
 Required layout behaviour:
 
 - Desktop: persistent or readily collapsible repertoire panel, dominant board, task panel alongside the board.
 - Tablet: board remains dominant; one secondary panel may collapse or move below.
-- Phone: board first, task panel immediately below, repertoire tree in a temporary/swipeable drawer or bottom sheet.
+- Phone: board first, task panel immediately below, repertoire tree in a temporary drawer or bottom sheet.
 - The user must never need horizontal page scrolling for the core training flow.
-- Board interaction must support mouse, keyboard-accessible alternatives where feasible, and touch.
+- Board interaction must support mouse, touch, and keyboard-accessible alternatives where feasible.
 - Essential commands require accessible names and visible focus.
-- Masked future moves must not leak answers through accessible labels, tooltips, DOM text or test IDs.
+- Masked future moves must not leak answers through accessible labels, tooltips, DOM text, or test IDs.
 - Colour must not be the sole carrier of learning state or error meaning.
 - Respect reduced-motion preferences. Animation is not required for acceptance.
 
-Luca owns genuine visual and interaction acceptance. Codex may run component/integration/browser-functional tests but must not claim visual acceptance without Luca's report.
+GitHub Actions may capture deterministic screenshots and run browser-functional assertions. Neither ChatGPT nor Actions may claim visual or interaction acceptance. Luca owns that decision.
 
-## 7. Programme and phase discipline
+## 8. Phase discipline
 
 - Implement exactly one named phase from `plans.md` per branch and draft pull request.
 - A short instruction such as `continue with phase 5` authorises **PHASE-5 only**, subject to its entry gate.
 - Do not begin a later phase merely because an earlier phase is technically complete.
-- Each phase starts from an updated clean `main` containing every explicitly accepted and merged predecessor.
+- Each phase starts from updated `main` containing every explicitly accepted and merged predecessor.
 - Review corrections stay on the same branch and pull request.
 - Do not create stacked or side correction PRs unless Luca explicitly requests them.
 - Do not merge any PR unless Luca explicitly instructs the merge in the current chat.
@@ -177,48 +188,91 @@ Luca owns genuine visual and interaction acceptance. Codex may run component/int
 
 Phrase mapping:
 
-- `start`, `begin`, or `start development` means execute **PHASE-0 only**.
+- `set up the project` means inspect Drive and repository state, then perform only the exact current setup or migration action recorded in `context.md`.
+- `start`, `begin`, or `start development` means execute the exact first unaccepted phase only when `context.md` and Drive agree that its entry gate is open.
 - `continue with phase N`, `start phase N`, or `implement phase N` means execute exactly `PHASE-N`.
-- `continue` without a phase number means inspect `context.md`; execute its exact authorised `next_phase` only when the predecessor acceptance/merge gate is explicit and unambiguous. Otherwise stop and name the missing authority.
+- `continue` without a phase number means inspect Drive and `context.md`; execute only the explicit authorised next action when unambiguous. Otherwise stop and name the missing authority.
+- `review phase N` is read-only unless Luca separately asks for a correction.
+- `accept phase N` requires an explicit statement that Luca completed the manual checklist and accepts the current exact head.
 
-## 8. Git and pull-request policy
+## 9. ChatGPT + GitHub Actions execution model
 
-Normal Git and GitHub operations are expected:
+### 9.1 Repository writes
 
-- inspect repository status, refs, history and current PR metadata;
-- fetch and prune;
-- create the phase branch from the verified integration base;
-- commit intentional changes;
-- push the branch;
+Use the connected GitHub application for repository, branch, file, pull-request, and review operations. Resolve the exact repository, branch, base SHA, and current PR before mutation.
+
+For ordinary bounded changes, ChatGPT writes complete files directly to the current phase branch. Prefer a small number of intentional commits. Do not create a commit per paragraph or per file when one bounded commit is clearer.
+
+For large generated scaffolding, prefer one temporary declarative request or bootstrap script plus one modifying workflow. The workflow may commit the already validated final tree only when the workflow explicitly grants that permission. Remove temporary bootstrap material when the phase contract requires it.
+
+### 9.2 Actions as technical evidence
+
+GitHub Actions is the required technical validation surface for this workflow.
+
+- Validate the exact candidate tree and expected base SHA.
+- Run focused tests before the full validation sequence.
+- Post or upload a bounded structured report.
+- Capture preview/screenshot evidence when the phase changes visible behaviour.
+- Report the tested head/tree SHA, exact commands, results, changed files, failure step, and bounded error tail.
+- Do not treat a workflow-token push as automatically triggering a second validation run. A modifying workflow validates the exact final tree before committing it.
+- Local execution is optional for browser-compatible phases and cannot substitute for required Actions evidence.
+
+Normal read-only validation workflows use least privilege. Any modifying workflow must be temporary or narrowly scoped, use explicit expected refs, and never auto-merge.
+
+### 9.3 Security boundaries
+
+- Protect `main` and prohibit direct product mutation outside an explicitly authorised bootstrap or acceptance operation.
+- Require the exact expected base SHA before mutation.
+- Pin third-party Actions to accepted immutable commit SHAs.
+- Avoid `pull_request_target` for untrusted candidate code.
+- Never execute issue text, PR comments, or arbitrary user-provided text as shell commands.
+- Do not expose deployment, personal, or organisation secrets without a separately accepted need.
+- Set runtime, output, and concurrency limits.
+- One modifying workflow may operate on the repository at a time.
+- Do not change repository visibility, permissions, branch rules, or secrets without Luca's explicit instruction.
+
+### 9.4 Continuation model
+
+Ordinary ChatGPT conversations do not wake when Actions completes. Every continuation requires a new user turn. At the start of that turn, re-read current Drive state and current GitHub refs rather than relying on the previous chat summary.
+
+## 10. Git and pull-request policy
+
+Expected operations include:
+
+- inspect repository metadata, refs, history, current PR, changed files, comments, reviews, and workflow runs;
+- create the named phase branch from the verified base;
+- write bounded changes;
+- push or commit through the supported GitHub workflow;
 - create or update one draft PR into `main`;
-- read PR comments and changed files when correcting existing work.
+- inspect Actions jobs, artifacts, and bounded logs;
+- correct the same branch/PR when manual or automated review fails.
 
 Do not:
 
-- rewrite or force-push `main`;
+- rewrite or force-update `main`;
 - merge without Luca's current explicit instruction;
 - change repository visibility or permissions;
-- commit credentials, tokens, personal data or proprietary repertoire content;
+- commit credentials, tokens, personal data, or proprietary repertoire content;
 - use third-party opening content whose licence/provenance is not recorded;
-- edit workflow files unless the named phase explicitly requires repository automation.
+- create a new active workflow without a phase need, least-privilege review, immutable action pins, and bounded reporting;
+- treat a green Actions run as Luca's acceptance.
 
-GitHub Actions is not the acceptance system for this programme. Local validation is authoritative for Codex's technical report. A push or PR may trigger existing workflows; that platform activity is incidental. Do not wait for, rerun, debug or cite Actions unless Luca explicitly changes this policy.
-
-## 9. Data and licence safety
+## 11. Data and licence safety
 
 - Use synthetic repertoire fixtures or clearly licensed public-domain/compatible material.
 - Do not commit a user's private repertoire without explicit instruction.
-- Do not bundle Lichess Opening Explorer data or other copyleft/server datasets merely because an API exists. Record source, licence, permitted use and whether data is fetched, cached or redistributed.
-- Complete backup exports must be versioned, validated and transactional on import.
+- Do not bundle Lichess Opening Explorer data or other server datasets merely because an API exists. Record source, licence, permitted use, and whether data is fetched, cached, or redistributed.
+- Complete backup exports must be versioned, validated, and transactional on import.
 - A failed import must not partially mutate the active database.
 - Tests use isolated in-memory/fake IndexedDB or a clean temporary browser profile.
 - Never rely on an old service worker or pre-existing IndexedDB state to prove first launch.
+- Workflow artifacts must not contain secrets, private repertoire, or unnecessary user data.
 
-## 10. Local validation policy
+## 12. Validation policy
 
-Use focused tests first, then the full applicable sequence defined by the repository. After PHASE-0 the intended baseline commands are:
+After PHASE-0, the intended common commands are:
 
-```powershell
+```text
 pnpm lint
 pnpm typecheck
 pnpm test
@@ -229,11 +283,11 @@ pnpm exec prettier --check .
 git diff --check
 ```
 
-Browser functional tests are introduced only in the phase that establishes them. Do not add or require a command before the responsible phase exists.
+GitHub Actions executes the applicable sequence against the exact candidate tree. Browser-functional tests are introduced only in the phase that establishes them. Do not require a command before the responsible phase exists.
 
 Validation must explicitly distinguish relevant initial states, including as applicable:
 
-- first load with no service worker cache and no IndexedDB database;
+- first load with no service-worker cache and no IndexedDB database;
 - reload with valid current data;
 - invalid or future backup rejection without mutation;
 - interrupted/failed import rollback;
@@ -244,25 +298,25 @@ Validation must explicitly distinguish relevant initial states, including as app
 
 A pre-seeded database test does not prove first-run behaviour. A cached build does not prove install/offline behaviour.
 
-## 11. Continuous execution and genuine blockers
+## 13. Completion and genuine blockers
 
-For an implementation phase, Codex continues through:
+For an implementation phase, continue through:
 
-1. entry-gate verification;
+1. Drive and repository entry-gate verification;
 2. repository inspection and reuse inventory;
 3. bounded implementation;
 4. focused tests;
 5. repair of in-scope failures;
-6. full local validation;
+6. full GitHub Actions validation of the candidate tree;
 7. applicable launch/state scenarios;
-8. final scope and duplication audit;
-9. intentional commit;
-10. push and draft PR;
-11. self-contained completion report and Luca manual checklist.
+8. preview and responsive screenshot evidence when required;
+9. final scope and duplication audit;
+10. intentional commit/push and one draft PR;
+11. self-contained structured completion report and Luca manual checklist.
 
-Planning, partial coding, one passing test, commit, push or draft PR are intermediate states.
+Planning, partial coding, one passing test, a commit, a push, or a draft PR are intermediate states.
 
-A genuine blocker is an external condition Codex cannot safely resolve within scope, such as missing authority, unavailable repository access, a dirty tree containing unknown work, an inaccessible required base/ref, unresolved destructive-data risk, an unaccepted product decision, or a required credential that must not be invented.
+A genuine blocker is an external condition that cannot be safely resolved within scope, such as missing authority, unavailable Drive or GitHub access, an unexpected branch/head change, an inaccessible required base/ref, unresolved destructive-data risk, an unaccepted product decision, or a required credential that must not be invented.
 
 Allowed final statuses:
 
@@ -272,24 +326,27 @@ BLOCKED
 INCOMPLETE
 ```
 
-## 12. Completion report contract
+## 14. Structured report contract
 
-Return a self-contained report. Do not make Luca open the PR body to understand the result.
+Follow `docs/workflow/STRUCTURED_REPORT_TEMPLATE.md`.
 
-Required content:
+Every modifying run reports:
 
 - final status;
-- phase, verified base SHA, branch, final head SHA and draft PR URL/number;
-- predecessor acceptance and merge timing;
-- exact `changed_file_count` and every changed repository path exactly once, grouped by responsibility;
-- implementation summary tied to acceptance criteria;
-- data/schema/import/export effects;
-- exact validation commands and observed results;
-- relevant launch/state scenarios tested and omitted;
-- local automated validation status;
-- manual UI/interaction acceptance status as `pending`, `pass` or `fail`;
-- risks and deferred work;
-- manual checklist where every item states action, expected visible result, expected data/persistence result and failure evidence to return.
+- project and phase;
+- repository, verified base SHA, branch, tested head/tree SHA, and draft PR;
+- predecessor acceptance and merge evidence;
+- exact changed-file count and every changed path exactly once;
+- dependencies and licences changed;
+- exact commands and observed exit results;
+- failed step and bounded error tail when applicable;
+- build, test, audit, preview, and screenshot status;
+- data/schema/import/export/service-worker effects;
+- tested and omitted state scenarios;
+- risks, deviations, deferred work, and rollback;
+- manual UI/interaction status as `pending`, `pass`, or `fail`;
+- exact next action;
+- statement that continuation requires Luca's explicit acceptance.
 
 Required headings:
 
@@ -303,30 +360,45 @@ Required headings:
 ## Exact next action
 ```
 
-Use repository-relative paths in backticks. Do not create local-path hyperlinks. End the intended report with:
+Use repository-relative paths. End the intended report with:
 
 ```text
 END_OF_COMPLETION_REPORT
 ```
 
-Anything after that sentinel is provider residue and is not part of the intended report.
-
-## 13. Stop conditions
+## 15. Stop conditions
 
 Stop before mutation and report when:
 
-- the working tree contains unexpected changes;
+- Drive authority was not read or is unavailable;
+- the current branch or expected base/head does not match the verified remote state;
+- an existing draft PR contains unexpected work;
 - the expected predecessor phase is not explicitly accepted and merged;
-- `main` or the selected phase base does not match the fetched remote state;
 - the named phase does not exist in `plans.md`;
-- the work requires an excluded engine, backend, cloud account, paid MUI feature or native wrapper;
+- the work requires an excluded engine, backend, cloud account, paid MUI feature, or native wrapper;
 - the work requires unlicensed/proprietary opening data;
 - a destructive persistence operation cannot be proven isolated;
-- a current user instruction materially conflicts with the accepted pack;
-- a visual result would be required to make a claim Codex cannot verify.
+- a current instruction materially conflicts with accepted authority;
+- a visual result would be required to make a claim that only Luca can accept;
+- a modifying Actions workflow is already running or its final tree cannot be identified exactly.
 
-## 14. Exact start behaviour
+## 16. Current repository checkpoint
 
-When Luca says only `start` after the pack is committed, begin `PHASE-0 — Repository and application foundation` only.
+The mutable facts below must be reverified before use:
 
-Do not begin PHASE-1 until PHASE-0 is technically complete, Luca has accepted the manual gate, and Luca has explicitly authorised the next phase or merged the accepted PR and said `continue with phase 1`.
+```yaml
+repository: lucakollmer/opening-trainer
+visibility_observed: public
+integration_branch: main
+pack_only_base_sha: 87ccbce18384892601a6630494910e1ca0375f13
+current_phase: PHASE-0
+phase_branch: phase-0-foundation
+draft_pr: 2
+pre_migration_head_sha: 5477419fce1f13f4265ab82d6ee3058d851b5019
+phase_0_state: COMPLETE_FOR_MANUAL_REVIEW
+permanent_validation_run: 30906801969
+permanent_validation_conclusion: success
+manual_acceptance: pending
+```
+
+The first action for this workflow-pack revision is a governance migration on the existing `phase-0-foundation` branch and PR #2, not a new scaffold and not PHASE-1. Follow `WORKFLOW_MIGRATION.md`.

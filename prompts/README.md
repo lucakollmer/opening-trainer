@@ -1,7 +1,18 @@
-# Issued Codex prompts
+# Issued ChatGPT + GitHub Actions work requests
 
-Each substantial Codex instruction is one immutable Markdown file with one active instruction, required front matter and `END_OF_CODEX_PROMPT` as its final content line.
+Each substantial implementation, correction, governance migration, acceptance or merge request may be archived as one immutable Markdown file.
 
-The pack includes the initial PHASE-0 implementation prompt. Later prompts may be generated from the accepted repository state, but the short commands in `docs/codex/PHASE_COMMANDS.md` are sufficient once `AGENTS.md` and `plans.md` are installed.
+Required properties:
 
-Corrections and continuations receive new IDs and link to the parent prompt. Do not edit an issued prompt in place.
+- one bounded operation;
+- project/repository/phase identity;
+- current expected refs, treated as facts to reverify;
+- mandatory Drive and repository authority;
+- scope and non-scope;
+- GitHub Actions validation/evidence contract;
+- manual acceptance owner and stop condition;
+- final content line `END_OF_WORK_REQUEST`.
+
+Do not edit an issued request in place. A correction or continuation receives a new ID and names its predecessor.
+
+The initial request in this pack migrates the existing PHASE-0 branch and PR from the historical Codex/local-validation authority to the accepted ChatGPT + GitHub Actions workflow. It does not reimplement PHASE-0.

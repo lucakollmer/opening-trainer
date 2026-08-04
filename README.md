@@ -1,46 +1,66 @@
-# Opening Trainer Codex agentic pack
+# Opening Trainer ChatGPT + GitHub Actions workflow pack
 
-This pack is the repository-grounded execution contract for `PRJ-CHESS-OPENING-TRAINER`.
+This is a **workflow migration overlay** for `lucakollmer/opening-trainer`. It replaces the historical local-Codex operating layer with the accepted ChatGPT-browser + GitHub Actions trial workflow while preserving the existing PHASE-0 application candidate.
 
-It contains:
+It is not a fresh repository scaffold and must not be copied over the repository indiscriminately.
 
-- `AGENTS.md` — repository-wide authority, safety, architecture, validation and reporting rules;
-- `context.md` — accepted product and execution state;
-- `plans.md` — the complete phase programme;
-- `CODEX_START_HERE.md` — short-command routing and the first instruction;
-- `CODEX_PROMPT_PROFILE.md` — project adaptation of the Codex prompt framework;
-- focused product, architecture, domain, training, UI, storage, testing, dependency and fixture contracts under `docs/`;
-- one executable PHASE-0 prompt under `prompts/`;
-- `START_DEVELOPMENT.md` — precise human setup instructions;
-- `PACK_MANIFEST.md`, `SHA256SUMS.txt` and `scripts/verify-pack.mjs` — integrity verification.
+## Current checkpoint
 
-The pack does not contain application implementation. Commit it to a new private repository, verify it, then start Codex with PHASE-0.
+At pack creation, the verified checkpoint was:
 
-## Phase programme
-
-```text
-PHASE-0  Repository and application foundation
-PHASE-1  Responsive board/tree/task training shell
-PHASE-2  Deterministic training vertical slice
-PHASE-3  Repertoire graph, transpositions, playlists and PGN import
-PHASE-4  Offline persistence, recovery and portability
-PHASE-5  FSRS adapter and adaptive session generator
-PHASE-6  Repertoire management, progress and name recall
-PHASE-7  PWA, mobile, accessibility and operational hardening
-PHASE-8  Release candidate, deployment and packaging decision
+```yaml
+repository: lucakollmer/opening-trainer
+visibility: public
+base_branch: main
+base_sha: 87ccbce18384892601a6630494910e1ca0375f13
+phase_branch: phase-0-foundation
+phase_head: 5477419fce1f13f4265ab82d6ee3058d851b5019
+pull_request: 2
+pull_request_state: open, draft, unmerged
+permanent_validation_run: 30906801969
+permanent_validation_result: success
+review_artifact_id: 8891213897
+phase_gate: COMPLETE_FOR_MANUAL_REVIEW
 ```
 
-Every phase is one branch and one draft PR. Technical completion stops at Luca's manual acceptance gate. No phase implicitly authorises the next.
+These are verification expectations, not permission to assume mutable GitHub state. The executing chat must re-read Drive and GitHub before writing.
 
-## PHASE-0 development commands
+## Start here
 
-The application foundation requires Node 24 LTS and the exact pnpm version recorded in `package.json`.
+1. Read `CHATGPT_START_HERE.md`.
+2. Read `WORKFLOW_MIGRATION.md`.
+3. Attach this ZIP to a fresh Opening Trainer project chat.
+4. Paste the exact migration request from `CHATGPT_START_HERE.md`.
+5. Apply the overlay only on the existing `phase-0-foundation` branch and PR #2 after exact-state verification.
+6. Let GitHub Actions validate the new head.
+7. Stop for Luca's PHASE-0 manual acceptance. Do not merge or begin PHASE-1.
+
+## Main files
+
+- `AGENTS.md` - durable repository operating rules.
+- `context.md` - current verified execution checkpoint.
+- `plans.md` - detailed PHASE-0 to PHASE-8 programme and gates.
+- `CHATGPT_START_HERE.md` - fresh-chat orientation and exact first request.
+- `CHATGPT_WORKFLOW_PROFILE.md` - bounded work-request contract.
+- `WORKFLOW_MIGRATION.md` - exact preserve/replace/add/delete migration map.
+- `docs/workflow/` - Actions security, evidence, phase-command, prompt and report contracts.
+- `prompts/WRK-OPENING-TRAINER-20260804-001__MVP__GOVERNANCE__migration__v1.md` - immutable first migration request.
+- `scripts/verify-pack.mjs` - overlay/repository integrity and stale-authority checks.
+
+## Current application commands
+
+After the overlay is applied, the PHASE-0 application remains a Node 24/pnpm project:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 pnpm validate
+pnpm build
 pnpm preview
 ```
 
-`pnpm validate` runs integrity verification, lint, strict type checking, deterministic tests, a production build, the PWA manifest/service-worker check and Prettier verification. The visible shell is an integration fixture, not the accepted PHASE-1 interface.
+GitHub Actions runs `pnpm validate` as the technical evidence gate. Local or Codespaces commands are for interactive review and debugging.
+
+## Critical boundary
+
+The overlay must preserve the current application implementation, package/lockfiles, tests, PHASE-0 documents and `.github/workflows/ci.yml`. It must not overwrite the repository's generated full-tree `SHA256SUMS.txt` with this transfer archive's checksum file. Follow `WORKFLOW_MIGRATION.md` exactly.

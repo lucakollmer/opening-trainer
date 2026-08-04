@@ -147,9 +147,9 @@ PHASE-7 covers:
 - standalone display launch where harness supports it;
 - unsupported install environment degrades to normal web app.
 
-## 8. Validation commands
+## 8. Validation and evidence
 
-PHASE-0 establishes scripts. Intended full command:
+PHASE-0 establishes scripts. GitHub Actions runs the exact candidate tree with the intended full command:
 
 ```powershell
 pnpm validate
@@ -157,18 +157,18 @@ pnpm validate
 
 It should call the accepted set of lint, typecheck, unit/integration tests, build and pack-specific checks. PWA/browser commands may be separate until their phases introduce them.
 
-Always also run:
+The validation script includes or is supplemented by:
 
 ```powershell
 pnpm exec prettier --check .
 git diff --check
 ```
 
-Record exact observed results, not estimated pass counts.
+Record exact observed results, workflow/run IDs and tested SHA, not estimated pass counts. Local or Codespaces runs may assist debugging but are not the programme evidence source.
 
 ## 9. Manual acceptance ownership
 
-Codex does not declare visual acceptance. It supplies a numbered checklist. Luca reports pass/fail and evidence.
+ChatGPT and GitHub Actions do not declare visual acceptance. The structured report supplies a numbered checklist. Luca reports pass/fail and evidence.
 
 Every item states:
 
@@ -185,7 +185,7 @@ A technically complete PR may remain pending manual acceptance. Do not change `c
 
 ## 11. Regression policy
 
-Every defect correction adds the smallest test that would have failed before the repair. A correction reruns the full applicable phase validation, not only the new focused test.
+Every defect correction adds the smallest test that would have failed before the repair. A correction reruns the full applicable GitHub Actions phase validation on the exact new head, not only the new focused test.
 
 ## 12. Performance bounds
 
