@@ -1,12 +1,13 @@
 name: Bootstrap verified Opening Trainer pack
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-    paths:
-      - opening-trainer-codex-pack.zip
-      - .github/workflows/bootstrap-verified-pack.yml
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 permissions:
   contents: write
@@ -17,22 +18,27 @@ concurrency:
 
 jobs:
   install-pack:
+    if: github.head_ref == 'pack-bootstrap'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out bootstrap commit
+      - name: Check out bootstrap branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Verify expected bootstrap base
         shell: bash
+        env:
+          EXPECTED_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          expected_parent='9e89752123e80d3f209b1a953992460880f1ef76'
-          actual_parent="$(git rev-parse HEAD^)"
-          test "$actual_parent" = "$expected_parent"
-          test "$(git branch --show-current)" = "main"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_BASE"
+          test "$(git merge-base HEAD origin/main)" = "$EXPECTED_BASE"
+          test "$(git branch --show-current)" = 'pack-bootstrap'
+          test -f .pack-bootstrap-request
 
       - name: Verify archive checksum and manifest
         shell: bash
@@ -62,9 +68,10 @@ jobs:
           file_count="$(find . -path './.git' -prune -o -type f -print | wc -l | tr -d ' ')"
           test "$file_count" = '30'
           test ! -e opening-trainer-codex-pack.zip
+          test ! -e .pack-bootstrap-request
           test ! -e .github/workflows/bootstrap-verified-pack.yml
 
-      - name: Commit verified pack baseline
+      - name: Commit verified pack baseline to bootstrap branch
         shell: bash
         run: |
           set -euo pipefail
@@ -74,4 +81,4 @@ jobs:
           git diff --cached --check
           git diff --cached --quiet && { echo 'No pack changes to commit'; exit 1; }
           git commit -m 'Install verified Opening Trainer Codex pack'
-          git push origin HEAD:main
+          git push origin HEAD:pack-bootstrap
