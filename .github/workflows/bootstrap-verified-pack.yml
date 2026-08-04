@@ -54,8 +54,8 @@ jobs:
           test -d "$pack_root"
           cd "$pack_root"
           node scripts/verify-pack.mjs
-          file_count="$(find . -type f | wc -l | tr -d ' ')"
-          test "$file_count" = '30'
+          total_file_count="$(find . -type f | wc -l | tr -d ' ')"
+          test "$total_file_count" = '31'
 
       - name: Install exact pack-only tree
         shell: bash
@@ -65,8 +65,8 @@ jobs:
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -a "$pack_root"/. .
           node scripts/verify-pack.mjs
-          file_count="$(find . -path './.git' -prune -o -type f -print | wc -l | tr -d ' ')"
-          test "$file_count" = '30'
+          total_file_count="$(find . -path './.git' -prune -o -type f -print | wc -l | tr -d ' ')"
+          test "$total_file_count" = '31'
           test ! -e opening-trainer-codex-pack.zip
           test ! -e .pack-bootstrap-request
           test ! -e .github/workflows/bootstrap-verified-pack.yml
