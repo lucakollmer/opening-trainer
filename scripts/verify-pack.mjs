@@ -12,7 +12,18 @@ async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    if (entry.name === '.git' || entry.name === 'node_modules') continue;
+    if (
+      [
+        '.git',
+        'node_modules',
+        'dist',
+        'coverage',
+        '.vite',
+        'playwright-report',
+        'test-results',
+      ].includes(entry.name)
+    )
+      continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) files.push(...(await walk(full)));
     else if (entry.isFile()) files.push(full);
@@ -87,10 +98,17 @@ for (const relative of expected.keys()) {
   if (!files.includes(relative)) fail(`manifest entry has no file ${relative}`);
 }
 
-for (const relative of files.filter((f) => /\.(md|txt|json|mjs|js|ts|tsx|css|html)$/.test(f) || !f.includes('.'))) {
+for (const relative of files.filter(
+  (f) => /\.(md|txt|json|mjs|js|ts|tsx|css|html)$/.test(f) || !f.includes('.'),
+)) {
   const buffer = await readFile(path.join(root, relative));
   const text = buffer.toString('utf8');
-  if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xef &&
+    buffer[1] === 0xbb &&
+    buffer[2] === 0xbf
+  ) {
     fail(`UTF-8 BOM present in ${relative}`);
   }
   if (text.includes('\r')) fail(`CR line ending present in ${relative}`);
@@ -100,15 +118,18 @@ for (const relative of files.filter((f) => /\.(md|txt|json|mjs|js|ts|tsx|css|htm
 }
 
 const agentsBytes = (await readFile(path.join(root, 'AGENTS.md'))).byteLength;
-if (agentsBytes > 32000) fail(`AGENTS.md is ${agentsBytes} bytes; keep at or below 32000`);
+if (agentsBytes > 32000)
+  fail(`AGENTS.md is ${agentsBytes} bytes; keep at or below 32000`);
 
 const promptPath = path.join(
   root,
   'prompts/PRM-OPENING-TRAINER-20260803-001__MVP__PHASE-0__implementation__v1.md',
 );
 const prompt = await readFile(promptPath, 'utf8');
-if (!prompt.endsWith('END_OF_CODEX_PROMPT\n')) fail('issued PHASE-0 prompt does not end with sentinel');
-if ((prompt.match(/END_OF_CODEX_PROMPT/g) ?? []).length !== 1) fail('issued prompt sentinel count is not one');
+if (!prompt.endsWith('END_OF_CODEX_PROMPT\n'))
+  fail('issued PHASE-0 prompt does not end with sentinel');
+if ((prompt.match(/END_OF_CODEX_PROMPT/g) ?? []).length !== 1)
+  fail('issued prompt sentinel count is not one');
 
 const plans = await readFile(path.join(root, 'plans.md'), 'utf8');
 for (let phase = 0; phase <= 8; phase += 1) {

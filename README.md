@@ -31,3 +31,16 @@ PHASE-8  Release candidate, deployment and packaging decision
 ```
 
 Every phase is one branch and one draft PR. Technical completion stops at Luca's manual acceptance gate. No phase implicitly authorises the next.
+
+## PHASE-0 development commands
+
+The application foundation requires Node 24 LTS and the exact pnpm version recorded in `package.json`.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm validate
+pnpm preview
+```
+
+`pnpm validate` runs integrity verification, lint, strict type checking, deterministic tests, a production build, the PWA manifest/service-worker check and Prettier verification. The visible shell is an integration fixture, not the accepted PHASE-1 interface.

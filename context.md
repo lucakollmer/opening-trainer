@@ -183,3 +183,9 @@ Implementation can begin with synthetic fixture data. The following remain bound
 4. Commit and push the pack as the documentation baseline.
 5. Start Codex in the repository and issue the PHASE-0 prompt in `prompts/` or the short command in `CODEX_START_HERE.md`.
 6. Do not begin PHASE-1 until Luca reviews and accepts PHASE-0 and explicitly authorises the next phase.
+
+## PHASE-0 technical state proposal — 2026-08-04
+
+This branch proposes a Node 24 LTS, pnpm, React, TypeScript and Vite foundation. Exact environment and package versions are generated in `docs/dependencies/INSTALLED_DEPENDENCIES.md`; transitive resolutions are locked in `pnpm-lock.yaml`.
+
+The application contains one MUI theme/provider, a minimal board/tree/task integration shell and focused smoke adapters for chess.js, Dexie/fake-indexeddb, ts-fsrs and vite-plugin-pwa. It deliberately contains no real repertoire, training, persistence or scheduling policy. This is a proposal pending Luca's technical and visible acceptance.
