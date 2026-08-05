@@ -32,7 +32,7 @@ export function ChessboardPreview({
   return (
     <Paper component="section" aria-labelledby="board-heading" sx={{ p: { xs: 1, sm: 2 } }}>
       <Stack spacing={1.5}>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
           <Typography id="board-heading" component="h2" variant="h6" sx={{ flexGrow: 1 }}>
             Training board
           </Typography>
@@ -53,7 +53,7 @@ export function ChessboardPreview({
           <Typography component="legend" variant="subtitle2">
             Accessible move entry
           </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
             <Button
               variant="outlined"
               disabled={interactionDisabled}
