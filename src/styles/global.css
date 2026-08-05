@@ -14,11 +14,28 @@ body,
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
-.foundation-board-frame {
-  width: min(100%, 520px);
+.training-workspace {
+  width: 100%;
+  min-width: 0;
+}
+
+.training-board-frame {
+  width: min(100%, 680px);
   margin-inline: auto;
   overflow: hidden;
   border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
