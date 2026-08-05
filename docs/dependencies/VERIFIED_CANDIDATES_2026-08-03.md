@@ -1,10 +1,9 @@
 # Candidate dependency/source verification — 2026-08-03
 
-This record supports pack authoring. PHASE-0 must re-read installed package metadata, lock exact versions and record licences before accepting the dependency baseline.
+This historical candidate record supports dependency provenance. The coding executor is not an application dependency; the accepted 2026-08-04 workflow uses ChatGPT plus GitHub Actions. PHASE-0 must re-read installed package metadata, lock exact versions and record licences before accepting the dependency baseline.
 
 | Candidate | Official source | Licence observed | Intended use |
 |---|---|---|---|
-| OpenAI Codex CLI | https://github.com/openai/codex | Apache-2.0 | Local coding agent; not an app dependency |
 | React | https://github.com/facebook/react | MIT | UI runtime |
 | Vite | https://github.com/vitejs/vite | MIT | Build/dev server |
 | Material UI | https://github.com/mui/material-ui | MIT | Standard UI components |

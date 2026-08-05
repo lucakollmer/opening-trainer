@@ -1,18 +1,22 @@
-# plans.md — Opening Trainer MVP programme
+# plans.md - Opening Trainer MVP programme
 
-## 0. Active instruction to Codex
+## 0. Active instruction to ChatGPT
 
-Read every file listed in `AGENTS.md` before changing the repository.
+Read Google Drive project authority first, then every repository file listed in `AGENTS.md` before changing GitHub.
 
-Implement only the phase explicitly named by Luca. If Luca says only `start`, execute:
+The current authorised operation is **workflow governance migration on the existing PHASE-0 branch and PR #2**. It is not a PHASE-0 scaffold rerun.
+
+Use:
 
 ```text
-PHASE-0 — Repository and application foundation
+Migrate the repository to the accepted ChatGPT + GitHub Actions workflow.
 ```
 
-A command such as `continue with phase 5` authorises PHASE-5 only, and only when PHASE-0 through PHASE-4 have been explicitly accepted and their accepted commits are present in fetched `origin/main`.
+Execute `WORKFLOW_MIGRATION.md` only after exact-state verification. Preserve the PHASE-0 application candidate and permanent validation workflow, update the same branch and draft PR, obtain Actions evidence for the exact new head, and stop at Luca's existing PHASE-0 manual acceptance gate.
 
-Do not implement more than one phase in a branch or pull request. Do not mark a phase accepted in `context.md`, merge its PR or begin the next phase without Luca's explicit instruction.
+After PHASE-0 is explicitly accepted and merged, a command such as `Continue with phase 1` authorises PHASE-1 only. `Continue with phase 5` authorises PHASE-5 only when PHASE-0 through PHASE-4 are all explicitly accepted and merged into current `main`.
+
+Do not implement more than one phase in a branch or pull request. Do not mark a phase accepted, merge, or begin the next phase without Luca's explicit instruction.
 
 ## 1. Programme outcome
 
@@ -23,7 +27,7 @@ The MVP programme delivers:
 - deterministic complete-line training from the initial position;
 - transposition-aware repertoire graph and tree projection;
 - multiple accepted moves and contextual training items;
-- PGN repertoire import with explicit variation support/warnings;
+- PGN repertoire import with explicit variation support and warnings;
 - local Dexie persistence and complete portable JSON backup/restore;
 - FSRS-based scheduling behind a chess-specific adapter;
 - guided learning, hints, repair, targeted/incidental evidence and contrast support;
@@ -33,270 +37,173 @@ The MVP programme delivers:
 
 ## 2. Programme-wide execution model
 
-### 2.1 Branch and PR model
+### 2.1 Authority and continuity
 
-- `main` is the integration branch.
-- One phase per branch and one draft PR to `main`.
-- Phase branch names are fixed below unless a verified naming conflict requires a reported alternative.
-- Review corrections remain on the same phase branch/PR.
-- No stacked phase PRs.
-- A phase begins from fetched `origin/main` after every accepted predecessor has been merged.
-- No merge without Luca's explicit instruction.
+- Google Drive Assistant Memory is the canonical project and operational record.
+- The product GitHub repository is the code, branch/PR, Actions execution and structured evidence channel.
+- Repository authority files are the execution copy and cannot silently override newer accepted Drive decisions.
+- Ordinary ChatGPT conversations do not resume when an Action completes; every continuation requires a user turn and state reread.
 
-### 2.2 Common entry gate
+### 2.2 Branch and PR model
 
-Before every phase:
+- `main` is the integration branch and is not directly mutated for phase implementation.
+- One named phase per branch and one draft PR to `main`.
+- Review corrections remain on the same phase branch and PR.
+- No stacked phase PRs unless Luca explicitly authorises an exception.
+- Each new phase starts from current `main` containing every explicitly accepted and merged predecessor.
+- No auto-merge. No merge without Luca's explicit current instruction.
+- Only one modifying workflow may operate on the repository at a time.
 
-```powershell
-git status --short --branch
-git remote -v
-git fetch --all --prune --tags
-git rev-parse origin/main
-git log -1 --oneline origin/main
+### 2.3 Common entry gate
+
+Before every write, ChatGPT verifies through Drive and GitHub:
+
+- current project status, exact authorised operation and stopping condition;
+- repository `lucakollmer/opening-trainer` unless explicitly superseded;
+- repository visibility as an observed fact, without changing it;
+- target branch, base SHA, current head SHA and draft PR;
+- predecessor acceptance and merge evidence in Drive and GitHub history;
+- no moved head, conflicting PR, pending correction or overlapping modifying workflow;
+- required workflow and action pins;
+- no unaccepted decision, credential, data or deployment dependency.
+
+Stop before mutation on mismatch. Old work-request SHAs are expectations to reverify, not authority to rewrite history.
+
+### 2.4 ChatGPT write model
+
+ChatGPT may use the connected GitHub application to create/update bounded files and refs on the authorised phase branch. Prefer coherent tree/commit operations over many unrelated single-file commits. Generated scaffolding may use a temporary modifying workflow only when the named phase explicitly authorises it and the workflow validates the exact final tree before committing.
+
+Never execute issue text, PR comments or arbitrary user content as shell commands. Do not use `pull_request_target` for candidate code. Do not invent secrets or deployment coordinates.
+
+### 2.5 Common GitHub Actions validation
+
+Focused tests run first, followed by the full repository validation sequence. PHASE-0 currently establishes:
+
+```text
+pnpm install --frozen-lockfile
+pnpm validate
 ```
 
-Verify:
+`pnpm validate` covers repository integrity, lint, strict TypeScript, deterministic tests, production build, generated PWA checks and formatting. Later phases may add browser-functional commands only when the responsible phase accepts the dependency and test harness.
 
-- repository is `lucakollmer/opening-trainer` unless Luca changed it explicitly;
-- working tree contains no unexpected changes;
-- current branch/base is known;
-- predecessor acceptance is recorded in current authority;
-- predecessor accepted commit is in `origin/main`;
-- no open correction remains for the predecessor;
-- the selected phase has not already been implemented on another branch/PR.
+Every required run must:
 
-Stop before mutation on mismatch.
+- test the exact candidate head/tree;
+- use least-privilege permissions;
+- use immutable reviewed action pins;
+- use frozen dependency installation and bounded timeouts/concurrency;
+- report workflow/run ID, tested SHA, job/step conclusions and exact command results;
+- publish bounded error tails on failure;
+- publish relevant build/preview/screenshot/report artifacts;
+- never auto-merge.
 
-### 2.3 Common validation
+Local or Codespaces execution is optional debugging evidence. GitHub Actions is the programme's technical evidence source for cloud-compatible phases.
 
-Run focused tests first. Then use the repository scripts established by PHASE-0. Intended common sequence:
+### 2.6 Preview and state-space evidence
 
-```powershell
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm exec prettier --check .
-git diff --check
-```
+Visible phases require production-build smoke and agreed desktop/tablet/phone screenshots or a separately accepted PR preview provider. Automated screenshots prove deterministic rendering, not visual quality or interaction feel. Luca owns visible acceptance.
 
-Add `pnpm test:pwa`, `pnpm test:e2e` or other scripts only after the responsible phase creates them.
+State claims name the initial state: empty database, existing data, migrated schema, invalid import, offline reload, service-worker update, or other relevant condition. A seeded-state test never substitutes for first-run evidence.
 
-Before completion:
+### 2.7 Common report
 
-- inspect `git diff --stat` and `git diff --name-only`;
-- audit scope and dependency changes;
-- search for duplicated components/state machines/listeners/hard-coded theme values when UI changed;
-- verify no secrets, private repertoire or unlicensed content;
-- commit intentionally;
-- verify clean tree;
-- push branch and create/update one draft PR.
+Follow `docs/workflow/STRUCTURED_REPORT_TEMPLATE.md` and `AGENTS.md`. The report includes exact refs, every changed path once, dependency/licence/data effects, Actions runs/results/artifacts, preview/state evidence, reuse and duplication audits, rollback, manual checklist and exact next action. End with `END_OF_COMPLETION_REPORT`.
 
-### 2.4 Common report
+### 2.8 Common acceptance rule
 
-Follow `docs/codex/COMPLETION_REPORT_TEMPLATE.md` and `AGENTS.md`. Every manual checklist item includes action, expected visible result, expected persisted/domain result and failure evidence.
-
-### 2.5 Common acceptance rule
-
-Technical completion authorises manual review only. It never authorises merge or the next phase. Luca reports the manual result and explicitly accepts/rejects the phase.
+Technical completion authorises manual review only. It never authorises merge or the next phase. Luca reports the manual result and explicitly accepts or rejects the exact PR head. Acceptance and merge are separate operations unless Luca explicitly combines them.
 
 ---
 
-# PHASE-0 — Repository and application foundation
+# GOVERNANCE-MIGRATION - Adopt ChatGPT + GitHub Actions
 
 ## Goal
 
-Create a clean, reproducible React/TypeScript/Vite/pnpm foundation, install and record the accepted dependency stack, establish architecture folders and quality gates, and prove a minimal library-integration shell without implementing the training product.
+Replace the historical local-Codex repository operating layer with the accepted ChatGPT + GitHub Actions workflow without replacing or reimplementing PHASE-0 product code.
 
-## Branch
+## Branch and PR
 
-```text
-phase-0-foundation
+```yaml
+branch: phase-0-foundation
+pull_request: 2
+base_branch: main
+expected_base_sha: 87ccbce18384892601a6630494910e1ca0375f13
+expected_pre_migration_head: 5477419fce1f13f4265ab82d6ee3058d851b5019
 ```
 
-Base:
-
-```text
-origin/main containing this agentic pack only
-```
-
-## Entry gate
-
-- This pack is committed and pushed on `main`.
-- `node scripts/verify-pack.mjs` passes before application scaffolding.
-- No application implementation already exists except deliberately committed pack files.
-- Node 24 LTS and pnpm are available.
-
-## Required reading
-
-```text
-AGENTS.md
-context.md
-CODEX_PROMPT_PROFILE.md
-docs/product/PRODUCT_CONTRACT.md
-docs/architecture/ARCHITECTURE.md
-docs/ui/UI_AND_INTERACTION_CONTRACT.md
-docs/testing/TEST_AND_ACCEPTANCE_STRATEGY.md
-docs/dependencies/DEPENDENCY_AND_LICENSE_POLICY.md
-```
-
-## Required repository inspection
-
-- confirm repository root and default branch;
-- inspect every existing file because the initial repository is intentionally small;
-- verify pack hashes and line-ending rules;
-- record exact Node, npm and pnpm versions;
-- inspect current package metadata/licences for each candidate before installing.
+All mutable values must be reverified. A mismatch blocks mutation until explained.
 
 ## Scope
 
-### Application scaffold
-
-Establish a Vite React TypeScript application at repository root without overwriting the agentic pack.
-
-Required baseline:
-
-- `package.json` and `pnpm-lock.yaml`;
-- Vite config;
-- strict TypeScript configuration;
-- React entry point;
-- MUI theme/provider;
-- Vitest/jsdom and Testing Library;
-- ESLint current flat configuration where compatible;
-- Prettier configuration;
-- scripts for `dev`, `build`, `preview`, `lint`, `typecheck`, `test`, `test:watch`, `test:pwa` placeholder/real manifest check as appropriate, `validate`;
-- `.editorconfig`, `.gitattributes`, `.gitignore` preserved/refined;
-- no router or global state library.
-
-### Dependencies
-
-Install current compatible stable versions and record exact resolved versions/licences for:
-
-```text
-react
-react-dom
-vite
-TypeScript
-Material UI and Emotion peers
-MUI icons
-MUI X Tree View Community
-react-chessboard
-chess.js
-Dexie and dexie-react-hooks
-ts-fsrs
-vite-plugin-pwa
-Vitest and Testing Library stack
-fake-indexeddb
-ESLint/TypeScript ESLint
-Prettier
-```
-
-A small runtime schema library may be added only with explicit justification in the PR/report and licence record.
-
-### Architecture skeleton
-
-Create the folders from `ARCHITECTURE.md` with small index/readme files only where useful. Avoid empty speculative abstractions.
-
-Create project-owned ports/types sufficient to prove compilation boundaries, without implementing repertoire or scheduler behaviour.
-
-### Minimal integration shell
-
-Render a minimal MUI application shell that proves:
-
-- theme provider works;
-- a placeholder board adapter can render `react-chessboard` in a bounded area;
-- a placeholder MUI Tree View renders synthetic non-answer data;
-- a placeholder task card renders;
-- layout is not the final PHASE-1 UI.
-
-Instantiate `chess.js` in a focused adapter test. Instantiate a test Dexie database with fake IndexedDB. Instantiate the scheduling adapter boundary without committing policy.
-
-### PWA foundation
-
-Configure a valid development/production manifest and basic service-worker generation using `vite-plugin-pwa`, but defer update UX, offline acceptance and full icons to PHASE-7.
-
-### Documentation
-
-Update:
-
-- `context.md` with observed environment and PHASE-0 technical state proposal, not acceptance;
-- dependency licence/version record;
-- architecture document only for verified deviations;
-- root README with install/dev/validate commands.
-
-## Reusable UI/UX inventory and reuse decisions
-
-Codex must report a map for toolbar/shell/tree/task/card/board placeholders. All ordinary controls use MUI. The board is the only specialised visual primitive. Do not build custom alternatives.
-
-## Tests
-
-At minimum:
-
-- application renders under theme;
-- error boundary or boot state test;
-- chess adapter legal move smoke;
-- canonical position-key test skeleton includes at least one real invariant;
-- Dexie isolated create/read/delete smoke with fake IndexedDB;
-- scheduler port adapter construction/serialization smoke without asserting final mapping;
-- manifest/build configuration check;
-- pack verifier remains passing.
-
-## Local validation
-
-```powershell
-node scripts/verify-pack.mjs
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm test:pwa
-pnpm validate
-pnpm exec prettier --check .
-git diff --check
-```
-
-Run a production preview smoke through a non-interactive request/harness if repository conventions support it. Do not claim visual acceptance.
-
-## Manual checklist for Luca
-
-1. Run `pnpm dev`; expected visible result: minimal MUI shell with board placeholder, tree placeholder and task card, no obvious error overlay; expected persisted result: only an isolated demo/test database if the shell intentionally creates one, clearly named and documented; failure evidence: console output and screenshot/description.
-2. Resize desktop to phone width; expected visible result: content remains usable without horizontal page scroll, acknowledging this is a foundation shell; expected persisted result: none; failure evidence: viewport and overflow description.
-3. Run the production build/preview commands; expected visible result: same minimal shell; expected persisted result: no user data deletion; failure evidence: exact commands/errors.
-4. Reload once; expected visible result: app loads and no service-worker loop/error; expected persisted result: test/demo state behaviour matches documentation; failure evidence: console/service-worker state.
+Execute `WORKFLOW_MIGRATION.md`: replace stale authority/handoff files, add `docs/workflow/` and the immutable migration request, remove only named deprecated Codex paths, preserve the application candidate and `.github/workflows/ci.yml`, regenerate the repository full-tree integrity manifest with the existing project updater, and run permanent validation on the exact new head.
 
 ## Acceptance criteria
 
-- clean reproducible install and lockfile;
-- accepted dependencies present, versions/licences recorded;
-- strict type/lint/test/build/format gates pass;
-- architecture boundaries are visible but not overbuilt;
-- minimal MUI/board/tree/chess/Dexie/FSRS/PWA integrations compile and have smoke coverage;
-- no PHASE-1 product UI or PHASE-2 training logic;
-- one draft PR and self-contained report;
-- Luca accepts foundation/manual shell before PHASE-1.
-
-## Non-scope
-
-- final responsive UI;
-- real repertoire graph;
-- move grading/session state machine;
-- PGN import;
-- permanent database schema;
-- scheduler mapping;
-- native packaging;
-- deployment.
+- no PHASE-0 application, dependency, lockfile, test or configuration regression;
+- no stale repository instruction that treats Actions as incidental or makes the previous local-executor policy authoritative;
+- no root `CODEX_*` or `docs/codex/` execution authority remains;
+- permanent Actions validation passes on the exact new head;
+- PR #2 is updated, still draft and unmerged;
+- PHASE-0 remains `COMPLETE_FOR_MANUAL_REVIEW` with the same four-item manual checklist;
+- no merge or PHASE-1.
 
 ## Rollback
 
-Close the draft PR and delete only the phase branch if rejected. The pack-only `main` remains intact.
-
-## Assistant Memory capture proposal
-
-Report exact environment versions, dependency licences, scripts, final branch/head/PR, validation results, deviations and next-phase gate.
+Revert the single governance-migration commit on `phase-0-foundation`. Do not rewrite `main`, discard PHASE-0 code, or delete review evidence.
 
 ---
 
-# PHASE-1 — Responsive board/tree/task training shell
+# PHASE-0 - Repository and application foundation
+
+## Current status
+
+PHASE-0 is already implemented and technically validated. Do not rerun its scaffold.
+
+```yaml
+base_sha: 87ccbce18384892601a6630494910e1ca0375f13
+branch: phase-0-foundation
+validated_head_before_governance_migration: 5477419fce1f13f4265ab82d6ee3058d851b5019
+pull_request: 2
+pull_request_state: open, draft, unmerged
+permanent_validation_run: 30906801969
+permanent_validation_result: success
+review_artifact_id: 8891213897
+review_artifact_digest: sha256:ac68b340c909073115c64ff3f989bd39c324492564c90f71e7080fb67a74a34d
+gate: COMPLETE_FOR_MANUAL_REVIEW
+```
+
+The governance migration will create a later head on the same branch. The final accepted head must have green permanent validation and preserve the implemented scope below.
+
+## Implemented scope to preserve
+
+- Node 24 and exact pnpm package-manager lock;
+- React, TypeScript and Vite root application;
+- Material UI and MUI X Community integration shell;
+- `react-chessboard`, `chess.js`, Dexie/fake-indexeddb and `ts-fsrs` adapter smoke boundaries;
+- strict TypeScript, ESLint, Prettier and Vitest/jsdom gates;
+- generated PWA manifest/service-worker proof;
+- dependency/licence record and locked transitive graph;
+- permanent read-only `.github/workflows/ci.yml` validation;
+- no real training behaviour, repertoire graph, production persistence schema or scheduling policy.
+
+## Required Actions evidence after governance migration
+
+The current `ci.yml` runs against the new branch head and passes repository integrity, lint, strict type checking, tests, production build, PWA checks, formatting and whitespace. No dependency change is expected.
+
+## Manual checklist for Luca
+
+1. Run `pnpm install --frozen-lockfile && pnpm dev`; expected: minimal MUI board/tree/task shell without error overlay; persistence: no production user-data mutation; return console and screenshot evidence on failure.
+2. Resize desktop to phone width; expected: no horizontal page scroll; persistence: none; return viewport and overflow evidence on failure.
+3. Run `pnpm build && pnpm preview`; expected: the same bounded shell loads; persistence: no deletion; return commands and output on failure.
+4. Reload once during preview; expected: no service-worker loop or browser-console error; persistence: documented demo state only; return console/service-worker evidence on failure.
+
+## Gate
+
+Luca explicitly accepts or rejects PHASE-0 at the exact current PR head. Keep PR #2 draft and unmerged. PHASE-1 remains blocked.
+
+---
+
+# PHASE-1 - Responsive board/tree/task training shell
 
 ## Goal
 
@@ -310,7 +217,7 @@ phase-1-responsive-shell
 
 ## Entry gate
 
-- PHASE-0 explicitly accepted and merged into `origin/main`.
+- PHASE-0 explicitly accepted and merged into `main`.
 - All PHASE-0 validation passes on current `main`.
 - No unresolved foundation correction.
 
@@ -395,7 +302,9 @@ Provide a development-only fixture selector or Storybook-equivalent only if PHAS
 - no horizontal overflow in a browser-capable layout test where practical;
 - reduced-motion and colour-independent labels where implemented.
 
-## Local validation
+## GitHub Actions validation and evidence
+
+Run focused tests and the repository's full `pnpm validate` sequence in GitHub Actions against the exact candidate head. The structured report records workflow/run IDs, tested SHA, job/step conclusions, command results, artifacts and bounded failure tails. Local or Codespaces runs may accelerate debugging but are not the phase evidence source.
 
 Common full sequence plus focused UI tests. Build and preview.
 
@@ -413,7 +322,7 @@ Common full sequence plus focused UI tests. Build and preview.
 - accepted responsive shell and component reuse;
 - mask non-disclosure tests;
 - no real session/repertoire/database logic hidden in UI;
-- local automated validation pass;
+- GitHub Actions technical validation pass;
 - Luca accepts layout, density, focus and interaction feel.
 
 ## Non-scope
@@ -433,7 +342,7 @@ Exact component inventory/reuse decisions, breakpoints, manual result, branch/he
 
 ---
 
-# PHASE-2 — Deterministic training vertical slice
+# PHASE-2 - Deterministic training vertical slice
 
 ## Goal
 
@@ -525,7 +434,9 @@ Record raw in-memory observations according to the training contract. Do not con
 - reducer transition table;
 - no React ownership of domain transitions.
 
-## Local validation
+## GitHub Actions validation and evidence
+
+Run focused tests and the repository's full `pnpm validate` sequence in GitHub Actions against the exact candidate head. The structured report records workflow/run IDs, tested SHA, job/step conclusions, command results, artifacts and bounded failure tails. Local or Codespaces runs may accelerate debugging but are not the phase evidence source.
 
 Common sequence; production build and controlled fixture flow tests.
 
@@ -563,7 +474,7 @@ Accepted training rhythm, state machine, outcome semantics, manual result, branc
 
 ---
 
-# PHASE-3 — Repertoire graph, transpositions, playlists and PGN import
+# PHASE-3 - Repertoire graph, transpositions, playlists and PGN import
 
 ## Goal
 
@@ -653,6 +564,10 @@ Run vertical slice against graph queries, multiple alternatives and transpositio
 - playlist filters;
 - no answer leakage after graph integration.
 
+## GitHub Actions validation and evidence
+
+Run focused domain/component/infrastructure tests and the repository full `pnpm validate` sequence in GitHub Actions against the exact candidate head. Record workflow/run IDs, tested SHA, command results, artifacts, state isolation and bounded failure tails. Use synthetic fixtures and isolated databases. Local/Codespaces runs are optional debugging evidence.
+
 ## Manual checklist
 
 1. Import recursive synthetic PGN: preview shows expected lines/variations/comments/warnings; commit creates one repertoire; failure evidence file/report.
@@ -688,7 +603,7 @@ Parser/dependency decision, canonical schemas/keys, transposition policy, import
 
 ---
 
-# PHASE-4 — Offline persistence, recovery and portability
+# PHASE-4 - Offline persistence, recovery and portability
 
 ## Goal
 
@@ -766,7 +681,9 @@ Use MUI dialogs for export/import/restore confirmation and errors. No custom fil
 - schema migration fixture when schema changes during phase;
 - cache/data reset distinction at API level.
 
-## Local validation
+## GitHub Actions validation and evidence
+
+Run focused tests and the repository's full `pnpm validate` sequence in GitHub Actions against the exact candidate head. The structured report records workflow/run IDs, tested SHA, job/step conclusions, command results, artifacts and bounded failure tails. Local or Codespaces runs may accelerate debugging but are not the phase evidence source.
 
 Common sequence plus repository/round-trip tests. Run browser reload smoke using isolated profile/harness if available.
 
@@ -804,7 +721,7 @@ Exact Dexie schema/version, database name, backup version, restore strategy, ide
 
 ---
 
-# PHASE-5 — FSRS adapter and adaptive session generator
+# PHASE-5 - FSRS adapter and adaptive session generator
 
 ## Goal
 
@@ -818,7 +735,7 @@ phase-5-fsrs-session-generator
 
 ## Entry gate
 
-- PHASE-0 through PHASE-4 explicitly accepted and merged into fetched `origin/main`.
+- PHASE-0 through PHASE-4 explicitly accepted and merged into fetched `main`.
 - The current database schema and complete backup/restore are accepted.
 - Canonical training-item identity and raw review evidence are present.
 - No unresolved data-loss or duplicate-review defect.
@@ -989,7 +906,9 @@ No dashboard or detailed charts.
 
 The report must map every UI addition to current MUI/project primitives. Scheduling logic remains outside React. Any new session settings composition is shared rather than duplicated in toolbar/dialog surfaces.
 
-## Local validation
+## GitHub Actions validation and evidence
+
+Run focused tests and the repository's full `pnpm validate` sequence in GitHub Actions against the exact candidate head. The structured report records workflow/run IDs, tested SHA, job/step conclusions, command results, artifacts and bounded failure tails. Local or Codespaces runs may accelerate debugging but are not the phase evidence source.
 
 - focused scheduler/unit simulations;
 - persistence migration/backup round trip;
@@ -1044,7 +963,7 @@ Record exact `ts-fsrs` version/API, scheduler serialization and policy versions,
 
 ---
 
-# PHASE-6 — Repertoire management, progress and opening-name recall
+# PHASE-6 - Repertoire management, progress and opening-name recall
 
 ## Goal
 
@@ -1092,6 +1011,10 @@ Do not implement drag-and-drop tree editing unless measured need and Community c
 - import/export/management responsive/accessibility tests;
 - no duplicate dialog/selector/state patterns.
 
+## GitHub Actions validation and evidence
+
+Run focused domain/component/infrastructure tests and the repository full `pnpm validate` sequence in GitHub Actions against the exact candidate head. Record workflow/run IDs, tested SHA, command results, artifacts, state isolation and bounded failure tails. Use synthetic fixtures and isolated databases. Local/Codespaces runs are optional debugging evidence.
+
 ## Manual checklist
 
 Create/manage repertoire and playlist; include/exclude branch; browse board/tree; edit note and confirm hint reveal; inspect progress with weak deep item; complete name recall without altering move interval; complete contrast drill; archive/restore; phone workflow.
@@ -1116,7 +1039,7 @@ Accepted management/progress/name/contrast behaviours, schemas, manual result, b
 
 ---
 
-# PHASE-7 — PWA, mobile, accessibility and operational hardening
+# PHASE-7 - PWA, mobile, accessibility and operational hardening
 
 ## Goal
 
@@ -1184,7 +1107,9 @@ Use bounded synthetic datasets to identify obvious tree/import/session bottlenec
 
 Document browser data backup/reset/update recovery. Test quota/transaction failure handling through fakes where possible.
 
-## Validation
+## GitHub Actions validation and evidence
+
+Run focused tests and the repository full validation in GitHub Actions against the exact candidate head. Record run IDs, tested SHA, command results, browser artifacts and bounded failure tails. Local/Codespaces execution is optional debugging evidence.
 
 Common sequence plus `pnpm test:e2e`, `pnpm test:pwa`, clean browser profiles, offline mode and production build/preview. Record tested browsers/environments and omissions honestly.
 
@@ -1210,7 +1135,7 @@ Manifest/update policy, browser matrix, accessibility decisions, performance obs
 
 ---
 
-# PHASE-8 — Release candidate, deployment and packaging decision
+# PHASE-8 - Release candidate, deployment and packaging decision
 
 ## Goal
 
@@ -1264,7 +1189,9 @@ Recommend PWA-only unless real evidence requires native capabilities/distributio
 
 Capacitor setup is a separate post-MVP phase requiring Luca's explicit acceptance. PHASE-8 does not install it by default.
 
-## Tests/validation
+## GitHub Actions validation and evidence
+
+Run the release suite in GitHub Actions against the exact candidate/release head and publish the release artifact inventory, hashes, browser evidence and structured report. Deployment execution requires the accepted provider/credential boundary.
 
 - clean clone/install/validate/build;
 - release artifact hash/inventory;

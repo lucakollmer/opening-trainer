@@ -1,6 +1,6 @@
 # Repository decision record
 
-This file summarises accepted design decisions for Codex execution. Historical supersession belongs in Assistant Memory; repository updates must preserve older entries or mark them superseded.
+This file summarises accepted design decisions for repository execution. Historical supersession belongs in Assistant Memory; repository updates must preserve older entries or mark them superseded.
 
 ## D-001 — Complete-line replay
 
@@ -80,8 +80,14 @@ Status: accepted.
 
 IndexedDB is operational storage. Versioned JSON preserves complete user data; PGN alone is not a full backup.
 
-## D-014 — Phase-gated Codex programme
+## D-014 - Phase-gated implementation programme
 
 Status: accepted.
 
 One named phase per branch/draft PR. Luca manually accepts each phase before the next.
+
+## D-015 - ChatGPT + GitHub Actions execution workflow
+
+Status: accepted on 2026-08-04.
+
+Google Drive remains the canonical project record. ChatGPT authors bounded changes through the connected GitHub application. GitHub Actions validates the exact candidate tree and publishes structured technical evidence and responsive review artifacts. Luca alone accepts visible behaviour, authorises merge and authorises continuation. The historical local-Codex execution mechanism is superseded; the product stack and PHASE-0 to PHASE-8 gates remain.
