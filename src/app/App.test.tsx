@@ -34,12 +34,12 @@ describe('PHASE-1 responsive shell', () => {
 
     expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
     expect(screen.queryByText('2... Nc6')).not.toBeInTheDocument();
-    expect(screen.getByText('Hidden continuation')).toBeVisible();
+    expect(screen.getAllByText('Hidden continuation')).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Browse' }));
 
-    expect(screen.getByText('2. Nf3')).toBeVisible();
-    expect(screen.getByText('2... Nc6')).toBeVisible();
+    expect(screen.getAllByText('2. Nf3')).toHaveLength(2);
+    expect(screen.getAllByText('2... Nc6')).toHaveLength(2);
   });
 
   it('emits a typed board command and exposes the promotion boundary', async () => {
