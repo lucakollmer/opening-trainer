@@ -25,7 +25,9 @@ describe('PHASE-1 responsive shell', () => {
     expect(screen.getByRole('group', { name: 'Training mode' })).toBeVisible();
     expect(screen.getByTestId('chessboard-adapter')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Repertoire tree' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Find the repertoire move' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Find the repertoire move' }),
+    ).toBeVisible();
   });
 
   it('does not expose future answer labels in Train mode and reveals them in Browse mode', async () => {
@@ -48,7 +50,9 @@ describe('PHASE-1 responsive shell', () => {
 
     await user.click(screen.getByRole('button', { name: 'Move knight g1 to f3' }));
 
-    expect(screen.getByRole('heading', { name: 'Fixture command received' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Fixture command received' }),
+    ).toBeVisible();
     expect(screen.getByText(/Last move: g1–f3/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Promotion boundary' })).toBeEnabled();
   });
@@ -61,7 +65,9 @@ describe('PHASE-1 responsive shell', () => {
     await user.click(openButton);
 
     const presentation = screen.getByRole('presentation');
-    expect(within(presentation).getByRole('heading', { name: 'Repertoire tree' })).toBeVisible();
+    expect(
+      within(presentation).getByRole('heading', { name: 'Repertoire tree' }),
+    ).toBeVisible();
 
     await user.keyboard('{Escape}');
     expect(openButton).toHaveFocus();

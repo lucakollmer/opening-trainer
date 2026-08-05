@@ -18,7 +18,10 @@ import {
   Typography,
 } from '@mui/material';
 import { useRef, useState } from 'react';
-import { ChessboardPreview, type BoardMoveCommand } from '../features/board/ChessboardPreview';
+import {
+  ChessboardPreview,
+  type BoardMoveCommand,
+} from '../features/board/ChessboardPreview';
 import { RepertoireTreePreview } from '../features/repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../features/task/TaskPreviewCard';
 import {
@@ -68,7 +71,9 @@ export function App() {
               value={foundationFixture.id}
               onChange={() => undefined}
             >
-              <MenuItem value={foundationFixture.id}>{foundationFixture.label}</MenuItem>
+              <MenuItem value={foundationFixture.id}>
+                {foundationFixture.label}
+              </MenuItem>
             </Select>
           </FormControl>
 
@@ -86,7 +91,11 @@ export function App() {
           </ToggleButtonGroup>
 
           <Chip size="small" label={`${foundationFixture.dueCount} due`} />
-          <Chip size="small" variant="outlined" label={foundationFixture.sessionProgress} />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={foundationFixture.sessionProgress}
+          />
 
           <Tooltip title="Open repertoire tree">
             <IconButton
@@ -126,7 +135,9 @@ export function App() {
             alignItems: 'start',
           }}
         >
-          <Box sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}>
+          <Box
+            sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}
+          >
             <RepertoireTreePreview mode={mode} items={foundationFixture.tree} />
           </Box>
 

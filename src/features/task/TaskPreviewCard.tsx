@@ -1,4 +1,13 @@
-import { Alert, Button, Card, CardActions, CardContent, Chip, Stack, Typography } from '@mui/material';
+import {
+  Alert,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  Chip,
+  Stack,
+  Typography,
+} from '@mui/material';
 import type { TaskFixtureState } from '../../fixtures/foundationFixture';
 
 interface TaskPreviewCardProps {
@@ -14,7 +23,8 @@ const stateContent: Record<
   'awaiting-user-move': {
     tone: 'info',
     title: 'Find the repertoire move',
-    instruction: 'Use the board or the accessible move entry. No review evidence is stored.',
+    instruction:
+      'Use the board or the accessible move entry. No review evidence is stored.',
   },
   'correct-feedback': {
     tone: 'success',
@@ -40,7 +50,11 @@ export function TaskPreviewCard({ state, onHint, onContinue }: TaskPreviewCardPr
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
       <CardContent>
         <Stack spacing={1.5}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+          >
             <Chip size="small" label="Synthetic fixture" />
             <Typography variant="caption" color="text.secondary">
               {state}
@@ -49,7 +63,10 @@ export function TaskPreviewCard({ state, onHint, onContinue }: TaskPreviewCardPr
           <Typography id="task-heading" component="h2" variant="h6">
             {content.title}
           </Typography>
-          <Alert severity={content.tone} aria-live={content.tone === 'success' ? 'polite' : 'off'}>
+          <Alert
+            severity={content.tone}
+            aria-live={content.tone === 'success' ? 'polite' : 'off'}
+          >
             {content.instruction}
           </Alert>
         </Stack>

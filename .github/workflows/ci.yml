@@ -34,24 +34,9 @@ jobs:
           npm install --global "$package_manager"
           pnpm install --frozen-lockfile
 
-      - name: Capture exact Prettier patch
+      - name: Validate foundation
         shell: bash
         run: |
           set -euo pipefail
-          pnpm exec prettier --write \
-            src/app/App.test.tsx \
-            src/app/App.tsx \
-            src/features/board/ChessboardPreview.tsx \
-            src/features/repertoire-tree/RepertoireTreePreview.tsx \
-            src/features/task/TaskPreviewCard.tsx \
-            src/fixtures/foundationFixture.ts
-          echo PRETTIER_DIFF_BEGIN
-          git diff --no-color --unified=1000 -- \
-            src/app/App.test.tsx \
-            src/app/App.tsx \
-            src/features/board/ChessboardPreview.tsx \
-            src/features/repertoire-tree/RepertoireTreePreview.tsx \
-            src/features/task/TaskPreviewCard.tsx \
-            src/fixtures/foundationFixture.ts
-          echo PRETTIER_DIFF_END
-          exit 1
+          pnpm validate
+          git diff --check

@@ -30,10 +30,23 @@ export function ChessboardPreview({
   const interactionDisabled = disabled || !userTurn;
 
   return (
-    <Paper component="section" aria-labelledby="board-heading" sx={{ p: { xs: 1, sm: 2 } }}>
+    <Paper
+      component="section"
+      aria-labelledby="board-heading"
+      sx={{ p: { xs: 1, sm: 2 } }}
+    >
       <Stack spacing={1.5}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          <Typography id="board-heading" component="h2" variant="h6" sx={{ flexGrow: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+        >
+          <Typography
+            id="board-heading"
+            component="h2"
+            variant="h6"
+            sx={{ flexGrow: 1 }}
+          >
             Training board
           </Typography>
           <Chip size="small" label={userTurn ? 'Your move' : 'Waiting'} />
@@ -57,7 +70,9 @@ export function ChessboardPreview({
             <Button
               variant="outlined"
               disabled={interactionDisabled}
-              onClick={() => onMove({ type: 'board.move-requested', from: 'g1', to: 'f3' })}
+              onClick={() =>
+                onMove({ type: 'board.move-requested', from: 'g1', to: 'f3' })
+              }
             >
               Move knight g1 to f3
             </Button>
@@ -79,7 +94,9 @@ export function ChessboardPreview({
         </Stack>
 
         <Typography variant="caption" color="text.secondary">
-          {lastMove ? `Last move: ${lastMove[0]}–${lastMove[1]}. ` : 'No move submitted. '}
+          {lastMove
+            ? `Last move: ${lastMove[0]}–${lastMove[1]}. `
+            : 'No move submitted. '}
           {hintSquares.length > 0
             ? `Hint squares: ${hintSquares.join(', ')}.`
             : 'No hint overlay active.'}

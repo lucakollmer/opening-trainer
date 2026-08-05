@@ -1,10 +1,7 @@
 export type TrainingMode = 'train' | 'browse';
 
 export type TaskFixtureState =
-  | 'awaiting-user-move'
-  | 'correct-feedback'
-  | 'hint-offered'
-  | 'line-complete';
+  'awaiting-user-move' | 'correct-feedback' | 'hint-offered' | 'line-complete';
 
 export interface RepertoireTreeFixtureItem {
   id: string;

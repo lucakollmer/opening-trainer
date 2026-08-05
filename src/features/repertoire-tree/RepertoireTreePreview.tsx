@@ -1,7 +1,10 @@
 import { Chip, Paper, Stack, Typography } from '@mui/material';
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
-import type { RepertoireTreeFixtureItem, TrainingMode } from '../../fixtures/foundationFixture';
+import type {
+  RepertoireTreeFixtureItem,
+  TrainingMode,
+} from '../../fixtures/foundationFixture';
 
 interface RepertoireTreePreviewProps {
   mode: TrainingMode;
@@ -15,8 +18,17 @@ const statusLabels: Record<RepertoireTreeFixtureItem['status'], string> = {
   new: 'New',
 };
 
-function TreeLabel({ item, mode }: { item: RepertoireTreeFixtureItem; mode: TrainingMode }) {
-  const label = mode === 'browse' || item.status === 'reviewed' ? item.visibleLabel : item.maskedLabel;
+function TreeLabel({
+  item,
+  mode,
+}: {
+  item: RepertoireTreeFixtureItem;
+  mode: TrainingMode;
+}) {
+  const label =
+    mode === 'browse' || item.status === 'reviewed'
+      ? item.visibleLabel
+      : item.maskedLabel;
 
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
@@ -36,7 +48,11 @@ function TreeLabel({ item, mode }: { item: RepertoireTreeFixtureItem; mode: Trai
 
 function renderItem(item: RepertoireTreeFixtureItem, mode: TrainingMode) {
   return (
-    <TreeItem key={item.id} itemId={item.id} label={<TreeLabel item={item} mode={mode} />}>
+    <TreeItem
+      key={item.id}
+      itemId={item.id}
+      label={<TreeLabel item={item} mode={mode} />}
+    >
       {item.children?.map((child) => renderItem(child, mode))}
     </TreeItem>
   );
@@ -44,7 +60,11 @@ function renderItem(item: RepertoireTreeFixtureItem, mode: TrainingMode) {
 
 export function RepertoireTreePreview({ mode, items }: RepertoireTreePreviewProps) {
   return (
-    <Paper component="section" aria-labelledby="tree-heading" sx={{ p: 2, minWidth: 0 }}>
+    <Paper
+      component="section"
+      aria-labelledby="tree-heading"
+      sx={{ p: 2, minWidth: 0 }}
+    >
       <Stack spacing={1}>
         <div>
           <Typography id="tree-heading" component="h2" variant="h6">
