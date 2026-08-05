@@ -47,6 +47,8 @@ The first bounded documentation operation is this superseding record. Historical
 
 Run focused component tests and the complete GitHub Actions validation sequence against the exact candidate head. Obtain a Cloudflare pull-request preview and responsive desktop/tablet/phone evidence when exposed. Automated evidence does not constitute visual acceptance.
 
+After the reported production React error #130, a user-visible candidate cannot return to the manual-review gate until the exact production bundle passes `docs/testing/RUNTIME_BROWSER_SMOKE.md` at desktop, tablet, and phone viewports. An HTTP response, static build, mocked component test, or deployment-success status is not runtime-render evidence.
+
 ## Stop condition
 
 Open one draft pull request to `main`, publish the structured completion report and manual checklist, and stop. Do not merge and do not begin PHASE-2 without Luca's explicit acceptance and continuation instruction.

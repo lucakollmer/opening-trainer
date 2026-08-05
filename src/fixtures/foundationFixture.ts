@@ -18,7 +18,8 @@ export const foundationFixture = {
   label: 'Synthetic e4 repertoire',
   dueCount: 7,
   sessionProgress: '1 of 12',
-  position: 'start',
+  position:
+    'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
   orientation: 'white' as const,
   tree: [
     {
