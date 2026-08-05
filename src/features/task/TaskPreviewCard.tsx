@@ -40,7 +40,7 @@ export function TaskPreviewCard({ state, onHint, onContinue }: TaskPreviewCardPr
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
       <CardContent>
         <Stack spacing={1.5}>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <Chip size="small" label="Synthetic fixture" />
             <Typography variant="caption" color="text.secondary">
               {state}
