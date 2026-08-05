@@ -48,7 +48,8 @@ export function App() {
 
   const advanceTaskState = () => {
     const currentIndex = taskStateOrder.indexOf(taskState);
-    setTaskState(taskStateOrder[(currentIndex + 1) % taskStateOrder.length]);
+    const nextState = taskStateOrder[(currentIndex + 1) % taskStateOrder.length];
+    if (nextState) setTaskState(nextState);
   };
 
   return (
@@ -154,8 +155,10 @@ export function App() {
         open={treeOpen}
         onClose={() => setTreeOpen(false)}
         ModalProps={{ keepMounted: true }}
-        PaperProps={{ sx: { width: 'min(88vw, 360px)', p: 1 } }}
-        slotProps={{ transition: { onExited: () => treeButtonRef.current?.focus() } }}
+        slotProps={{
+          paper: { sx: { width: 'min(88vw, 360px)', p: 1 } },
+          transition: { onExited: () => treeButtonRef.current?.focus() },
+        }}
       >
         <RepertoireTreePreview mode={mode} items={foundationFixture.tree} />
       </Drawer>
