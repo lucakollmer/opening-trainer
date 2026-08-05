@@ -19,7 +19,7 @@ function TreeLabel({ item, mode }: { item: RepertoireTreeFixtureItem; mode: Trai
   const label = mode === 'browse' || item.status === 'reviewed' ? item.visibleLabel : item.maskedLabel;
 
   return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 0.25 }}>
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
       <Typography component="span" variant="body2">
         {label}
       </Typography>
