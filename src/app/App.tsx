@@ -20,7 +20,10 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import { ChessboardPreview, type BoardMoveCommand } from '../features/board/ChessboardPreview';
+import {
+  ChessboardPreview,
+  type BoardMoveCommand,
+} from '../features/board/ChessboardPreview';
 import { RepertoireTreePreview } from '../features/repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../features/task/TaskPreviewCard';
 import {
@@ -44,12 +47,15 @@ export function App() {
   const [mode, setMode] = useState<TrainingMode>('train');
   const [treeOpen, setTreeOpen] = useState(false);
   const [fixtureId, setFixtureId] = useState<string>(fix01White.id);
-  const [session, setSession] = useState(() => createTrainingSession(fix01White, nowMs()));
+  const [session, setSession] = useState(() =>
+    createTrainingSession(fix01White, nowMs()),
+  );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   const fixture: TrainingFixture =
-    phase2TrainingFixtures.find((candidate) => candidate.id === fixtureId) ?? fix01White;
+    phase2TrainingFixtures.find((candidate) => candidate.id === fixtureId) ??
+    fix01White;
   const currentStep = currentFixtureStep(session, fixture);
 
   useEffect(() => {
@@ -115,7 +121,7 @@ export function App() {
 
   const hintSquares =
     session.hintLevel >= 2 && session.hintLevel < 4 && currentStep?.actor === 'user'
-      ? currentStep.hint?.candidateDestinations ?? []
+      ? (currentStep.hint?.candidateDestinations ?? [])
       : [];
   const lastMove = session.lastMove
     ? ([session.lastMove.from, session.lastMove.to] as const)
@@ -214,7 +220,9 @@ export function App() {
             alignItems: 'start',
           }}
         >
-          <Box sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}>
+          <Box
+            sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}
+          >
             {tree}
           </Box>
 
@@ -242,12 +250,18 @@ export function App() {
               }
               onReveal={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, { type: 'reveal', nowMs: nowMs() }),
+                  reduceTrainingSession(current, fixture, {
+                    type: 'reveal',
+                    nowMs: nowMs(),
+                  }),
                 )
               }
               onContinue={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, { type: 'continue', nowMs: nowMs() }),
+                  reduceTrainingSession(current, fixture, {
+                    type: 'continue',
+                    nowMs: nowMs(),
+                  }),
                 )
               }
               onRetest={() =>
@@ -265,7 +279,10 @@ export function App() {
               }
               onRestart={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, { type: 'restart', nowMs: nowMs() }),
+                  reduceTrainingSession(current, fixture, {
+                    type: 'restart',
+                    nowMs: nowMs(),
+                  }),
                 )
               }
               onAbandon={() =>

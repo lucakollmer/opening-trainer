@@ -1,5 +1,9 @@
 import type { ChessMoveInput } from '../chess/chessAdapter';
-import { fix01White, fix02Black, type TrainingFixture } from '../../fixtures/trainingFixtures';
+import {
+  fix01White,
+  fix02Black,
+  type TrainingFixture,
+} from '../../fixtures/trainingFixtures';
 import {
   createTrainingSession,
   currentFixtureStep,
@@ -9,7 +13,10 @@ import {
   type TrainingSessionState,
 } from './session';
 
-function expectedMove(state: TrainingSessionState, fixture: TrainingFixture): ChessMoveInput {
+function expectedMove(
+  state: TrainingSessionState,
+  fixture: TrainingFixture,
+): ChessMoveInput {
   const step = currentFixtureStep(state, fixture);
   if (!step) throw new Error('Expected an active fixture step.');
   return {
@@ -105,7 +112,9 @@ describe('PHASE-2 training session reducer', () => {
     expect(state.plyIndex).toBe(fix01White.route.length);
     expect(state.treeRevealedPlyCount).toBe(fix01White.route.length);
     expect(state.evidence.filter((item) => item.outcome === 'correct')).toHaveLength(4);
-    expect(state.evidence.filter((item) => item.evidenceRole === 'targeted')).toHaveLength(1);
+    expect(
+      state.evidence.filter((item) => item.evidenceRole === 'targeted'),
+    ).toHaveLength(1);
   });
 
   it('plays the black fixture with deterministic opponent-first actor assignment', () => {
@@ -212,7 +221,10 @@ describe('PHASE-2 training session reducer', () => {
     expect(state.retestQueue[0]?.separationRemaining).toBe(1);
 
     state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 6210 });
-    state = reduceTrainingSession(state, fix01White, { type: 'opponent-tick', nowMs: 6220 });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'opponent-tick',
+      nowMs: 6220,
+    });
     state = reduceTrainingSession(state, fix01White, {
       type: 'user-move',
       move: { from: 'f1', to: 'b5' },
@@ -232,7 +244,10 @@ describe('PHASE-2 training session reducer', () => {
       nowMs: 7200,
     });
     state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 7210 });
-    state = reduceTrainingSession(state, fix01White, { type: 'opponent-tick', nowMs: 7220 });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'opponent-tick',
+      nowMs: 7220,
+    });
     state = reduceTrainingSession(state, fix01White, {
       type: 'user-move',
       move: { from: 'f1', to: 'b5' },
@@ -241,9 +256,15 @@ describe('PHASE-2 training session reducer', () => {
 
     while (state.status !== 'line-complete') {
       if (state.status === 'correct-feedback') {
-        state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 7400 });
+        state = reduceTrainingSession(state, fix01White, {
+          type: 'continue',
+          nowMs: 7400,
+        });
       } else if (state.status === 'opponent-moving') {
-        state = reduceTrainingSession(state, fix01White, { type: 'opponent-tick', nowMs: 7410 });
+        state = reduceTrainingSession(state, fix01White, {
+          type: 'opponent-tick',
+          nowMs: 7410,
+        });
       } else if (state.status === 'awaiting-user-move') {
         state = reduceTrainingSession(state, fix01White, {
           type: 'user-move',

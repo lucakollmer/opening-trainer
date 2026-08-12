@@ -25,8 +25,7 @@ describe('canonicalPositionKey', () => {
   });
 
   it('drops a nominal en-passant square when no legal capture exists', () => {
-    const nominal =
-      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
+    const nominal = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
     const none = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
 
     expect(canonicalPositionKey(nominal)).toBe(canonicalPositionKey(none));

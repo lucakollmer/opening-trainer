@@ -50,7 +50,8 @@ const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 export const fix01White: TrainingFixture = {
   id: 'fix-01-white',
   label: 'FIX-01 · White branching line',
-  description: 'Synthetic e4 line with a deterministic e5 reply and a sibling knight branch.',
+  description:
+    'Synthetic e4 line with a deterministic e5 reply and a sibling knight branch.',
   orientation: 'white',
   userColour: 'white',
   initialFen,
@@ -257,7 +258,8 @@ export const fix01White: TrainingFixture = {
 export const fix02Black: TrainingFixture = {
   id: 'fix-02-black',
   label: 'FIX-02 · Black line',
-  description: 'Synthetic black repertoire line proving actor assignment and black orientation.',
+  description:
+    'Synthetic black repertoire line proving actor assignment and black orientation.',
   orientation: 'black',
   userColour: 'black',
   initialFen,
@@ -282,7 +284,7 @@ export const fix02Black: TrainingFixture = {
       acceptedUci: ['c7c5'],
       hint: {
         piece: 'c-pawn',
-        candidateDestinations: ['c5', 'c6'],
+        candidateDestinations: ['c5', 'c7'],
         purpose: 'Challenge the centre from the flank.',
       },
     },
@@ -303,7 +305,7 @@ export const fix02Black: TrainingFixture = {
       san: 'd6',
       treeItemId: 'fix02-node-04',
       acceptedUci: ['d7d6'],
-      wrongSiblingUci: ['b8c6'],
+      wrongSiblingUci: ['b8c7'],
       hint: {
         piece: 'd-pawn',
         candidateDestinations: ['d6', 'd5'],

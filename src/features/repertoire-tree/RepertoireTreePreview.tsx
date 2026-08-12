@@ -87,7 +87,11 @@ export function RepertoireTreePreview({
   currentItemId,
 }: RepertoireTreePreviewProps) {
   return (
-    <Paper component="section" aria-labelledby="tree-heading" sx={{ p: 2, minWidth: 0 }}>
+    <Paper
+      component="section"
+      aria-labelledby="tree-heading"
+      sx={{ p: 2, minWidth: 0 }}
+    >
       <Stack spacing={1}>
         <div>
           <Typography id="tree-heading" component="h2" variant="h6">

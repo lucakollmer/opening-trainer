@@ -4,7 +4,10 @@ import {
   type AppliedChessMove,
   type ChessMoveInput,
 } from '../chess/chessAdapter';
-import type { TrainingFixture, TrainingFixtureMove } from '../../fixtures/trainingFixtures';
+import type {
+  TrainingFixture,
+  TrainingFixtureMove,
+} from '../../fixtures/trainingFixtures';
 
 export type HintLevel = 0 | 1 | 2 | 3 | 4;
 export type EvidenceRole = 'targeted' | 'incidental';
@@ -99,7 +102,10 @@ const USER_INPUT_STATUSES: readonly TrainingStatus[] = [
   'repair-replay',
 ];
 
-function fixtureStep(fixture: TrainingFixture, plyIndex: number): TrainingFixtureMove | null {
+function fixtureStep(
+  fixture: TrainingFixture,
+  plyIndex: number,
+): TrainingFixtureMove | null {
   return fixture.route[plyIndex] ?? null;
 }
 
@@ -317,7 +323,9 @@ function requestHint(
   state: TrainingSessionState,
   fixture: TrainingFixture,
 ): TrainingSessionState {
-  if (!['awaiting-user-move', 'hint-offered', 'illegal-feedback'].includes(state.status)) {
+  if (
+    !['awaiting-user-move', 'hint-offered', 'illegal-feedback'].includes(state.status)
+  ) {
     return state;
   }
 
@@ -332,7 +340,8 @@ function requestHint(
     feedback: {
       kind: 'info',
       title: `Hint ${nextLevel} of 3`,
-      message: 'Only the requested hint level is disclosed. The full move remains hidden.',
+      message:
+        'Only the requested hint level is disclosed. The full move remains hidden.',
     },
   };
 }
@@ -342,7 +351,9 @@ function revealMove(
   fixture: TrainingFixture,
   nowMs: number,
 ): TrainingSessionState {
-  if (!['awaiting-user-move', 'hint-offered', 'illegal-feedback'].includes(state.status)) {
+  if (
+    !['awaiting-user-move', 'hint-offered', 'illegal-feedback'].includes(state.status)
+  ) {
     return state;
   }
 
@@ -377,7 +388,8 @@ function continueSession(
     return {
       ...state,
       status,
-      attemptStartedAtMs: status === 'awaiting-user-move' ? nowMs : state.attemptStartedAtMs,
+      attemptStartedAtMs:
+        status === 'awaiting-user-move' ? nowMs : state.attemptStartedAtMs,
       feedback: undefined,
     };
   }
@@ -435,7 +447,8 @@ function applyOpponentMove(
       feedback: {
         kind: 'info',
         title: 'Fixture route error',
-        message: 'The deterministic opponent move was not legal from the current fixture state.',
+        message:
+          'The deterministic opponent move was not legal from the current fixture state.',
       },
     };
   }
@@ -451,7 +464,8 @@ function applyOpponentMove(
     treeRevealedPlyCount: Math.max(state.treeRevealedPlyCount, nextPly),
     treeRevealedItemIds: revealTreeItem(state.treeRevealedItemIds, step.treeItemId),
     lastMove: applied,
-    attemptStartedAtMs: nextStatus === 'awaiting-user-move' ? nowMs : state.attemptStartedAtMs,
+    attemptStartedAtMs:
+      nextStatus === 'awaiting-user-move' ? nowMs : state.attemptStartedAtMs,
     feedback:
       nextStatus === 'line-complete'
         ? {
@@ -470,10 +484,14 @@ function startRetest(
 ): TrainingSessionState {
   if (state.status !== 'line-complete') return state;
 
-  const ticket = state.retestQueue.find((candidate) => candidate.separationRemaining === 0);
+  const ticket = state.retestQueue.find(
+    (candidate) => candidate.separationRemaining === 0,
+  );
   if (!ticket) return state;
 
-  const remainingQueue = state.retestQueue.filter((candidate) => candidate.id !== ticket.id);
+  const remainingQueue = state.retestQueue.filter(
+    (candidate) => candidate.id !== ticket.id,
+  );
   const status = statusForCurrentStep(fixture, 0);
 
   return {
@@ -493,7 +511,8 @@ function startRetest(
     feedback: {
       kind: 'info',
       title: 'Delayed retest',
-      message: 'Replay the containing line from move one. The previously failed decision is targeted again.',
+      message:
+        'Replay the containing line from move one. The previously failed decision is targeted again.',
     },
   };
 }
@@ -579,7 +598,8 @@ export function hintDisclosure(
   fixture: TrainingFixture,
 ): string | null {
   const step = fixtureStep(fixture, state.plyIndex);
-  if (!step || step.actor !== 'user' || !step.hint || state.hintLevel === 0) return null;
+  if (!step || step.actor !== 'user' || !step.hint || state.hintLevel === 0)
+    return null;
 
   if (state.hintLevel === 1) {
     return `Piece: ${step.hint.piece}.`;

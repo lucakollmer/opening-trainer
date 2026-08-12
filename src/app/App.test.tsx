@@ -29,7 +29,11 @@ function renderApp() {
   );
 }
 
-async function submitAccessibleMove(user: ReturnType<typeof userEvent.setup>, from: string, to: string) {
+async function submitAccessibleMove(
+  user: ReturnType<typeof userEvent.setup>,
+  from: string,
+  to: string,
+) {
   const fromInput = screen.getByRole('textbox', { name: 'From square' });
   const toInput = screen.getByRole('textbox', { name: 'To square' });
   await user.clear(fromInput);
@@ -51,7 +55,9 @@ describe('PHASE-2 deterministic training vertical slice', () => {
       'white',
     );
     expect(screen.getByRole('heading', { name: 'Repertoire tree' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Find the repertoire move' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Find the repertoire move' }),
+    ).toBeVisible();
   });
 
   it('withholds all future answer labels in Train mode and reveals them in Browse mode', async () => {
@@ -73,7 +79,9 @@ describe('PHASE-2 deterministic training vertical slice', () => {
   it('rejects an illegal move without advancing the board and records distinct feedback', async () => {
     const user = userEvent.setup();
     renderApp();
-    const initialPosition = screen.getByTestId('chessboard-adapter').getAttribute('data-position');
+    const initialPosition = screen
+      .getByTestId('chessboard-adapter')
+      .getAttribute('data-position');
 
     await submitAccessibleMove(user, 'e2', 'e5');
 
@@ -93,7 +101,9 @@ describe('PHASE-2 deterministic training vertical slice', () => {
 
     expect(screen.getAllByText('1. e4').length).toBeGreaterThan(0);
     expect(screen.queryByText('1... c5')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Correct repertoire move' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Correct repertoire move' }),
+    ).toBeVisible();
   });
 
   it('classifies a known sibling move separately and offers an explicit repair', async () => {
@@ -102,11 +112,17 @@ describe('PHASE-2 deterministic training vertical slice', () => {
 
     await submitAccessibleMove(user, 'e2', 'e4');
     await user.click(screen.getByRole('button', { name: 'Continue line' }));
-    await screen.findByRole('heading', { name: 'Find the repertoire move' }, { timeout: 1500 });
+    await screen.findByRole(
+      'heading',
+      { name: 'Find the repertoire move' },
+      { timeout: 1500 },
+    );
 
     await submitAccessibleMove(user, 'b1', 'c3');
 
-    expect(screen.getByRole('heading', { name: 'Known sibling variation' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Known sibling variation' }),
+    ).toBeVisible();
     expect(screen.getByText(/This prompt expects Nf3/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Repair move' })).toBeVisible();
   });
@@ -117,7 +133,11 @@ describe('PHASE-2 deterministic training vertical slice', () => {
 
     await submitAccessibleMove(user, 'e2', 'e4');
     await user.click(screen.getByRole('button', { name: 'Continue line' }));
-    await screen.findByRole('heading', { name: 'Find the repertoire move' }, { timeout: 1500 });
+    await screen.findByRole(
+      'heading',
+      { name: 'Find the repertoire move' },
+      { timeout: 1500 },
+    );
 
     await user.click(screen.getByRole('button', { name: 'Hint 1' }));
     expect(screen.getByText(/Piece: kingside knight/)).toBeVisible();

@@ -67,7 +67,8 @@ function defaultContent(session: TrainingSessionState) {
       return {
         severity: 'success' as const,
         title: 'Session complete',
-        message: 'This run kept all observations in memory only; no scheduler state was updated.',
+        message:
+          'This run kept all observations in memory only; no scheduler state was updated.',
       };
     case 'abandoned':
       return {
@@ -79,15 +80,18 @@ function defaultContent(session: TrainingSessionState) {
       return {
         severity: 'error' as const,
         title: 'Training fixture error',
-        message: 'The deterministic route could not continue from the current position.',
+        message:
+          'The deterministic route could not continue from the current position.',
       };
     default:
       return {
-        severity: session.feedback?.kind === 'correct' || session.feedback?.kind === 'repair'
-          ? ('success' as const)
-          : session.feedback?.kind === 'illegal' || session.feedback?.kind === 'outside'
-            ? ('error' as const)
-            : ('warning' as const),
+        severity:
+          session.feedback?.kind === 'correct' || session.feedback?.kind === 'repair'
+            ? ('success' as const)
+            : session.feedback?.kind === 'illegal' ||
+                session.feedback?.kind === 'outside'
+              ? ('error' as const)
+              : ('warning' as const),
         title: session.feedback?.title ?? 'Training feedback',
         message: session.feedback?.message ?? 'Review the feedback before continuing.',
       };
@@ -119,9 +123,21 @@ export function TaskPreviewCard({
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
       <CardContent>
         <Stack spacing={1.5}>
-          <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-            <Chip size="small" label={session.runKind === 'retest' ? 'Retest run' : 'Primary run'} />
-            <Chip size="small" variant="outlined" label={`${session.evidence.length} observations`} />
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+          >
+            <Chip
+              size="small"
+              label={session.runKind === 'retest' ? 'Retest run' : 'Primary run'}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`${session.evidence.length} observations`}
+            />
             {session.retestQueue.length > 0 ? (
               <Chip
                 size="small"
@@ -148,8 +164,9 @@ export function TaskPreviewCard({
           ) : null}
 
           <Typography variant="body2" color="text.secondary">
-            Move {Math.min(session.plyIndex + 1, fixture.route.length)} of {fixture.route.length}.{' '}
-            Review observations and retest tickets are intentionally in-memory only in PHASE-2.
+            Move {Math.min(session.plyIndex + 1, fixture.route.length)} of{' '}
+            {fixture.route.length}. Review observations and retest tickets are
+            intentionally in-memory only in PHASE-2.
           </Typography>
         </Stack>
       </CardContent>
@@ -178,7 +195,9 @@ export function TaskPreviewCard({
         {session.status === 'session-complete' || session.status === 'abandoned' ? (
           <Button onClick={onRestart}>Restart session</Button>
         ) : null}
-        {!['session-complete', 'abandoned', 'line-complete'].includes(session.status) ? (
+        {!['session-complete', 'abandoned', 'line-complete'].includes(
+          session.status,
+        ) ? (
           <Button onClick={onAbandon}>End session</Button>
         ) : null}
       </CardActions>
