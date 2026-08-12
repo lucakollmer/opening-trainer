@@ -108,7 +108,7 @@ export function ChessboardPreview({
               label="From square"
               value={from}
               disabled={interactionDisabled}
-              inputProps={{ maxLength: 2, inputMode: 'text' }}
+              slotProps={{ htmlInput: { maxLength: 2, inputMode: 'text' } }}
               onChange={(event: ChangeEvent<HTMLInputElement>) => setFrom(event.target.value)}
             />
             <TextField
@@ -116,7 +116,7 @@ export function ChessboardPreview({
               label="To square"
               value={to}
               disabled={interactionDisabled}
-              inputProps={{ maxLength: 2, inputMode: 'text' }}
+              slotProps={{ htmlInput: { maxLength: 2, inputMode: 'text' } }}
               onChange={(event: ChangeEvent<HTMLInputElement>) => setTo(event.target.value)}
             />
             <FormControl size="small" sx={{ minWidth: 130 }} disabled={interactionDisabled}>
