@@ -1,81 +1,51 @@
 import { Chip, Paper, Stack, Typography } from '@mui/material';
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
-import type { TrainingMode, TrainingTreeItem } from '../../fixtures/trainingFixtures';
+import type { TrainingMode } from '../../fixtures/trainingFixtures';
+import type { ProjectedTrainingTreeItem } from '../../domain/training/treeProjection';
 
 interface RepertoireTreePreviewProps {
   mode: TrainingMode;
-  items: readonly TrainingTreeItem[];
-  revealedItemIds: readonly string[];
-  currentItemId?: string;
+  items: readonly ProjectedTrainingTreeItem[];
 }
 
-const statusLabels: Record<TrainingTreeItem['status'], string> = {
+const statusLabels: Record<ProjectedTrainingTreeItem['status'], string> = {
   reviewed: 'Reviewed',
   current: 'Current',
   due: 'Due',
   new: 'New',
 };
 
-function collectExpandedItemIds(items: readonly TrainingTreeItem[]): string[] {
+function collectExpandedItemIds(
+  items: readonly ProjectedTrainingTreeItem[],
+): string[] {
   return items.flatMap((item) => [
-    ...(item.children?.length ? [item.id] : []),
-    ...collectExpandedItemIds(item.children ?? []),
+    ...(item.children.length ? [item.id] : []),
+    ...collectExpandedItemIds(item.children),
   ]);
 }
 
-function TreeLabel({
-  item,
-  mode,
-  revealedItemIds,
-  currentItemId,
-}: {
-  item: TrainingTreeItem;
-  mode: TrainingMode;
-  revealedItemIds: readonly string[];
-  currentItemId?: string;
-}) {
-  const visible = mode === 'browse' || revealedItemIds.includes(item.id);
-  const label = visible ? item.visibleLabel : item.maskedLabel;
-
-  return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
-      <Typography component="span" variant="body2">
-        {label}
-      </Typography>
-      <Chip size="small" variant="outlined" label={statusLabels[item.status]} />
-      {item.transposition ? <Chip size="small" label="Transposition" /> : null}
-      {item.id === currentItemId ? (
-        <Typography component="span" variant="caption" sx={{ fontWeight: 700 }}>
-          Current decision
-        </Typography>
-      ) : null}
-    </Stack>
-  );
-}
-
-function renderItem(
-  item: TrainingTreeItem,
-  mode: TrainingMode,
-  revealedItemIds: readonly string[],
-  currentItemId: string | undefined,
-) {
+function renderItem(item: ProjectedTrainingTreeItem) {
   return (
     <TreeItem
       key={item.id}
       itemId={item.id}
       label={
-        <TreeLabel
-          item={item}
-          mode={mode}
-          revealedItemIds={revealedItemIds}
-          currentItemId={currentItemId}
-        />
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
+          <Typography component="span" variant="body2">
+            {item.label.text}
+          </Typography>
+          <Chip size="small" variant="outlined" label={statusLabels[item.status]} />
+          {item.transposition ? <Chip size="small" label="Transposition" /> : null}
+          {item.current ? (
+            <Typography component="span" variant="caption" sx={{ fontWeight: 700 }}>
+              Current decision
+            </Typography>
+          ) : null}
+        </Stack>
       }
     >
-      {item.children?.map((child) =>
-        renderItem(child, mode, revealedItemIds, currentItemId),
-      )}
+      {item.children.map(renderItem)}
     </TreeItem>
   );
 }
@@ -83,8 +53,6 @@ function renderItem(
 export function RepertoireTreePreview({
   mode,
   items,
-  revealedItemIds,
-  currentItemId,
 }: RepertoireTreePreviewProps) {
   return (
     <Paper
@@ -100,14 +68,14 @@ export function RepertoireTreePreview({
           <Typography variant="body2" color="text.secondary">
             {mode === 'train'
               ? 'Played or explicitly revealed moves are shown; unrelated future answers remain withheld.'
-              : 'Browse mode shows the complete synthetic fixture.'}
+              : 'Browse mode shows the complete repertoire projection.'}
           </Typography>
         </div>
         <SimpleTreeView
           defaultExpandedItems={collectExpandedItemIds(items)}
-          aria-label="Synthetic repertoire tree"
+          aria-label="Repertoire tree"
         >
-          {items.map((item) => renderItem(item, mode, revealedItemIds, currentItemId))}
+          {items.map(renderItem)}
         </SimpleTreeView>
       </Stack>
     </Paper>

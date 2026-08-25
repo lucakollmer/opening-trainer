@@ -1,6 +1,10 @@
 import {
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
@@ -13,7 +17,10 @@ import {
 import { useState, type ChangeEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { Chessboard } from 'react-chessboard';
-import type { PromotionPiece } from '../../domain/chess/chessAdapter';
+import {
+  requiresPromotion,
+  type PromotionPiece,
+} from '../../domain/chess/chessAdapter';
 
 export interface BoardMoveCommand {
   type: 'board.move-requested';
@@ -47,6 +54,10 @@ export function ChessboardPreview({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [promotion, setPromotion] = useState<PromotionPiece | ''>('');
+  const [pendingPromotion, setPendingPromotion] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
 
   const submitAccessibleMove = () => {
     if (!from || !to || interactionDisabled) return;
@@ -61,6 +72,12 @@ export function ChessboardPreview({
       setTo('');
       setPromotion('');
     }
+  };
+
+  const submitPromotion = (piece: PromotionPiece) => {
+    if (!pendingPromotion) return;
+    onMove({ type: 'board.move-requested', ...pendingPromotion, promotion: piece });
+    setPendingPromotion(null);
   };
 
   const hintSquareStyles = Object.fromEntries(
@@ -104,6 +121,10 @@ export function ChessboardPreview({
               squareStyles: hintSquareStyles,
               onPieceDrop: ({ sourceSquare, targetSquare }) => {
                 if (interactionDisabled || !targetSquare) return false;
+                if (requiresPromotion(position, sourceSquare, targetSquare)) {
+                  setPendingPromotion({ from: sourceSquare, to: targetSquare });
+                  return false;
+                }
                 return onMove({
                   type: 'board.move-requested',
                   from: sourceSquare,
@@ -135,9 +156,7 @@ export function ChessboardPreview({
               value={to}
               disabled={interactionDisabled}
               slotProps={{ htmlInput: { maxLength: 2, inputMode: 'text' } }}
-              onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                setTo(event.target.value)
-              }
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setTo(event.target.value)}
             />
             <FormControl
               size="small"
@@ -183,6 +202,25 @@ export function ChessboardPreview({
             : 'No hint overlay active.'}
         </Typography>
       </Stack>
+
+      <Dialog
+        open={pendingPromotion !== null}
+        onClose={() => setPendingPromotion(null)}
+        aria-labelledby="promotion-dialog-title"
+      >
+        <DialogTitle id="promotion-dialog-title">Choose promotion piece</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Choose the piece before the move is submitted.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => submitPromotion('q')}>Queen</Button>
+          <Button onClick={() => submitPromotion('r')}>Rook</Button>
+          <Button onClick={() => submitPromotion('b')}>Bishop</Button>
+          <Button onClick={() => submitPromotion('n')}>Knight</Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

@@ -1,55 +1,46 @@
-# Opening Trainer ChatGPT + GitHub Actions workflow pack
+# Opening Trainer
 
-This is a **workflow migration overlay** for `lucakollmer/opening-trainer`. It replaces the historical local-Codex operating layer with the accepted ChatGPT-browser + GitHub Actions trial workflow while preserving the existing PHASE-0 application candidate.
+Opening Trainer is a web-first React/TypeScript chess repertoire trainer deployed as a Cloudflare Worker at `openings.lucakollmer.com`.
 
-It is not a fresh repository scaffold and must not be copied over the repository indiscriminately.
+## Current authority and workflow
 
-## Current checkpoint
+Repository operating authority is `AGENTS.md` plus the GitHub Assistant Memory project `PRJ-CHESS-OPENING-TRAINER`. Google Drive and the older ChatGPT + GitHub Actions workflow documents in this repository are historical/recovery material only.
 
-At pack creation, the verified checkpoint was:
+The accepted development mode is `cloud` and the accepted validation workflow is `cloudflare-workers-direct`:
 
-```yaml
-repository: lucakollmer/opening-trainer
-visibility: public
-base_branch: main
-base_sha: 87ccbce18384892601a6630494910e1ca0375f13
-phase_branch: phase-0-foundation
-phase_head: 5477419fce1f13f4265ab82d6ee3058d851b5019
-pull_request: 2
-pull_request_state: open, draft, unmerged
-permanent_validation_run: 30906801969
-permanent_validation_result: success
-review_artifact_id: 8891213897
-phase_gate: COMPLETE_FOR_MANUAL_REVIEW
+1. publish an exact candidate SHA on the intended GitHub branch;
+2. require the Cloudflare Workers Build for that exact SHA to reach terminal success;
+3. require the immutable Worker Version Preview and exact `/deployment.json` SHA readback;
+4. perform proportionate browser/runtime validation on the immutable preview;
+5. stop at the applicable Luca Product/merge gate.
+
+GitHub Actions is not part of the accepted validation workflow and must not be intentionally invoked for validation.
+
+Canonical provider commands are:
+
+```text
+build: pnpm validate && git diff --check
+preview deploy: npx wrangler versions upload
+production deploy: npx wrangler deploy
 ```
 
-These are verification expectations, not permission to assume mutable GitHub state. The executing chat must re-read Drive and GitHub before writing.
+## Product programme
 
-## Start here
+The MVP is implemented through explicit phases. Accepted work currently includes the responsive board/tree/task shell and deterministic complete-line training vertical slice. `plans.md` retains the detailed PHASE-0 through PHASE-8 product programme; where its historical workflow prose conflicts with `AGENTS.md` or current Assistant Memory, the current GitHub/Workers workflow governs.
 
-1. Read `CHATGPT_START_HERE.md`.
-2. Read `WORKFLOW_MIGRATION.md`.
-3. Attach this ZIP to a fresh Opening Trainer project chat.
-4. Paste the exact migration request from `CHATGPT_START_HERE.md`.
-5. Apply the overlay only on the existing `phase-0-foundation` branch and PR #2 after exact-state verification.
-6. Let GitHub Actions validate the new head.
-7. Stop for Luca's PHASE-0 manual acceptance. Do not merge or begin PHASE-1.
+The product direction includes:
 
-## Main files
+- complete-line repertoire recall from the initial position;
+- deterministic repertoire opponent behaviour without a chess engine;
+- contextual repertoire graph and transpositions;
+- multiple accepted moves and PGN import;
+- local persistence and portable backup/restore;
+- scheduler-neutral raw review evidence and later FSRS scheduling;
+- responsive, accessible PWA delivery.
 
-- `AGENTS.md` - durable repository operating rules.
-- `context.md` - current verified execution checkpoint.
-- `plans.md` - detailed PHASE-0 to PHASE-8 programme and gates.
-- `CHATGPT_START_HERE.md` - fresh-chat orientation and exact first request.
-- `CHATGPT_WORKFLOW_PROFILE.md` - bounded work-request contract.
-- `WORKFLOW_MIGRATION.md` - exact preserve/replace/add/delete migration map.
-- `docs/workflow/` - Actions security, evidence, phase-command, prompt and report contracts.
-- `prompts/WRK-OPENING-TRAINER-20260804-001__MVP__GOVERNANCE__migration__v1.md` - immutable first migration request.
-- `scripts/verify-pack.mjs` - overlay/repository integrity and stale-authority checks.
+## Development commands
 
-## Current application commands
-
-After the overlay is applied, the PHASE-0 application remains a Node 24/pnpm project:
+The application uses Node 24 and pnpm.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -59,8 +50,20 @@ pnpm build
 pnpm preview
 ```
 
-GitHub Actions runs `pnpm validate` as the technical evidence gate. Local or Codespaces commands are for interactive review and debugging.
+`pnpm validate` covers repository integrity, ESLint, strict TypeScript, deterministic tests, production build, generated PWA checks and Prettier. `git diff --check` is additionally part of the Workers Build command.
 
-## Critical boundary
+## Key files
 
-The overlay must preserve the current application implementation, package/lockfiles, tests, PHASE-0 documents and `.github/workflows/ci.yml`. It must not overwrite the repository's generated full-tree `SHA256SUMS.txt` with this transfer archive's checksum file. Follow `WORKFLOW_MIGRATION.md` exactly.
+- `AGENTS.md` — current repository operating and validation rules.
+- `CHATGPT_WORKFLOW_PROFILE.md` — current cloud/Workers execution profile.
+- `plans.md` — detailed product phase programme; legacy workflow prose is historical.
+- `docs/product/PRODUCT_CONTRACT.md` — product behaviour contract.
+- `docs/architecture/ARCHITECTURE.md` — module and dependency boundaries.
+- `docs/domain/REPERTOIRE_DOMAIN_MODEL.md` — canonical repertoire/context model.
+- `docs/training/TRAINING_AND_SCHEDULING.md` — evidence/session/scheduling contract.
+- `docs/ui/UI_AND_INTERACTION_CONTRACT.md` — responsive and accessibility contract.
+- `SHA256SUMS.txt` — repository integrity manifest.
+
+## Safety boundaries
+
+Do not merge a phase candidate, start a later phase, change production routing, retire the retained Pages recovery project, or broaden Product scope without the authority required by `AGENTS.md` and current Assistant Memory. Never force-push or rewrite product history.
