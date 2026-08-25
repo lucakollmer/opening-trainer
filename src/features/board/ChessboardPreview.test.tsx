@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { ChessboardPreview } from './ChessboardPreview';
@@ -28,7 +28,11 @@ describe('ChessboardPreview promotion boundary', () => {
         onMove={onMove}
       />,
     );
-    expect(drop?.({ sourceSquare: 'a7', targetSquare: 'a8' })).toBe(false);
+    let dropAccepted: boolean | undefined;
+    act(() => {
+      dropAccepted = drop?.({ sourceSquare: 'a7', targetSquare: 'a8' });
+    });
+    expect(dropAccepted).toBe(false);
     expect(
       await screen.findByRole('dialog', { name: 'Choose promotion piece' }),
     ).toBeVisible();
