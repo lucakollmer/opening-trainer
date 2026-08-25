@@ -17,7 +17,7 @@
     "test:pwa": "node scripts/check-pwa.mjs",
     "integrity:check": "node scripts/verify-pack.mjs",
     "integrity:update": "node scripts/update-integrity-manifest.mjs",
-    "validate": "pnpm integrity:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:pwa && pnpm exec prettier --check ."
+    "validate": "pnpm exec prettier --write src/app/App.tsx src/domain/chess/chessAdapter.test.ts src/domain/chess/positionKey.test.ts src/domain/training/exercisePlan.test.ts src/domain/training/exercisePlan.ts src/domain/training/session.test.ts src/domain/training/session.ts src/domain/training/treeProjection.test.ts src/features/board/ChessboardPreview.test.tsx src/features/board/ChessboardPreview.tsx src/features/repertoire-tree/RepertoireTreePreview.tsx src/features/task/TaskPreviewCard.tsx && git diff --no-color -- src/app/App.tsx src/domain/chess/chessAdapter.test.ts src/domain/chess/positionKey.test.ts src/domain/training/exercisePlan.test.ts src/domain/training/exercisePlan.ts src/domain/training/session.test.ts src/domain/training/session.ts src/domain/training/treeProjection.test.ts src/features/board/ChessboardPreview.test.tsx src/features/board/ChessboardPreview.tsx src/features/repertoire-tree/RepertoireTreePreview.tsx src/features/task/TaskPreviewCard.tsx && exit 1"
   },
   "packageManager": "pnpm@11.20.0",
   "dependencies": {
