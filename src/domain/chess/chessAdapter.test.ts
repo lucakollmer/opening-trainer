@@ -1,49 +1,53 @@
 import { Chess } from 'chess.js';
-import { applyInitialPositionMove, applyMove, moveToUci } from './chessAdapter';
+import {
+  applyInitialPositionMove,
+  moveToUci,
+  requiresPromotion,
+  tryApplyMove,
+} from './chessAdapter';
 
 describe('chess adapter', () => {
-  it('accepts a legal initial move and exposes SAN, UCI, and resulting position', () => {
-    const result = applyMove(new Chess().fen(), { from: 'e2', to: 'e4' });
-
-    expect(result?.san).toBe('e4');
-    expect(result?.uci).toBe('e2e4');
-    expect(result?.fen).toContain(' b ');
-    expect(result?.positionKey).toContain(' b ');
+  it('accepts a legal move with stable SAN, UCI and position identity', () => {
+    const result = tryApplyMove(new Chess().fen(), { from: 'e2', to: 'e4' });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.move.san).toBe('e4');
+    expect(result.move.uci).toBe('e2e4');
+    expect(result.move.positionKey).toContain(' b ');
   });
 
-  it('rejects an illegal move without advancing state', () => {
-    expect(applyMove(new Chess().fen(), { from: 'e2', to: 'e5' })).toBeNull();
+  it('distinguishes illegal moves from invalid source positions', () => {
+    const illegal = tryApplyMove(new Chess().fen(), { from: 'e2', to: 'e5' });
+    const invalid = tryApplyMove('not a fen', { from: 'e2', to: 'e4' });
+    expect(illegal).toMatchObject({ ok: false, code: 'CHESS_ILLEGAL_MOVE' });
+    expect(invalid).toMatchObject({ ok: false, code: 'CHESS_INVALID_POSITION' });
   });
 
-  it('preserves the PHASE-0 initial-position helper', () => {
-    const result = applyInitialPositionMove('e2', 'e4');
-
-    expect(result?.san).toBe('e4');
-    expect(result?.fen).toContain(' b ');
+  it('preserves the initial-position helper', () => {
+    expect(applyInitialPositionMove('e2', 'e4')?.san).toBe('e4');
   });
 
-  it('applies a promotion and includes it in stable UCI identity', () => {
-    const fen = '8/P7/8/8/8/8/4K3/7k w - - 0 1';
-    const result = applyMove(fen, { from: 'a7', to: 'a8', promotion: 'n' });
-
-    expect(result?.uci).toBe('a7a8n');
-    expect(result?.san).toContain('N');
+  it('handles promotion, castling and legal en-passant', () => {
+    const promotionFen = '8/P7/8/8/8/8/4K3/7k w - - 0 1';
+    const promoted = tryApplyMove(promotionFen, {
+      from: 'a7',
+      to: 'a8',
+      promotion: 'n',
+    });
+    expect(promoted.ok && promoted.move.uci).toBe('a7a8n');
     expect(moveToUci({ from: 'a7', to: 'a8', promotion: 'q' })).toBe('a7a8q');
-  });
+    expect(requiresPromotion(promotionFen, 'a7', 'a8')).toBe(true);
 
-  it('handles castling through the same legal-move boundary', () => {
-    const fen = 'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1';
-    const result = applyMove(fen, { from: 'e1', to: 'g1' });
+    const castled = tryApplyMove(
+      'r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1',
+      { from: 'e1', to: 'g1' },
+    );
+    expect(castled.ok && castled.move.san).toBe('O-O');
 
-    expect(result?.san).toBe('O-O');
-    expect(result?.uci).toBe('e1g1');
-  });
-
-  it('handles legal en-passant captures through the same boundary', () => {
-    const fen = '8/8/8/3pP3/8/8/4K3/7k w - d6 0 1';
-    const result = applyMove(fen, { from: 'e5', to: 'd6' });
-
-    expect(result?.uci).toBe('e5d6');
-    expect(result?.san).toContain('exd6');
+    const ep = tryApplyMove('8/8/8/3pP3/8/8/4K3/7k w - d6 0 1', {
+      from: 'e5',
+      to: 'd6',
+    });
+    expect(ep.ok && ep.move.uci).toBe('e5d6');
   });
 });

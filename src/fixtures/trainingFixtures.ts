@@ -305,7 +305,7 @@ export const fix02Black: TrainingFixture = {
       san: 'd6',
       treeItemId: 'fix02-node-04',
       acceptedUci: ['d7d6'],
-      wrongSiblingUci: ['b8c7'],
+      wrongSiblingUci: ['b8c6'],
       hint: {
         piece: 'd-pawn',
         candidateDestinations: ['d6', 'd5'],
