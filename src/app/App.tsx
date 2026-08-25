@@ -16,8 +16,10 @@ import {
   Toolbar,
   Tooltip,
   Typography,
+  useMediaQuery,
 } from '@mui/material';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   ChessboardPreview,
   type BoardMoveCommand,
@@ -25,35 +27,114 @@ import {
 import { RepertoireTreePreview } from '../features/repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../features/task/TaskPreviewCard';
 import {
-  foundationFixture,
-  type TaskFixtureState,
+  canSubmitUserMove,
+  createTrainingSession,
+  currentFixtureStep,
+  reduceTrainingSession,
+} from '../domain/training/session';
+import {
+  fix01White,
+  phase2TrainingFixtures,
+  type TrainingFixture,
   type TrainingMode,
-} from '../fixtures/foundationFixture';
+} from '../fixtures/trainingFixtures';
 
-const taskStateOrder: readonly TaskFixtureState[] = [
-  'awaiting-user-move',
-  'correct-feedback',
-  'hint-offered',
-  'line-complete',
-];
+function nowMs() {
+  return Date.now();
+}
 
 export function App() {
   const [mode, setMode] = useState<TrainingMode>('train');
   const [treeOpen, setTreeOpen] = useState(false);
-  const [taskState, setTaskState] = useState<TaskFixtureState>('awaiting-user-move');
-  const [lastCommand, setLastCommand] = useState<BoardMoveCommand | null>(null);
+  const [fixtureId, setFixtureId] = useState<string>(fix01White.id);
+  const [session, setSession] = useState(() =>
+    createTrainingSession(fix01White, nowMs()),
+  );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
-  const handleMove = (command: BoardMoveCommand) => {
-    setLastCommand(command);
-    setTaskState('correct-feedback');
+  const fixture: TrainingFixture =
+    phase2TrainingFixtures.find((candidate) => candidate.id === fixtureId) ??
+    fix01White;
+  const currentStep = currentFixtureStep(session, fixture);
+
+  useEffect(() => {
+    if (mode !== 'train') return undefined;
+
+    if (session.status === 'opponent-moving') {
+      const timer = window.setTimeout(
+        () =>
+          setSession((current) =>
+            reduceTrainingSession(current, fixture, {
+              type: 'opponent-tick',
+              nowMs: nowMs(),
+            }),
+          ),
+        reducedMotion ? 0 : 260,
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    if (session.status === 'correct-feedback') {
+      const timer = window.setTimeout(
+        () =>
+          setSession((current) =>
+            reduceTrainingSession(current, fixture, {
+              type: 'continue',
+              nowMs: nowMs(),
+            }),
+          ),
+        420,
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    return undefined;
+  }, [fixture, mode, reducedMotion, session.status]);
+
+  const handleFixtureChange = (nextFixtureId: string) => {
+    const nextFixture = phase2TrainingFixtures.find(
+      (candidate) => candidate.id === nextFixtureId,
+    );
+    if (!nextFixture) return;
+
+    setFixtureId(nextFixture.id);
+    setSession(createTrainingSession(nextFixture, nowMs()));
   };
 
-  const advanceTaskState = () => {
-    const currentIndex = taskStateOrder.indexOf(taskState);
-    const nextState = taskStateOrder[(currentIndex + 1) % taskStateOrder.length];
-    if (nextState) setTaskState(nextState);
+  const handleMove = (command: BoardMoveCommand): boolean => {
+    if (mode !== 'train') return false;
+
+    const next = reduceTrainingSession(session, fixture, {
+      type: 'user-move',
+      move: {
+        from: command.from,
+        to: command.to,
+        ...(command.promotion ? { promotion: command.promotion } : {}),
+      },
+      nowMs: nowMs(),
+    });
+    const advanced = next.fen !== session.fen;
+    setSession(next);
+    return advanced;
   };
+
+  const hintSquares =
+    session.hintLevel >= 2 && session.hintLevel < 4 && currentStep?.actor === 'user'
+      ? (currentStep.hint?.candidateDestinations ?? [])
+      : [];
+  const lastMove = session.lastMove
+    ? ([session.lastMove.from, session.lastMove.to] as const)
+    : undefined;
+
+  const tree = (
+    <RepertoireTreePreview
+      mode={mode}
+      items={fixture.tree}
+      revealedItemIds={session.treeRevealedItemIds}
+      currentItemId={currentStep?.treeItemId}
+    />
+  );
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -63,17 +144,21 @@ export function App() {
             Opening Trainer
           </Typography>
 
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="repertoire-label">Repertoire</InputLabel>
+          <FormControl size="small" sx={{ minWidth: 210 }}>
+            <InputLabel id="repertoire-label">Training fixture</InputLabel>
             <Select
               labelId="repertoire-label"
-              label="Repertoire"
-              value={foundationFixture.id}
-              onChange={() => undefined}
+              label="Training fixture"
+              value={fixture.id}
+              onChange={(event: SelectChangeEvent<string>) =>
+                handleFixtureChange(String(event.target.value))
+              }
             >
-              <MenuItem value={foundationFixture.id}>
-                {foundationFixture.label}
-              </MenuItem>
+              {phase2TrainingFixtures.map((candidate) => (
+                <MenuItem key={candidate.id} value={candidate.id}>
+                  {candidate.label}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
 
@@ -82,7 +167,7 @@ export function App() {
             exclusive
             value={mode}
             aria-label="Training mode"
-            onChange={(_, nextMode: TrainingMode | null) => {
+            onChange={(_: MouseEvent<HTMLElement>, nextMode: TrainingMode | null) => {
               if (nextMode) setMode(nextMode);
             }}
           >
@@ -90,11 +175,11 @@ export function App() {
             <ToggleButton value="browse">Browse</ToggleButton>
           </ToggleButtonGroup>
 
-          <Chip size="small" label={`${foundationFixture.dueCount} due`} />
+          <Chip size="small" label={`${session.evidence.length} observations`} />
           <Chip
             size="small"
             variant="outlined"
-            label={foundationFixture.sessionProgress}
+            label={`${session.plyIndex}/${fixture.route.length} plies`}
           />
 
           <Tooltip title="Open repertoire tree">
@@ -138,25 +223,73 @@ export function App() {
           <Box
             sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}
           >
-            <RepertoireTreePreview mode={mode} items={foundationFixture.tree} />
+            {tree}
           </Box>
 
           <Box sx={{ gridArea: 'board', minWidth: 0 }}>
             <ChessboardPreview
-              position={foundationFixture.position}
-              orientation={foundationFixture.orientation}
-              userTurn
-              lastMove={lastCommand ? [lastCommand.from, lastCommand.to] : undefined}
-              hintSquares={taskState === 'hint-offered' ? ['g1', 'f3'] : []}
+              position={session.fen}
+              orientation={fixture.orientation}
+              userTurn={mode === 'train' && canSubmitUserMove(session)}
+              disabled={mode === 'browse'}
+              lastMove={lastMove}
+              hintSquares={hintSquares}
+              reducedMotion={reducedMotion}
               onMove={handleMove}
             />
           </Box>
 
           <Box sx={{ gridArea: 'task', minWidth: 0 }}>
             <TaskPreviewCard
-              state={taskState}
-              onHint={() => setTaskState('hint-offered')}
-              onContinue={advanceTaskState}
+              session={session}
+              fixture={fixture}
+              onHint={() =>
+                setSession((current) =>
+                  reduceTrainingSession(current, fixture, { type: 'request-hint' }),
+                )
+              }
+              onReveal={() =>
+                setSession((current) =>
+                  reduceTrainingSession(current, fixture, {
+                    type: 'reveal',
+                    nowMs: nowMs(),
+                  }),
+                )
+              }
+              onContinue={() =>
+                setSession((current) =>
+                  reduceTrainingSession(current, fixture, {
+                    type: 'continue',
+                    nowMs: nowMs(),
+                  }),
+                )
+              }
+              onRetest={() =>
+                setSession((current) =>
+                  reduceTrainingSession(current, fixture, {
+                    type: 'start-retest',
+                    nowMs: nowMs(),
+                  }),
+                )
+              }
+              onCompleteSession={() =>
+                setSession((current) =>
+                  reduceTrainingSession(current, fixture, { type: 'complete-session' }),
+                )
+              }
+              onRestart={() =>
+                setSession((current) =>
+                  reduceTrainingSession(current, fixture, {
+                    type: 'restart',
+                    nowMs: nowMs(),
+                  }),
+                )
+              }
+              onAbandon={() =>
+                setSession((current) =>
+                  reduceTrainingSession(current, fixture, { type: 'abandon' }),
+                )
+              }
             />
           </Box>
         </Box>
@@ -171,7 +304,7 @@ export function App() {
           transition: { onExited: () => treeButtonRef.current?.focus() },
         }}
       >
-        <RepertoireTreePreview mode={mode} items={foundationFixture.tree} />
+        {tree}
       </Drawer>
     </Box>
   );

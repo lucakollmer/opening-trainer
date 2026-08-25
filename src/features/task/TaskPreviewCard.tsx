@@ -8,43 +8,116 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import type { TaskFixtureState } from '../../fixtures/foundationFixture';
+import {
+  canSubmitUserMove,
+  currentFixtureStep,
+  hintDisclosure,
+  readyRetestCount,
+  type TrainingSessionState,
+} from '../../domain/training/session';
+import type { TrainingFixture } from '../../fixtures/trainingFixtures';
 
 interface TaskPreviewCardProps {
-  state: TaskFixtureState;
+  session: TrainingSessionState;
+  fixture: TrainingFixture;
   onHint: () => void;
+  onReveal: () => void;
   onContinue: () => void;
+  onRetest: () => void;
+  onCompleteSession: () => void;
+  onRestart: () => void;
+  onAbandon: () => void;
 }
 
-const stateContent: Record<
-  TaskFixtureState,
-  { tone: 'info' | 'success' | 'warning'; title: string; instruction: string }
-> = {
-  'awaiting-user-move': {
-    tone: 'info',
-    title: 'Find the repertoire move',
-    instruction:
-      'Use the board or the accessible move entry. No review evidence is stored.',
-  },
-  'correct-feedback': {
-    tone: 'success',
-    title: 'Fixture command received',
-    instruction: 'The shell accepted a typed command. Real grading begins in PHASE-2.',
-  },
-  'hint-offered': {
-    tone: 'warning',
-    title: 'Synthetic hint',
-    instruction: 'Consider developing a kingside piece. The answer remains concealed.',
-  },
-  'line-complete': {
-    tone: 'success',
-    title: 'Fixture line complete',
-    instruction: 'This state demonstrates the line-summary surface only.',
-  },
-};
+function defaultContent(session: TrainingSessionState) {
+  switch (session.status) {
+    case 'awaiting-user-move':
+      return {
+        severity: 'info' as const,
+        title: 'Find the repertoire move',
+        message: 'Play a legal move from the board or accessible move entry.',
+      };
+    case 'opponent-moving':
+      return {
+        severity: 'info' as const,
+        title: 'Opponent reply',
+        message: 'The deterministic fixture opponent is following the selected route.',
+      };
+    case 'hint-offered':
+      return {
+        severity: 'warning' as const,
+        title: 'Hint requested',
+        message: 'Use the disclosed clue and make the move when ready.',
+      };
+    case 'repair-replay':
+      return {
+        severity: 'warning' as const,
+        title: session.feedback?.title ?? 'Repair this decision',
+        message:
+          session.feedback?.message ??
+          'Replay the accepted move now. The original failure remains recorded.',
+      };
+    case 'line-complete':
+      return {
+        severity: 'success' as const,
+        title: 'Line complete',
+        message: 'The full fixture route has been replayed from the initial position.',
+      };
+    case 'session-complete':
+      return {
+        severity: 'success' as const,
+        title: 'Session complete',
+        message:
+          'This run kept all observations in memory only; no scheduler state was updated.',
+      };
+    case 'abandoned':
+      return {
+        severity: 'warning' as const,
+        title: 'Session abandoned',
+        message: 'The in-memory run ended without committing persistent review state.',
+      };
+    case 'error':
+      return {
+        severity: 'error' as const,
+        title: 'Training fixture error',
+        message:
+          'The deterministic route could not continue from the current position.',
+      };
+    default:
+      return {
+        severity:
+          session.feedback?.kind === 'correct' || session.feedback?.kind === 'repair'
+            ? ('success' as const)
+            : session.feedback?.kind === 'illegal' ||
+                session.feedback?.kind === 'outside'
+              ? ('error' as const)
+              : ('warning' as const),
+        title: session.feedback?.title ?? 'Training feedback',
+        message: session.feedback?.message ?? 'Review the feedback before continuing.',
+      };
+  }
+}
 
-export function TaskPreviewCard({ state, onHint, onContinue }: TaskPreviewCardProps) {
-  const content = stateContent[state];
+export function TaskPreviewCard({
+  session,
+  fixture,
+  onHint,
+  onReveal,
+  onContinue,
+  onRetest,
+  onCompleteSession,
+  onRestart,
+  onAbandon,
+}: TaskPreviewCardProps) {
+  const content = defaultContent(session);
+  const hint = hintDisclosure(session, fixture);
+  const step = currentFixtureStep(session, fixture);
+  const hintAllowed =
+    canSubmitUserMove(session) &&
+    session.status !== 'repair-replay' &&
+    step?.actor === 'user' &&
+    Boolean(step.hint);
+  const readyRetests = readyRetestCount(session);
 
   return (
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
@@ -53,29 +126,80 @@ export function TaskPreviewCard({ state, onHint, onContinue }: TaskPreviewCardPr
           <Stack
             direction="row"
             spacing={1}
+            useFlexGap
             sx={{ alignItems: 'center', flexWrap: 'wrap' }}
           >
-            <Chip size="small" label="Synthetic fixture" />
+            <Chip
+              size="small"
+              label={session.runKind === 'retest' ? 'Retest run' : 'Primary run'}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`${session.evidence.length} observations`}
+            />
+            {session.retestQueue.length > 0 ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${session.retestQueue.length} retest queued`}
+              />
+            ) : null}
             <Typography variant="caption" color="text.secondary">
-              {state}
+              {session.status}
             </Typography>
           </Stack>
+
           <Typography id="task-heading" component="h2" variant="h6">
             {content.title}
           </Typography>
-          <Alert
-            severity={content.tone}
-            aria-live={content.tone === 'success' ? 'polite' : 'off'}
-          >
-            {content.instruction}
+          <Alert severity={content.severity} aria-live="polite">
+            {content.message}
           </Alert>
+
+          {hint ? (
+            <Alert severity={session.hintLevel === 4 ? 'warning' : 'info'}>
+              {hint}
+            </Alert>
+          ) : null}
+
+          <Typography variant="body2" color="text.secondary">
+            Move {Math.min(session.plyIndex + 1, fixture.route.length)} of{' '}
+            {fixture.route.length}. Review observations and retest tickets are
+            intentionally in-memory only in PHASE-2.
+          </Typography>
         </Stack>
       </CardContent>
-      <CardActions>
-        <Button onClick={onHint} disabled={state === 'hint-offered'}>
-          Hint
-        </Button>
-        <Button onClick={onContinue}>Next fixture state</Button>
+
+      <CardActions sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+        {hintAllowed && session.hintLevel < 3 ? (
+          <Button onClick={onHint}>Hint {session.hintLevel + 1}</Button>
+        ) : null}
+        {hintAllowed && session.hintLevel < 4 ? (
+          <Button onClick={onReveal}>Reveal move</Button>
+        ) : null}
+        {session.status === 'correct-feedback' ? (
+          <Button onClick={onContinue}>Continue line</Button>
+        ) : null}
+        {session.status === 'wrong-variation-feedback' ||
+        session.status === 'outside-repertoire-feedback' ||
+        session.status === 'answer-revealed' ? (
+          <Button onClick={onContinue}>Repair move</Button>
+        ) : null}
+        {session.status === 'line-complete' && readyRetests > 0 ? (
+          <Button onClick={onRetest}>Run queued retest</Button>
+        ) : null}
+        {session.status === 'line-complete' ? (
+          <Button onClick={onCompleteSession}>Complete session</Button>
+        ) : null}
+        {session.status === 'session-complete' || session.status === 'abandoned' ? (
+          <Button onClick={onRestart}>Restart session</Button>
+        ) : null}
+        {!['session-complete', 'abandoned', 'line-complete'].includes(
+          session.status,
+        ) ? (
+          <Button onClick={onAbandon}>End session</Button>
+        ) : null}
       </CardActions>
     </Card>
   );

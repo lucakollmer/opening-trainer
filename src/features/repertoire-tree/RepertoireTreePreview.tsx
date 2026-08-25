@@ -1,34 +1,42 @@
 import { Chip, Paper, Stack, Typography } from '@mui/material';
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
-import type {
-  RepertoireTreeFixtureItem,
-  TrainingMode,
-} from '../../fixtures/foundationFixture';
+import type { TrainingMode, TrainingTreeItem } from '../../fixtures/trainingFixtures';
 
 interface RepertoireTreePreviewProps {
   mode: TrainingMode;
-  items: readonly RepertoireTreeFixtureItem[];
+  items: readonly TrainingTreeItem[];
+  revealedItemIds: readonly string[];
+  currentItemId?: string;
 }
 
-const statusLabels: Record<RepertoireTreeFixtureItem['status'], string> = {
+const statusLabels: Record<TrainingTreeItem['status'], string> = {
   reviewed: 'Reviewed',
   current: 'Current',
   due: 'Due',
   new: 'New',
 };
 
+function collectExpandedItemIds(items: readonly TrainingTreeItem[]): string[] {
+  return items.flatMap((item) => [
+    ...(item.children?.length ? [item.id] : []),
+    ...collectExpandedItemIds(item.children ?? []),
+  ]);
+}
+
 function TreeLabel({
   item,
   mode,
+  revealedItemIds,
+  currentItemId,
 }: {
-  item: RepertoireTreeFixtureItem;
+  item: TrainingTreeItem;
   mode: TrainingMode;
+  revealedItemIds: readonly string[];
+  currentItemId?: string;
 }) {
-  const label =
-    mode === 'browse' || item.status === 'reviewed'
-      ? item.visibleLabel
-      : item.maskedLabel;
+  const visible = mode === 'browse' || revealedItemIds.includes(item.id);
+  const label = visible ? item.visibleLabel : item.maskedLabel;
 
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', py: 0.25 }}>
@@ -37,28 +45,47 @@ function TreeLabel({
       </Typography>
       <Chip size="small" variant="outlined" label={statusLabels[item.status]} />
       {item.transposition ? <Chip size="small" label="Transposition" /> : null}
-      {item.current ? (
+      {item.id === currentItemId ? (
         <Typography component="span" variant="caption" sx={{ fontWeight: 700 }}>
-          Current position
+          Current decision
         </Typography>
       ) : null}
     </Stack>
   );
 }
 
-function renderItem(item: RepertoireTreeFixtureItem, mode: TrainingMode) {
+function renderItem(
+  item: TrainingTreeItem,
+  mode: TrainingMode,
+  revealedItemIds: readonly string[],
+  currentItemId: string | undefined,
+) {
   return (
     <TreeItem
       key={item.id}
       itemId={item.id}
-      label={<TreeLabel item={item} mode={mode} />}
+      label={
+        <TreeLabel
+          item={item}
+          mode={mode}
+          revealedItemIds={revealedItemIds}
+          currentItemId={currentItemId}
+        />
+      }
     >
-      {item.children?.map((child) => renderItem(child, mode))}
+      {item.children?.map((child) =>
+        renderItem(child, mode, revealedItemIds, currentItemId),
+      )}
     </TreeItem>
   );
 }
 
-export function RepertoireTreePreview({ mode, items }: RepertoireTreePreviewProps) {
+export function RepertoireTreePreview({
+  mode,
+  items,
+  revealedItemIds,
+  currentItemId,
+}: RepertoireTreePreviewProps) {
   return (
     <Paper
       component="section"
@@ -72,15 +99,15 @@ export function RepertoireTreePreview({ mode, items }: RepertoireTreePreviewProp
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {mode === 'train'
-              ? 'Future answer-bearing labels are withheld.'
+              ? 'Played or explicitly revealed moves are shown; unrelated future answers remain withheld.'
               : 'Browse mode shows the complete synthetic fixture.'}
           </Typography>
         </div>
         <SimpleTreeView
-          defaultExpandedItems={['root-e4', 'reply-e5', 'future-nf3']}
+          defaultExpandedItems={collectExpandedItemIds(items)}
           aria-label="Synthetic repertoire tree"
         >
-          {items.map((item) => renderItem(item, mode))}
+          {items.map((item) => renderItem(item, mode, revealedItemIds, currentItemId))}
         </SimpleTreeView>
       </Stack>
     </Paper>
