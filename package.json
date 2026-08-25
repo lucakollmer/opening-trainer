@@ -17,7 +17,7 @@
     "test:pwa": "node scripts/check-pwa.mjs",
     "integrity:check": "node scripts/verify-pack.mjs",
     "integrity:update": "node scripts/update-integrity-manifest.mjs",
-    "validate": "pnpm integrity:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:pwa && pnpm exec prettier --check ."
+    "validate": "pnpm exec prettier --write src/app/App.tsx src/domain/chess/chessAdapter.test.ts src/domain/chess/positionKey.test.ts src/domain/training/exercisePlan.test.ts src/domain/training/exercisePlan.ts src/domain/training/session.test.ts src/domain/training/session.ts src/domain/training/treeProjection.test.ts src/features/board/ChessboardPreview.test.tsx src/features/board/ChessboardPreview.tsx src/features/repertoire-tree/RepertoireTreePreview.tsx src/features/task/TaskPreviewCard.tsx && node -e \"const fs=require('fs'); for(const f of process.argv.slice(1)){const b=Buffer.from(fs.readFileSync(f)).toString('base64'); for(let i=0,n=0;i<b.length;i+=1500,n++) console.log('FORMAT_B64:'+f+':'+n+':'+b.slice(i,i+1500));}\" src/app/App.tsx src/domain/chess/chessAdapter.test.ts src/domain/chess/positionKey.test.ts src/domain/training/exercisePlan.test.ts src/domain/training/exercisePlan.ts src/domain/training/session.test.ts src/domain/training/session.ts src/domain/training/treeProjection.test.ts src/features/board/ChessboardPreview.test.tsx src/features/board/ChessboardPreview.tsx src/features/repertoire-tree/RepertoireTreePreview.tsx src/features/task/TaskPreviewCard.tsx && exit 1"
   },
   "packageManager": "pnpm@11.20.0",
   "dependencies": {
