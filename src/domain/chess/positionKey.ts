@@ -1,32 +1,52 @@
 import { Chess } from 'chess.js';
 
 const FEN_FIELD_COUNT = 6;
+const CASTLING_ORDER = ['K', 'Q', 'k', 'q'] as const;
 
-function hasLegalEnPassantCapture(fen: string): boolean {
-  if (fen.trim().split(/\s+/u)[3] === '-') return false;
+function canonicalCastling(castling: string): string {
+  if (castling === '-') return '-';
+  const available = new Set(castling.split(''));
+  const normalized = CASTLING_ORDER.filter((right) => available.has(right)).join('');
+  return normalized || '-';
+}
 
-  try {
-    const game = new Chess(fen);
-    return game.moves({ verbose: true }).some((move) => move.flags.includes('e'));
-  } catch {
-    return false;
-  }
+function hasLegalEnPassantCapture(game: Chess, enPassant: string): boolean {
+  if (enPassant === '-') return false;
+  return game.moves({ verbose: true }).some((move) => move.flags.includes('e'));
 }
 
 export function canonicalPositionKey(fen: string): string {
   const fields = fen.trim().split(/\s+/u);
-
   if (fields.length !== FEN_FIELD_COUNT) {
     throw new Error('A complete six-field FEN is required.');
   }
 
-  const [placement, turn, castling, enPassant] = fields;
+  const [placement, turn, castling, enPassant, halfmove, fullmove] = fields;
   if (!placement || !turn || !castling || !enPassant) {
     throw new Error('A complete six-field FEN is required.');
   }
 
-  const canonicalEnPassant =
-    enPassant !== '-' && hasLegalEnPassantCapture(fen) ? enPassant : '-';
+  const normalizedCastling = canonicalCastling(castling);
+  const normalizedFen = [
+    placement,
+    turn,
+    normalizedCastling,
+    enPassant,
+    halfmove,
+    fullmove,
+  ].join(' ');
+  let game: Chess;
+  try {
+    game = new Chess(normalizedFen);
+  } catch (error) {
+    throw new Error(
+      `Invalid chess position: ${error instanceof Error ? error.message : 'invalid FEN'}`,
+    );
+  }
 
-  return `${placement} ${turn} ${castling} ${canonicalEnPassant}`;
+  const canonicalEnPassant = hasLegalEnPassantCapture(game, enPassant)
+    ? enPassant
+    : '-';
+
+  return `${placement} ${turn} ${normalizedCastling} ${canonicalEnPassant}`;
 }

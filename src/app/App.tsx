@@ -48,7 +48,9 @@ export function App() {
   const [treeOpen, setTreeOpen] = useState(false);
   const [fixtureId, setFixtureId] = useState<string>(fix01White.id);
   const [session, setSession] = useState(() =>
-    createTrainingSession(fix01White, nowMs()),
+    createTrainingSession(fix01White, nowMs(), {
+      sessionId: globalThis.crypto?.randomUUID?.() ?? `${fix01White.id}-${nowMs()}`,
+    }),
   );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
@@ -99,7 +101,11 @@ export function App() {
     if (!nextFixture) return;
 
     setFixtureId(nextFixture.id);
-    setSession(createTrainingSession(nextFixture, nowMs()));
+    setSession(
+      createTrainingSession(nextFixture, nowMs(), {
+        sessionId: globalThis.crypto?.randomUUID?.() ?? `${nextFixture.id}-${nowMs()}`,
+      }),
+    );
   };
 
   const handleMove = (command: BoardMoveCommand): boolean => {
@@ -117,6 +123,15 @@ export function App() {
     const advanced = next.fen !== session.fen;
     setSession(next);
     return advanced;
+  };
+
+  const handleInteractionBlockChange = (blocked: boolean) => {
+    setSession((current) =>
+      reduceTrainingSession(current, fixture, {
+        type: blocked ? 'pause-attempt' : 'resume-attempt',
+        nowMs: nowMs(),
+      }),
+    );
   };
 
   const hintSquares =
@@ -236,6 +251,7 @@ export function App() {
               hintSquares={hintSquares}
               reducedMotion={reducedMotion}
               onMove={handleMove}
+              onInteractionBlockChange={handleInteractionBlockChange}
             />
           </Box>
 
