@@ -1,182 +1,76 @@
-# CHATGPT_WORKFLOW_PROFILE.md - Opening Trainer execution profile
+# CHATGPT_WORKFLOW_PROFILE.md — Opening Trainer execution profile
 
-## 1. Identity
+## Identity
 
 ```yaml
 project_id: PRJ-CHESS-OPENING-TRAINER
 repository: lucakollmer/opening-trainer
 integration_branch: main
 programme: MVP
-workflow: ChatGPT + GitHub Actions Coding Workflow
-workflow_status: trial; explicitly adopted by this project
-profile_version: 2.0
+development_mode: cloud
+validation_workflow: cloudflare-workers-direct
+worker: opening-trainer
+profile_version: 3.0
 ```
 
-Google Drive Assistant Memory is the project authority. The repository contains the execution copy and code. ChatGPT uses connected Drive and GitHub tools; GitHub Actions runs the exact candidate tree.
+Durable project state is resolved from the private GitHub Assistant Memory repository `lucakollmer/assistant` using its verified numeric trust anchor. Google Drive is recovery/audit-only.
 
-## 2. Execution defaults
+## Responsibility split
 
-- One named phase or correction per branch and draft pull request.
-- Luca owns product, visual, manual interaction, merge, and continuation acceptance.
-- ChatGPT owns authority reads, repository inspection, bounded implementation, GitHub writes, Actions inspection, structured reporting, and proposed memory capture.
-- GitHub Actions owns reproducible command execution and exact candidate-tree evidence.
-- A phase is not accepted because tests pass, screenshots exist, or a PR is open.
-- Do not merge or start the next phase without Luca's current explicit instruction.
-- Each chat turn revalidates Drive and GitHub state because ordinary chats do not wake automatically after Actions.
+- Luca owns Product acceptance, visual/manual interaction acceptance, merge authorization, production-domain cutover and continuation to later phases.
+- Browser ChatGPT owns Assistant Memory bootstrap, scope resolution, GitHub source/ref operations, Cloudflare provider observation, browser/HTTP validation and user-facing handoff evidence.
+- Codex may own bounded implementation when delegated, but it must verify live product-repository facts and return the exact candidate SHA/ref.
+- Cloudflare Workers Builds owns the authoritative exact-SHA final build/deployment gate.
+- GitHub Actions is excluded from the accepted validation workflow.
 
-## 3. Work-request artefact rules
+## Candidate workflow
 
-A substantial implementation, correction, continuation, migration, acceptance, or merge instruction may be archived as one executable Markdown file containing one active instruction.
+For a reviewable exact candidate:
 
-Required front matter:
+1. verify current product base/ref coordinates;
+2. make only authorized repository changes;
+3. run the maximum feasible focused/runtime checks;
+4. publish and verify the exact Git SHA;
+5. locate the Workers Build with matching `commitHash`;
+6. require terminal success for `pnpm validate && git diff --check`;
+7. for non-production branches require successful `npx wrangler versions upload`;
+8. retrieve the provider-authored immutable Version Preview URL;
+9. require `/deployment.json` to report the same Git SHA;
+10. perform browser/HTTP smoke validation against that immutable preview;
+11. hand the exact preview to Luca when manual Product review is required.
 
-```yaml
----
-request_id: WRK-OPENING-TRAINER-<YYYYMMDD>-<NNN>
-project_id: PRJ-CHESS-OPENING-TRAINER
-workflow_version: 1.0-trial
-project_profile_version: 2.0
-request_type: migration | implementation | correction | continuation | acceptance | merge
-programme: MVP
-phase: <phase-or-governance>
-repository: lucakollmer/opening-trainer
-integration_branch: main
-working_branch: <branch>
-expected_base_sha: <sha-or-verify-current>
-expected_head_sha: <sha-or-null>
-parent_request_id: <ID-or-null>
-supersedes_request_id: <ID-or-null>
-created_date_europe_london: <YYYY-MM-DD>
-status: issued
----
-```
+Pending or failed provider/browser evidence blocks technical-readiness claims.
 
-Filename:
+Production `main` uses the same build command followed by `npx wrangler deploy`.
 
-```text
-<RequestId>__<Programme>__<Phase>__<RequestType>__v<Revision>.md
-```
+## Validation contents
 
-Normalize to UTF-8 without BOM, LF endings, no non-meaningful trailing spaces, and one terminal LF. End executable request content with:
+`pnpm validate` owns repository integrity, lint, typecheck, deterministic tests, production build, PWA validation and Prettier. Workers Builds additionally runs `git diff --check`.
 
-```text
-END_OF_WORK_REQUEST
-```
+Focused checks during implementation may overlap the final gate for feedback, but do not repeatedly run the full aggregate gate without a changed candidate or diagnostic reason.
 
-Issued requests are immutable. Corrections and continuations receive a new request ID and parent link.
+For visible changes, test relevant desktop/tablet/phone, keyboard/touch, focus, error-boundary and answer-disclosure behavior. Automated evidence never substitutes for Luca's visual/Product acceptance.
 
-## 4. Entry-gate evidence
+## Cloudflare capability routing
 
-Every modifying turn states:
+Use the dedicated Workers Builds capability for exact-SHA build listing/details/logs when available.
 
-- Drive entrypoint and workflow read status;
-- repository identity and visibility observation;
-- integration-branch SHA;
-- phase branch and PR state;
-- expected and observed base/head SHAs;
-- predecessor phase and explicit acceptance/merge evidence;
-- whether another modifying workflow is active;
-- current explicit authority;
-- phases and operations that remain blocked.
+Use Cloudflare API Full for authorized Cloudflare writes and as the backup observation API when the dedicated Workers Builds capability cannot expose required evidence.
 
-Do not infer acceptance from a merged-looking branch, green check, label, PR body, or stale repository document.
+Provider mutation scope remains bounded. Production domains, DNS, deletion of the Pages project and unrelated account configuration remain separately gated.
 
-## 5. Write strategy
+## Phase and merge safety
 
-Use direct GitHub file writes for bounded changes. Prefer complete-file replacement with current blob SHA, and perform sequential updates when two writes depend on the same path.
+Luca retains phase acceptance, merge, and continuation authority.
 
-For large scaffolds or generated outputs, use one bounded bootstrap request/workflow that:
+A successful Worker build or preview does not authorize merge. Do not start PHASE-3 or merge PHASE-2 without the required explicit acceptance. Infrastructure migration acceptance is also separate from the PHASE-2 Product gate.
 
-1. verifies the exact base;
-2. generates the final tree;
-3. removes temporary bootstrap material where required;
-4. validates that exact final tree;
-5. commits/pushes only after validation succeeds;
-6. reports the final head/tree SHA and every changed path.
+## Repository integrity
 
-Do not assume a workflow-token push triggers a new validation run.
+Every tracked repository content change must be represented in `SHA256SUMS.txt`. Final validation must pass `pnpm integrity:check` without regenerating the manifest first.
 
-## 6. Actions evidence gate
+Historical repository documents may still describe the former Google Drive / GitHub Actions workflow. They are historical evidence only. Current Assistant Memory, `AGENTS.md`, and this profile govern current execution.
 
-Required evidence is phase-dependent but normally includes:
+## Completion evidence
 
-- repository integrity;
-- lint;
-- strict type checking;
-- deterministic tests;
-- production build;
-- PWA validation where applicable;
-- formatting and whitespace checks;
-- dependency audit/licence record when dependencies change;
-- browser HTTP smoke;
-- desktop/tablet/phone screenshots for visible phases;
-- uploaded structured report and relevant build/preview artifacts.
-
-Actions must use least privilege, bounded timeouts, concurrency control, immutable action pins, and no automatic merge.
-
-## 7. UI reuse gate
-
-Every phase that creates or changes UI first inspects:
-
-- MUI components already used;
-- project-owned reusable components and hooks;
-- representative host surfaces and tests;
-- theme tokens and responsive layout contracts;
-- existing command/state ownership.
-
-Map each requested behaviour to `reuse`, `compose`, `extend`, or `create`. Default to reuse or composition. A new primitive requires evidence that no suitable primitive exists, clear ownership, focused tests, and host-surface integration tests.
-
-Prohibit feature-specific copies of shared components, duplicate state machines, nested forms, accidental event-bubbling coordination, conflicting global keyboard listeners, duplicated theme values, and custom ordinary controls where MUI already supplies the accepted pattern.
-
-## 8. State-space validation
-
-Select relevant scenarios and state exactly what Actions tested or omitted:
-
-- clean first load with no database;
-- valid current database reload;
-- schema upgrade;
-- failed/invalid import without partial mutation;
-- full backup export and restore;
-- offline reload after caching;
-- stale service-worker update;
-- desktop, tablet, and phone functional layouts;
-- keyboard and touch routes;
-- masked-answer non-disclosure;
-- deterministic fixture and clock handling;
-- same-session repair/retest;
-- transposition and accepted-alternative routing.
-
-Automated functional evidence does not substitute for Luca's visual acceptance.
-
-## 9. Structured report rules
-
-The report includes:
-
-- final status, phase, base SHA, branch, tested head/tree, PR, and clean candidate-tree state;
-- predecessor acceptance/merge evidence;
-- exact changed-file count and every path;
-- exact commands and observed results;
-- tested and omitted state scenarios;
-- data/schema/service-worker effects;
-- Actions validation status;
-- manual UI validation by Luca as `pending`, `pass`, or `fail`;
-- risks, deferred work, and rollback;
-- manual checklist with action, expected visible result, expected persisted/domain result, and failure evidence.
-
-Required headings:
-
-```text
-## Reusable UI/UX implementation
-## Reuse and duplication audit
-## Final diff audit
-## Rollback
-## Acceptance-state proposal
-## Assistant Memory capture proposal
-## Exact next action
-```
-
-End with `END_OF_COMPLETION_REPORT`.
-
-## 10. Stop rules
-
-Stop before mutation when Drive authority is unavailable, refs differ from expected state, an existing PR contains unexpected work, predecessor acceptance is missing, scope requires an excluded system, unlicensed data is required, data safety cannot be proved, or a modifying workflow is already operating on the repository.
+Report the exact Git SHA/ref, changed paths, runtime checks, Worker name/tag, exact build UUID, build outcome, build/deploy commands, Worker version ID, immutable preview URL, `/deployment.json` readback, browser smoke result, superseded failed iterations, and every remaining manual/merge/production gate.
