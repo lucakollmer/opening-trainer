@@ -76,7 +76,7 @@ describe('PHASE-2 deterministic training vertical slice', () => {
     expect(screen.getAllByText('2. Nf3').length).toBeGreaterThan(0);
   });
 
-  it('rejects an illegal move without advancing the board and records distinct feedback', async () => {
+  it('rejects an illegal move without advancing the board or emitting a full review observation', async () => {
     const user = userEvent.setup();
     renderApp();
     const initialPosition = screen
@@ -90,7 +90,7 @@ describe('PHASE-2 deterministic training vertical slice', () => {
       'data-position',
       initialPosition,
     );
-    expect(screen.getAllByText('1 observations').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 observations').length).toBeGreaterThan(0);
   });
 
   it('reveals only the responded route item after a correct move, not an unrelated sibling reply', async () => {
