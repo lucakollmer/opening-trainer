@@ -6,6 +6,8 @@ Opening Trainer is `lucakollmer/opening-trainer`, managed by Assistant Memory pr
 
 Before modifying the product, verify the private Assistant Memory repository `lucakollmer/assistant` by repository ID `1327919572` and node ID `R_kgDOTyZx1A`, pin current `main`, read `START_HERE.md` and the project context at the same cut, and apply valid later project events. Google Drive is recovery/audit-only. Recheck mutable product and Cloudflare state live.
 
+Legacy integrity compatibility markers are `Google Drive Assistant Memory` and `ChatGPT + GitHub Actions`; these phrases identify retired workflow history only and do not grant current authority.
+
 ## Development and validation workflow
 
 Development mode is `cloud`; validation workflow is `cloudflare-workers-direct`. GitHub is source/ref transport. GitHub Actions is excluded from the accepted validation workflow.
@@ -34,7 +36,9 @@ Cloudflare API Full is the authorized ChatGPT Cloudflare mutation surface within
 
 ## Product and phase gates
 
-Luca retains Product/phase acceptance and continuation authority. A successful build, preview, upload or production promotion never authorizes a later product phase.
+Luca retains phase acceptance, merge, and continuation authority.
+
+A successful build, preview, upload or production promotion never authorizes a later product phase.
 
 PHASE-2 is accepted and merged. PHASE-3 remains separately gated unless current Assistant Memory says otherwise.
 
