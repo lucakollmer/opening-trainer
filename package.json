@@ -17,6 +17,7 @@
     "test:pwa": "node scripts/check-pwa.mjs",
     "integrity:check": "node scripts/verify-pack.mjs",
     "integrity:update": "node scripts/update-integrity-manifest.mjs",
+    "validate:provider": "pnpm integrity:check && pnpm build && pnpm test:pwa && git diff --check",
     "validate": "pnpm integrity:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:pwa && pnpm exec prettier --check ."
   },
   "packageManager": "pnpm@11.20.0",
