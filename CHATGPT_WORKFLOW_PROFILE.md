@@ -10,67 +10,58 @@ programme: MVP
 development_mode: cloud
 validation_workflow: cloudflare-workers-direct
 worker: opening-trainer
-profile_version: 3.0
+profile_version: 4.0
 ```
 
-Durable project state is resolved from the private GitHub Assistant Memory repository `lucakollmer/assistant` using its verified numeric trust anchor. Google Drive is recovery/audit-only.
+Durable project state comes from the verified private Assistant Memory repository `lucakollmer/assistant`; Google Drive is recovery/audit-only.
 
 ## Responsibility split
 
-- Luca owns Product acceptance, visual/manual interaction acceptance, merge authorization, production-domain cutover and continuation to later phases.
-- Browser ChatGPT owns Assistant Memory bootstrap, scope resolution, GitHub source/ref operations, Cloudflare provider observation, browser/HTTP validation and user-facing handoff evidence.
-- Codex may own bounded implementation when delegated, but it must verify live product-repository facts and return the exact candidate SHA/ref.
-- Cloudflare Workers Builds owns the authoritative exact-SHA final build/deployment gate.
-- GitHub Actions is excluded from the accepted validation workflow.
+- Luca owns Product/phase acceptance and continuation.
+- ChatGPT resolves Assistant Memory, live GitHub/Cloudflare state, source/ref operations, provider observation, browser validation and handoff evidence.
+- Codex may implement bounded changes after verifying live product facts.
+- Full correctness validation is front-loaded into ChatGPT/Codex where reliably available.
+- Cloudflare Workers Builds is a cheap exact-SHA packaging/provider gate, not the normal debugging loop.
+- GitHub Actions is excluded.
 
 ## Candidate workflow
 
-For a reviewable exact candidate:
+1. Verify current base/ref and scope.
+2. Run the maximum reliable focused checks while iterating, then `pnpm validate` before the final provider candidate whenever the runtime supports it.
+3. Make all candidate source changes without touching `.cloudflare-review`.
+4. In the final reviewable candidate commit, change `.cloudflare-review`; this is the only path watched by the non-production Workers trigger.
+5. Verify the resulting exact Git SHA/ref.
+6. Require the matching Workers Build to pass `pnpm validate:provider`.
+7. Require `npx wrangler versions upload`, the provider-authored immutable Version Preview URL and exact `/deployment.json` SHA binding.
+8. Run affected browser/HTTP smoke validation against that immutable preview.
+9. Merge only when the applicable Product/merge gate is satisfied.
 
-1. verify current product base/ref coordinates;
-2. make only authorized repository changes;
-3. run the maximum feasible focused/runtime checks;
-4. publish and verify the exact Git SHA;
-5. locate the Workers Build with matching `commitHash`;
-6. require terminal success for `pnpm validate && git diff --check`;
-7. for non-production branches require successful `npx wrangler versions upload`;
-8. retrieve the provider-authored immutable Version Preview URL;
-9. require `/deployment.json` to report the same Git SHA;
-10. perform browser/HTTP smoke validation against that immutable preview;
-11. hand the exact preview to Luca when manual Product review is required.
+A superseding provider candidate must change `.cloudflare-review` again. Ordinary feature/debug commits therefore consume no Workers Build minutes.
 
-Pending or failed provider/browser evidence blocks technical-readiness claims.
+## Production workflow
 
-Production `main` uses the same build command followed by `npx wrangler deploy`.
+A `main` build runs `pnpm validate:provider` and `npx wrangler versions upload`; it does not automatically change production traffic.
 
-## Validation contents
+After the immutable exact-`main` version passes deployment-marker and browser/HTTP validation, explicitly promote that exact version to 100% through the Cloudflare Deployment API. Verify the canonical domain after promotion. Do not rebuild an unchanged SHA merely to promote it.
 
-`pnpm validate` owns repository integrity, lint, typecheck, deterministic tests, production build, PWA validation and Prettier. Workers Builds additionally runs `git diff --check`.
+`openings.lucakollmer.com` is canonical production. The retained `opening-trainer.pages.dev` project is recovery-only; automatic Pages production and preview deployments are disabled.
 
-Focused checks during implementation may overlap the final gate for feedback, but do not repeatedly run the full aggregate gate without a changed candidate or diagnostic reason.
+## Validation ownership
 
-For visible changes, test relevant desktop/tablet/phone, keyboard/touch, focus, error-boundary and answer-disclosure behavior. Automated evidence never substitutes for Luca's visual/Product acceptance.
+`pnpm validate` owns integrity, lint, standalone typecheck, deterministic tests, production build, PWA validation and Prettier.
 
-## Cloudflare capability routing
+`pnpm validate:provider` owns integrity, production build/TypeScript, PWA artifact validation and `git diff --check`.
 
-Use the dedicated Workers Builds capability for exact-SHA build listing/details/logs when available.
+Pending or failed required exact-SHA provider/browser evidence blocks readiness. Automated evidence never substitutes for Luca's Product acceptance.
 
-Use Cloudflare API Full for authorized Cloudflare writes and as the backup observation API when the dedicated Workers Builds capability cannot expose required evidence.
+## Provider routing and safety
 
-Provider mutation scope remains bounded. Production domains, DNS, deletion of the Pages project and unrelated account configuration remain separately gated.
+Use the dedicated Workers Builds capability for build listing/details/logs when available. Use Cloudflare API Full for authorized provider writes and fallback observation.
 
-## Phase and merge safety
+PHASE-2 is accepted and merged. PHASE-3 remains separately gated by current Assistant Memory. Do not force-update history, delete the retained Pages project, or infer Product authority from infrastructure success.
 
-Luca retains phase acceptance, merge, and continuation authority.
+## Repository integrity and completion evidence
 
-A successful Worker build or preview does not authorize merge. Do not start PHASE-3 or merge PHASE-2 without the required explicit acceptance. Infrastructure migration acceptance is also separate from the PHASE-2 Product gate.
+Every tracked content change must be represented in `SHA256SUMS.txt`.
 
-## Repository integrity
-
-Every tracked repository content change must be represented in `SHA256SUMS.txt`. Final validation must pass `pnpm integrity:check` without regenerating the manifest first.
-
-Historical repository documents may still describe the former Google Drive / GitHub Actions workflow. They are historical evidence only. Current Assistant Memory, `AGENTS.md`, and this profile govern current execution.
-
-## Completion evidence
-
-Report the exact Git SHA/ref, changed paths, runtime checks, Worker name/tag, exact build UUID, build outcome, build/deploy commands, Worker version ID, immutable preview URL, `/deployment.json` readback, browser smoke result, superseded failed iterations, and every remaining manual/merge/production gate.
+Report exact SHA/ref, changed paths, runtime checks, Worker/tag, build UUID/outcome, commands, version/preview, deployment marker, browser smoke, production promotion/deployment identity when applicable, failed/superseded iterations, and remaining Product/phase gates.
