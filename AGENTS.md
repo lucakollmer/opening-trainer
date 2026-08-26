@@ -1,106 +1,55 @@
 # AGENTS.md — Opening Trainer
 
-## Authority and project identity
+## Authority and identity
 
-Opening Trainer is the managed product repository `lucakollmer/opening-trainer` for Assistant Memory project `PRJ-CHESS-OPENING-TRAINER`.
+Opening Trainer is `lucakollmer/opening-trainer`, managed by Assistant Memory project `PRJ-CHESS-OPENING-TRAINER`.
 
-Durable project authority lives in the private GitHub Assistant Memory repository `lucakollmer/assistant`, repository ID `1327919572`, node ID `R_kgDOTyZx1A`, default branch `main`. A modifying session must verify that trust anchor, pin current Assistant Memory `main`, read `START_HERE.md`, then read `projects/PRJ-CHESS-OPENING-TRAINER/context.json` at the same cut and apply valid later project events before inferring current state. Google Drive is recovery/audit-only and is not a normal semantic authority.
+Before modifying the product, verify the private Assistant Memory repository `lucakollmer/assistant` by repository ID `1327919572` and node ID `R_kgDOTyZx1A`, pin current `main`, read `START_HERE.md` and the project context at the same cut, and apply valid later project events. Google Drive is recovery/audit-only. Recheck mutable product and Cloudflare state live.
 
-Mutable product-repository facts must also be checked live in this repository before mutation.
+## Development and validation workflow
 
-## Current development and validation workflow
+Development mode is `cloud`; validation workflow is `cloudflare-workers-direct`. GitHub is source/ref transport. GitHub Actions is excluded from the accepted validation workflow.
 
-The accepted development mode is `cloud`.
+Validation is deliberately split to conserve Cloudflare Workers Build minutes:
 
-The accepted validation workflow is `cloudflare-workers-direct`.
+- `pnpm validate` is the full development/review gate: integrity, lint, standalone typecheck, deterministic tests, production build, PWA validation and Prettier.
+- `pnpm validate:provider` is the cheap Workers provider gate: integrity, production build (including TypeScript), PWA validation and `git diff --check`.
+- ChatGPT/Codex must run the maximum reliable full/focused validation available in its runtime before publishing a provider candidate. Do not use Workers Builds as the debugging loop.
 
-GitHub is the source/ref publication surface. Cloudflare Workers Builds is the authoritative exact-SHA build and deployment surface. GitHub Actions is not part of the accepted validation workflow and must not be dispatched, rerun, waited on, depended on, or intentionally triggered as validation.
+Ordinary non-`main` pushes must not trigger a Workers Build. The non-production trigger watches only `.cloudflare-review`. To request one deliberate provider build, change `.cloudflare-review` in the final reviewable candidate commit after runtime validation. A superseding candidate must change the marker again. The marker is trigger metadata, not product semantics.
 
-For each reviewable candidate:
+For a reviewable candidate, verify the exact Git SHA/ref, observe the matching Workers Build, require terminal success, obtain the provider-authored immutable Version Preview URL, require `/deployment.json` to bind that SHA, and perform proportionate browser/HTTP smoke validation.
 
-1. run the maximum feasible focused/runtime checks before publication;
-2. publish the exact candidate SHA to the intended GitHub ref;
-3. verify the ref points to that SHA;
-4. observe the Cloudflare Workers Build whose `commitHash` equals that exact SHA;
-5. require terminal build success;
-6. obtain the provider-authored immutable Version Preview URL for the uploaded Worker version;
-7. read `/deployment.json` from that immutable preview and require its `sha` to equal the candidate SHA;
-8. perform proportionate browser/HTTP smoke validation on the immutable preview, including affected routes;
-9. report pending or failed provider state explicitly rather than implying readiness.
+Canonical provider commands:
 
-The canonical Workers Builds commands are:
-
-- build: `pnpm validate && git diff --check`
+- build: `pnpm validate:provider`
 - non-production deploy: `npx wrangler versions upload`
-- production deploy: `npx wrangler deploy`
+- production deploy: `npx wrangler versions upload`
 
-The Worker is `opening-trainer`. Static assets are built into `dist` and served using the SPA fallback configured in `wrangler.jsonc`.
+Production upload is not production traffic promotion. After the exact `main` version passes deployment-marker and browser/HTTP validation, promote that already-uploaded exact version explicitly through the Cloudflare Deployment API. Never promote a version whose source SHA is not current `main`.
 
-Cloudflare API Full is the authorized ChatGPT Cloudflare write surface for provider configuration changes within the current task scope and the fallback observation surface when the dedicated Workers Builds capability is unavailable or insufficient. This does not grant blanket authority for destructive account, DNS, domain, or unrelated Cloudflare changes.
+The Worker is `opening-trainer`. `openings.lucakollmer.com` is the canonical production hostname. The legacy Cloudflare Pages project is recovery-only and its automatic production/preview deployments are disabled.
+
+Cloudflare API Full is the authorized ChatGPT Cloudflare mutation surface within current task authority and the fallback observation surface when the dedicated Workers Builds capability is insufficient.
 
 ## Product and phase gates
 
-Luca retains phase acceptance, merge, and continuation authority.
+Luca retains Product/phase acceptance and continuation authority. A successful build, preview, upload or production promotion never authorizes a later product phase.
 
-Automated validation, a successful Worker deployment, a preview URL, or an open pull request never implies Product acceptance.
+PHASE-2 is accepted and merged. PHASE-3 remains separately gated unless current Assistant Memory says otherwise.
 
-Do not:
+Do not force-push or rewrite history, broaden a bounded infrastructure change into Product work, or delete the retained Pages recovery project without separate authority.
 
-- merge a phase or migration candidate without Luca's current explicit authorization;
-- start a later phase without the required separate authority;
-- cut over production domains, DNS, or delete the legacy Pages project without explicit production-cutover authority;
-- force-push or rewrite history;
-- broaden a bounded implementation into a new Product decision.
+## UI and implementation defaults
 
-The existing PHASE-2 Product gate remains separate from this infrastructure migration unless current Assistant Memory state says otherwise.
-
-## Implementation defaults
-
-Prefer bounded changes with clear ownership and reuse existing architecture and components before creating new primitives.
-
-During implementation use focused checks that give fast feedback. Before a final reviewable candidate, the Cloudflare build command owns the aggregate repository gate; do not duplicate its broad stages without a diagnostic reason.
-
-The aggregate `pnpm validate` includes:
-
-- integrity verification;
-- lint;
-- TypeScript validation;
-- deterministic tests;
-- production build;
-- PWA validation;
-- Prettier.
-
-`git diff --check` is additionally owned by the Workers Build command.
-
-When visible UI behavior changes, preserve desktop, tablet, phone, keyboard, touch, focus, masked-answer and error-boundary behavior as applicable. Browser evidence does not substitute for Luca's Product acceptance.
+Prefer bounded changes and existing architecture/components. For visible behavior, preserve relevant desktop/tablet/phone, keyboard/touch, focus, masked-answer and error-boundary behavior. Browser evidence does not substitute for Product acceptance.
 
 ## Repository integrity
 
-`SHA256SUMS.txt` is the repository integrity manifest. Any repository file addition, removal or content change must be reflected in it. Run `pnpm integrity:update` only when intentionally regenerating the manifest, then ensure the resulting manifest itself is committed. Final candidates must pass `pnpm integrity:check` without first rewriting the manifest.
+`SHA256SUMS.txt` is the integrity manifest. Every tracked repository content change must be reflected in it. Final candidates must pass `pnpm integrity:check` without first rewriting the manifest.
 
-Text files use UTF-8 without BOM, LF endings, no trailing whitespace and one terminal LF.
-
-Issued work-request artifacts under `prompts/` are immutable historical records unless the governing workflow explicitly creates a new revision.
-
-## Historical workflow documents
-
-Some repository documents retain filenames or historical discussion referring to the former GitHub Actions / Google Drive workflow. They are historical execution evidence, not current authority. Legacy integrity compatibility markers are `Google Drive Assistant Memory` and `ChatGPT + GitHub Actions`; these strings name the retired workflow only and do not confer authority. When a historical document conflicts with this file or current Assistant Memory, current Assistant Memory and this workflow profile govern. Migrate or archive those documents only in bounded maintenance work; do not resurrect the old validation model from their filenames or prose.
+Text files use UTF-8 without BOM, LF endings, no trailing whitespace and one terminal LF. Issued artifacts under `prompts/` remain immutable historical records unless the governing workflow explicitly creates a new revision.
 
 ## Completion reporting
 
-For a candidate handoff report:
-
-- exact product Git SHA and ref;
-- changed paths;
-- runtime checks actually performed;
-- Cloudflare Worker name/tag;
-- exact Cloudflare build UUID and terminal outcome;
-- build and deploy commands;
-- Worker version ID;
-- immutable Version Preview URL;
-- `/deployment.json` SHA readback;
-- affected-route/browser smoke result;
-- any superseded failed candidate SHAs/builds;
-- remaining Product, merge, release or production-cutover gate.
-
-Do not call a candidate technically ready while required exact-SHA Cloudflare or browser evidence is pending or failed.
+Report the exact Git SHA/ref, changed paths, runtime checks, Worker/tag, exact build UUID/outcome, build/deploy commands, Worker version ID and immutable preview, `/deployment.json` readback, browser smoke, production deployment/promotion identity when applicable, superseded failed candidates, and remaining Product/phase gates.
