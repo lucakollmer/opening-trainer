@@ -263,7 +263,7 @@ export function App() {
                   onChange={(_: ChangeEvent<HTMLInputElement>, checked: boolean) =>
                     handleDemoAlternativeChange(checked)
                   }
-                  inputProps={{ 'aria-label': 'Include alternative branch' }}
+                  slotProps={{ input: { 'aria-label': 'Include alternative branch' } }}
                 />
               }
               label="Include alternative branch"
