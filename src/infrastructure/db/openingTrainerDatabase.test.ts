@@ -212,11 +212,11 @@ describe('PHASE-4 Opening Trainer persistence', () => {
       const preview = previewBackupJson(first.json);
       expect(preview.summary).toMatchObject({
         repertoires: 1,
-        trainingItems: expect.any(Number),
         reviewLogs: 1,
         sessions: 1,
         settings: 1,
       });
+      expect(preview.summary.trainingItems).toBeGreaterThan(0);
 
       await commitBackupRestore(target.database, preview, {
         restoredAt: '2026-08-27T15:07:00.000Z',
@@ -226,8 +226,8 @@ describe('PHASE-4 Opening Trainer persistence', () => {
         target.database,
         '2026-08-27T15:06:00.000Z',
       );
-      expect(JSON.parse(targetExport.json).data).toEqual(
-        JSON.parse(first.json).data,
+      expect(previewBackupJson(targetExport.json).backup.data).toEqual(
+        preview.backup.data,
       );
     } finally {
       await dispose(source);
