@@ -56,7 +56,8 @@ export function normalizedAcceptedMoveSet(moves: readonly string[]): string {
 }
 
 export function compileTrainingFixture(fixture: TrainingFixture): TrainingExercisePlan {
-  if (fixture.route.length === 0) throw new Error('A training fixture requires route moves.');
+  if (fixture.route.length === 0)
+    throw new Error('A training fixture requires route moves.');
   if (fixture.targetPly < 0 || fixture.targetPly >= fixture.route.length) {
     throw new Error(`Fixture target ply is outside the route: ${fixture.targetPly}`);
   }
@@ -78,7 +79,9 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     const positionKey = canonicalPositionKey(fen);
     const routeUci = `${step.from}${step.to}${step.promotion ?? ''}`;
     if (!step.acceptedUci.includes(routeUci)) {
-      throw new Error(`Route move ${routeUci} is absent from accepted set at ${step.id}`);
+      throw new Error(
+        `Route move ${routeUci} is absent from accepted set at ${step.id}`,
+      );
     }
 
     for (const acceptedUci of step.acceptedUci) {
