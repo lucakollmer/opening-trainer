@@ -2,6 +2,7 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import {
+  Alert,
   AppBar,
   Box,
   Chip,
@@ -27,7 +28,9 @@ import {
   ChessboardPreview,
   type BoardMoveCommand,
 } from '../features/board/ChessboardPreview';
+import { DataManagementDialog } from '../features/data/DataManagementDialog';
 import { PgnImportDialog } from '../features/import/PgnImportDialog';
+import { SessionRecoveryDialog } from '../features/session/SessionRecoveryDialog';
 import { RepertoireTreePreview } from '../features/repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../features/task/TaskPreviewCard';
 import { canSubmitUserMove, currentFixtureStep } from '../domain/training/session';
@@ -37,7 +40,6 @@ import {
 } from '../domain/training/exercisePlan';
 import { createGraphExercisePlan } from '../domain/repertoire/exercisePlan';
 import { contextPly } from '../domain/repertoire/graph';
-import { InMemoryImportRepository } from '../domain/repertoire/importRepository';
 import {
   createGraphTrainingSession,
   reduceGraphTrainingSession,
@@ -53,6 +55,12 @@ import {
   type TrainingTreeItem,
 } from '../fixtures/trainingFixtures';
 import { phase3DemoFilteredPlan, phase3DemoPlan } from '../fixtures/phase3Demo';
+import {
+  OPENING_TRAINER_DATABASE_NAME,
+  OpeningTrainerDatabase,
+  type SessionRecord,
+} from '../infrastructure/db/openingTrainerDatabase';
+import { OpeningTrainerRepository } from '../infrastructure/db/openingTrainerRepository';
 
 const phase2Plans = phase2TrainingFixtures.map(compileTrainingFixture);
 const defaultPlan = phase2Plans[0]!;
@@ -64,6 +72,12 @@ function nowMs() {
 
 function sessionId(plan: TrainingExercisePlan) {
   return globalThis.crypto?.randomUUID?.() ?? `${plan.id}-${nowMs()}`;
+}
+
+function applicationDatabaseName(): string {
+  return import.meta.env.MODE === 'test'
+    ? `opening-trainer-test-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`
+    : OPENING_TRAINER_DATABASE_NAME;
 }
 
 function isDescendantOf(
@@ -134,6 +148,28 @@ function importedExercisePlans(graph: RepertoireGraph): TrainingExercisePlan[] {
   return plans;
 }
 
+function persistedPlans(
+  graphs: readonly RepertoireGraph[],
+): {
+  plans: TrainingExercisePlan[];
+  repertoireByPlanId: Map<string, string>;
+} {
+  const plans: TrainingExercisePlan[] = [];
+  const repertoireByPlanId = new Map<string, string>();
+  for (const graph of graphs) {
+    const repertoire = graph.repertoires[0];
+    if (!repertoire) continue;
+    try {
+      const graphPlans = importedExercisePlans(graph);
+      graphPlans.forEach((plan) => repertoireByPlanId.set(plan.id, repertoire.id));
+      plans.push(...graphPlans);
+    } catch {
+      // A valid stored repertoire may contain no trainable user decision yet.
+    }
+  }
+  return { plans, repertoireByPlanId };
+}
+
 function fullTreeLabels(items: readonly TrainingTreeItem[]): Map<string, string> {
   const labels = new Map<string, string>();
   const visit = (nodes: readonly TrainingTreeItem[]) => {
@@ -164,13 +200,30 @@ function revealTrainTreeLabels(
   return visit(items);
 }
 
+function hasDurableSessionProgress(session: SessionRecord['state']): boolean {
+  return (
+    session.plyIndex > 0 ||
+    session.evidence.length > 0 ||
+    session.hintLevel > 0 ||
+    session.retestQueue.length > 0 ||
+    session.status === 'session-complete' ||
+    session.status === 'abandoned'
+  );
+}
+
 export function App() {
   const [mode, setMode] = useState<TrainingMode>('train');
   const [treeOpen, setTreeOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [dataOpen, setDataOpen] = useState(false);
   const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(basePlans);
   const [selectionId, setSelectionId] = useState(defaultPlan.id);
   const [includeDemoAlternative, setIncludeDemoAlternative] = useState(true);
+  const [repertoireByPlanId, setRepertoireByPlanId] = useState<ReadonlyMap<string, string>>(
+    new Map(),
+  );
+  const [recoverySession, setRecoverySession] = useState<SessionRecord | null>(null);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const selectedPlan =
     plans.find((candidate) => candidate.id === selectionId) ?? defaultPlan;
   const plan =
@@ -182,12 +235,106 @@ export function App() {
       sessionId: sessionId(defaultPlan),
     }),
   );
+  const [repository] = useState(
+    () =>
+      new OpeningTrainerRepository(
+        new OpeningTrainerDatabase(applicationDatabaseName()),
+      ),
+  );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
-  const importRepositoryRef = useRef(new InMemoryImportRepository());
+  const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   const currentStep = currentFixtureStep(session, plan);
   const totalPlies = Math.max(1, ...plan.steps.map((step) => step.ply + 1));
+  const selectedRepertoireId = repertoireByPlanId.get(plan.id);
+
+  const refreshPersistedPlans = async (activateFirst = false) => {
+    const stored = persistedPlans(await repository.listRepertoireGraphs());
+    const storedIds = new Set(stored.plans.map((item) => item.id));
+    const nextPlans = [
+      ...basePlans.filter((item) => !storedIds.has(item.id)),
+      ...stored.plans,
+    ];
+    setPlans(nextPlans);
+    setRepertoireByPlanId(stored.repertoireByPlanId);
+    if (activateFirst && stored.plans[0]) {
+      const first = stored.plans[0];
+      setSelectionId(first.id);
+      setIncludeDemoAlternative(true);
+      setMode('train');
+      setSession(
+        createGraphTrainingSession(first, nowMs(), {
+          sessionId: sessionId(first),
+        }),
+      );
+    }
+    return { ...stored, allPlans: nextPlans };
+  };
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        await repository.initialize();
+        const refreshed = await refreshPersistedPlans();
+        if (!active) return;
+        const requestedPlanId = await repository.getSetting<string>('active-plan-id');
+        if (
+          requestedPlanId &&
+          refreshed.allPlans.some((candidate) => candidate.id === requestedPlanId)
+        ) {
+          const requestedPlan = refreshed.allPlans.find(
+            (candidate) => candidate.id === requestedPlanId,
+          )!;
+          setSelectionId(requestedPlanId);
+          setSession(
+            createGraphTrainingSession(requestedPlan, nowMs(), {
+              sessionId: sessionId(requestedPlan),
+            }),
+          );
+        }
+        const interrupted = await repository.latestInterruptedSession();
+        if (
+          active &&
+          interrupted &&
+          refreshed.allPlans.some((candidate) => candidate.id === interrupted.planId)
+        ) {
+          setRecoverySession(interrupted);
+        }
+      } catch (error) {
+        if (active) {
+          setPersistenceError(
+            error instanceof Error ? error.message : 'Local data initialization failed.',
+          );
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+      repository.close();
+      if (import.meta.env.MODE === 'test') {
+        void repository.deleteDatabase();
+      }
+    };
+    // Repository is intentionally constructed once for the application lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repository]);
+
+  useEffect(() => {
+    if (!repertoireByPlanId.has(session.planId) || !hasDurableSessionProgress(session)) {
+      return;
+    }
+    const snapshot = structuredClone(session);
+    persistenceQueueRef.current = persistenceQueueRef.current
+      .then(() => repository.saveSession(snapshot))
+      .catch((error: unknown) => {
+        setPersistenceError(
+          error instanceof Error ? error.message : 'Session persistence failed.',
+        );
+      });
+  }, [repository, repertoireByPlanId, session]);
 
   useEffect(() => {
     if (mode !== 'train') return undefined;
@@ -235,6 +382,9 @@ export function App() {
     setIncludeDemoAlternative(true);
     setMode('train');
     beginPlan(nextPlan);
+    if (repertoireByPlanId.has(nextPlan.id)) {
+      void repository.putSetting('active-plan-id', nextPlan.id);
+    }
   };
 
   const handleDemoAlternativeChange = (checked: boolean) => {
@@ -243,19 +393,26 @@ export function App() {
     beginPlan(checked ? phase3DemoPlan : phase3DemoFilteredPlan);
   };
 
-  const handleImportedCandidate = (candidate: ImportCandidate) => {
-    const importedPlans = importedExercisePlans(candidate.proposedGraph);
-    importRepositoryRef.current.createRepertoire(candidate);
+  const handleImportedCandidate = async (candidate: ImportCandidate) => {
+    const storedGraph = await repository.createRepertoire(candidate);
+    const importedPlans = importedExercisePlans(storedGraph);
     const importedIds = new Set(importedPlans.map((item) => item.id));
     setPlans((current) => [
       ...current.filter((item) => !importedIds.has(item.id)),
       ...importedPlans,
     ]);
+    const repertoireId = storedGraph.repertoires[0]!.id;
+    setRepertoireByPlanId((current) => {
+      const next = new Map(current);
+      importedPlans.forEach((item) => next.set(item.id, repertoireId));
+      return next;
+    });
     const firstPlan = importedPlans[0]!;
     setSelectionId(firstPlan.id);
     setIncludeDemoAlternative(true);
     setMode('train');
     beginPlan(firstPlan);
+    await repository.putSetting('active-plan-id', firstPlan.id);
   };
 
   const handleModeChange = (nextMode: TrainingMode) => {
@@ -292,6 +449,39 @@ export function App() {
         type: blocked ? 'pause-attempt' : 'resume-attempt',
         nowMs: nowMs(),
       }),
+    );
+  };
+
+  const resumeInterruptedSession = () => {
+    if (!recoverySession) return;
+    const recoveredPlan = plans.find(
+      (candidate) => candidate.id === recoverySession.planId,
+    );
+    if (!recoveredPlan) {
+      setPersistenceError('The saved session repertoire is not available.');
+      setRecoverySession(null);
+      return;
+    }
+    setSelectionId(recoveredPlan.id);
+    setIncludeDemoAlternative(true);
+    setMode('train');
+    setSession({
+      ...structuredClone(recoverySession.state),
+      attemptStartedAtMs: nowMs(),
+      pausedDurationMs: 0,
+      pauseStartedAtMs: undefined,
+    });
+    setRecoverySession(null);
+  };
+
+  const abandonInterruptedSession = () => {
+    if (!recoverySession) return;
+    const id = recoverySession.id;
+    setRecoverySession(null);
+    void repository.markSessionAbandoned(id).catch((error: unknown) =>
+      setPersistenceError(
+        error instanceof Error ? error.message : 'Could not abandon saved session.',
+      ),
     );
   };
 
@@ -339,6 +529,11 @@ export function App() {
               ))}
             </Select>
           </FormControl>
+          <Chip
+            size="small"
+            variant="outlined"
+            label={selectedRepertoireId ? 'Saved locally' : 'Demo fixture'}
+          />
           {selectionId === phase3DemoPlan.id ? (
             <FormControlLabel
               control={
@@ -392,8 +587,12 @@ export function App() {
               <AccountTreeOutlinedIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Settings placeholder">
-            <IconButton color="inherit" aria-label="Settings placeholder">
+          <Tooltip title="Local data and recovery">
+            <IconButton
+              color="inherit"
+              aria-label="Local data and recovery"
+              onClick={() => setDataOpen(true)}
+            >
               <SettingsOutlinedIcon />
             </IconButton>
           </Tooltip>
@@ -401,6 +600,15 @@ export function App() {
       </AppBar>
 
       <Container component="main" maxWidth="xl" sx={{ py: { xs: 1.5, md: 3 } }}>
+        {persistenceError ? (
+          <Alert
+            severity="error"
+            onClose={() => setPersistenceError(null)}
+            sx={{ mb: 2 }}
+          >
+            {persistenceError}
+          </Alert>
+        ) : null}
         <Box
           className="training-workspace"
           sx={{
@@ -516,6 +724,22 @@ export function App() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onCommit={handleImportedCandidate}
+      />
+      <DataManagementDialog
+        open={dataOpen}
+        onClose={() => setDataOpen(false)}
+        repository={repository}
+        selectedRepertoireId={selectedRepertoireId}
+        onDataChanged={async () => {
+          await refreshPersistedPlans(true);
+          const interrupted = await repository.latestInterruptedSession();
+          setRecoverySession(interrupted ?? null);
+        }}
+      />
+      <SessionRecoveryDialog
+        session={recoverySession}
+        onResume={resumeInterruptedSession}
+        onAbandon={abandonInterruptedSession}
       />
     </Box>
   );
