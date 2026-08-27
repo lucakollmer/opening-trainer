@@ -1,7 +1,4 @@
-import type {
-  ImportCandidate,
-  RepertoireGraph,
-} from '../../domain/repertoire/types';
+import type { ImportCandidate, RepertoireGraph } from '../../domain/repertoire/types';
 import type { TrainingSessionState } from '../../domain/training/session';
 import {
   DATABASE_META_ID,
@@ -113,11 +110,7 @@ export class OpeningTrainerRepository {
     const graph = await this.loadCompleteGraph();
     return graph.repertoires
       .filter((repertoire) => !repertoire.archivedAt)
-      .sort(
-        (a, b) =>
-          a.name.localeCompare(b.name) ||
-          a.id.localeCompare(b.id),
-      )
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
       .map((repertoire) => graphForRepertoire(graph, repertoire.id));
   }
 
@@ -243,10 +236,7 @@ export class OpeningTrainerRepository {
     );
   }
 
-  public async saveSession(
-    state: TrainingSessionState,
-    now = nowIso(),
-  ): Promise<void> {
+  public async saveSession(state: TrainingSessionState, now = nowIso()): Promise<void> {
     await this.database.transaction(
       'rw',
       [
@@ -323,17 +313,12 @@ export class OpeningTrainerRepository {
     const candidates = (await this.database.sessions.toArray())
       .filter((session) => !TERMINAL_SESSION_STATUSES.has(session.status))
       .sort(
-        (a, b) =>
-          b.updatedAt.localeCompare(a.updatedAt) ||
-          b.id.localeCompare(a.id),
+        (a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id.localeCompare(a.id),
       );
     return candidates[0];
   }
 
-  public async markSessionAbandoned(
-    sessionId: string,
-    now = nowIso(),
-  ): Promise<void> {
+  public async markSessionAbandoned(sessionId: string, now = nowIso()): Promise<void> {
     const session = await this.database.sessions.get(sessionId);
     if (!session) return;
     const state = { ...session.state, status: 'abandoned' as const };
@@ -350,28 +335,19 @@ export class OpeningTrainerRepository {
     return (await this.database.settings.get(id))?.value as T | undefined;
   }
 
-  public async putSetting(
-    id: string,
-    value: unknown,
-    now = nowIso(),
-  ): Promise<void> {
+  public async putSetting(id: string, value: unknown, now = nowIso()): Promise<void> {
     const record: SettingRecord = { id, value: structuredClone(value), updatedAt: now };
     await this.database.settings.put(record);
   }
 
-  public async listTrainingItems(
-    repertoireId: string,
-  ): Promise<TrainingItemRecord[]> {
+  public async listTrainingItems(repertoireId: string): Promise<TrainingItemRecord[]> {
     return this.database.trainingItems
       .where('repertoireId')
       .equals(repertoireId)
       .sortBy('id');
   }
 
-  public async clearUserData(
-    confirmation: string,
-    now = nowIso(),
-  ): Promise<void> {
+  public async clearUserData(confirmation: string, now = nowIso()): Promise<void> {
     if (confirmation !== 'RESET LOCAL DATA') {
       throw new Error('Reset confirmation did not match.');
     }
