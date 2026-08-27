@@ -126,6 +126,14 @@ function stepIndex(plan: TrainingExercisePlan, stepId: string | undefined): numb
   return index < 0 ? plan.steps.length : index;
 }
 
+function stepPly(
+  plan: TrainingExercisePlan,
+  stepId: string | undefined,
+  fallback: number,
+): number {
+  return exerciseStep(plan, stepId)?.ply ?? fallback;
+}
+
 function currentStep(state: TrainingSessionState, plan: TrainingExercisePlan) {
   return exerciseStep(plan, state.currentStepId);
 }
@@ -218,6 +226,26 @@ function nextStepId(step: TrainingExerciseStep, acceptedUci?: string): string | 
   return step.nextStepId;
 }
 
+function acceptedSans(step: TrainingExerciseStep): readonly string[] {
+  const unique = [...new Set(step.acceptedSan.filter(Boolean))];
+  return unique.length > 0 ? unique : [step.san];
+}
+
+function acceptedAnswerSentence(step: TrainingExerciseStep): string {
+  const sans = acceptedSans(step);
+  if (sans.length === 1) return `This prompt expects ${sans[0]}.`;
+  if (sans.length === 2) return `Accepted repertoire moves here are ${sans[0]} or ${sans[1]}.`;
+  return `Accepted repertoire moves here are ${sans.slice(0, -1).join(', ')}, or ${sans.at(-1)}.`;
+}
+
+function repairInstruction(step: TrainingExerciseStep): string {
+  const sans = acceptedSans(step);
+  if (sans.length === 1) {
+    return `Play ${sans[0]} now. A correct repair will not erase the original evidence.`;
+  }
+  return `Play any accepted repertoire move (${sans.join(' / ')}) now. A correct repair will not erase the original evidence.`;
+}
+
 function acceptedMoveState(
   state: TrainingSessionState,
   plan: TrainingExercisePlan,
@@ -233,14 +261,14 @@ function acceptedMoveState(
       : 'correct';
   const observation = makeObservation(state, step, nowMs, outcome, { playedUci: applied.uci });
   const followingStepId = nextStepId(step, applied.uci);
-  const followingIndex = stepIndex(plan, followingStepId);
+  const followingPly = stepPly(plan, followingStepId, step.ply + 1);
 
   return {
     ...state,
     status: 'correct-feedback',
     fen: applied.fen,
     currentStepId: followingStepId,
-    plyIndex: followingIndex,
+    plyIndex: followingPly,
     treeRevealedPlyCount: Math.max(state.treeRevealedPlyCount, state.plyIndex + 1),
     treeRevealedItemIds: revealTreeItem(state.treeRevealedItemIds, step.treeItemId),
     hintLevel: 0,
@@ -254,7 +282,7 @@ function acceptedMoveState(
       kind: isRepair ? 'repair' : 'correct',
       title: isRepair ? 'Repair complete' : 'Correct repertoire move',
       message: isRepair
-        ? `${step.san} was replayed correctly. The original failure remains in the evidence log.`
+        ? `${applied.san} was replayed correctly. The original failure remains in the evidence log.`
         : `${applied.san} is accepted. Continue the line.`,
     },
   };
@@ -275,6 +303,7 @@ function failedLegalMoveState(
       : {}),
   });
   const queued = queueRetest(state, step.id, observation.id);
+  const answer = acceptedAnswerSentence(step);
 
   return {
     ...state,
@@ -287,12 +316,12 @@ function failedLegalMoveState(
       ? {
           kind: 'variation',
           title: 'Known sibling variation',
-          message: `${applied.san} is legal and belongs to another known branch. This prompt expects ${step.san}. Repair this decision before continuing.`,
+          message: `${applied.san} is legal and belongs to another known branch. ${answer} Repair this decision before continuing.`,
         }
       : {
           kind: 'outside',
           title: 'Legal, but outside this repertoire line',
-          message: `${applied.san} is legal but is not accepted by this repertoire context. This prompt expects ${step.san}. Repair this decision before continuing.`,
+          message: `${applied.san} is legal but is not accepted by this repertoire context. ${answer} Repair this decision before continuing.`,
         },
   };
 }
@@ -420,7 +449,7 @@ function continueSession(
       feedback: {
         kind: 'repair',
         title: 'Repair this decision',
-        message: `Play ${step.san} now. A correct repair will not erase the original evidence.`,
+        message: repairInstruction(step),
       },
     };
   }
@@ -459,7 +488,7 @@ function applyOpponentMove(
     status: nextStatus,
     fen: result.move.fen,
     currentStepId: followingStepId,
-    plyIndex: stepIndex(plan, followingStepId),
+    plyIndex: following?.ply ?? step.ply + 1,
     treeRevealedPlyCount: Math.max(state.treeRevealedPlyCount, state.plyIndex + 1),
     treeRevealedItemIds: revealTreeItem(state.treeRevealedItemIds, step.treeItemId),
     lastMove: result.move,
@@ -481,14 +510,15 @@ function startRetest(
   const ticket = state.retestQueue.find((candidate) => candidate.separationRemaining === 0);
   if (!ticket) return state;
   const start = exerciseStep(plan, plan.startStepId);
+  const target = exerciseStep(plan, ticket.targetStepId);
   return {
     ...state,
     status: statusForStep(start),
     fen: plan.initialFen,
     currentStepId: plan.startStepId,
-    plyIndex: 0,
+    plyIndex: start?.ply ?? 0,
     targetStepId: ticket.targetStepId,
-    targetPly: stepIndex(plan, ticket.targetStepId),
+    targetPly: target?.ply ?? stepIndex(plan, ticket.targetStepId),
     runKind: 'retest',
     treeRevealedPlyCount: 0,
     treeRevealedItemIds: [],
@@ -514,7 +544,8 @@ export function createTrainingSession(
 ): TrainingSessionState {
   const plan = asPlan(source);
   const start = exerciseStep(plan, plan.startStepId);
-  const targetPly = stepIndex(plan, plan.targetStepId);
+  const target = exerciseStep(plan, plan.targetStepId);
+  const targetPly = target?.ply ?? stepIndex(plan, plan.targetStepId);
   return {
     sessionId: options.sessionId ?? `${plan.id}-${nowMs}`,
     planId: plan.id,
@@ -522,7 +553,7 @@ export function createTrainingSession(
     status: statusForStep(start),
     fen: plan.initialFen,
     currentStepId: plan.startStepId,
-    plyIndex: 0,
+    plyIndex: start?.ply ?? 0,
     targetStepId: plan.targetStepId,
     targetPly,
     runKind: 'primary',
