@@ -71,7 +71,12 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
   };
 
   return (
-    <Dialog open={open} onClose={committing ? undefined : onClose} fullWidth maxWidth="md">
+    <Dialog
+      open={open}
+      onClose={committing ? undefined : onClose}
+      fullWidth
+      maxWidth="md"
+    >
       <DialogTitle>Import PGN repertoire</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
