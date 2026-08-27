@@ -295,10 +295,7 @@ export function App({
         const requestedPlan = requestedPlanId
           ? refreshed.allPlans.find((candidate) => candidate.id === requestedPlanId)
           : undefined;
-        const initialPlan =
-          requestedPlan ??
-          refreshed.plans[0] ??
-          (initialDemoFixtures ? refreshed.allPlans[0] : undefined);
+        const initialPlan = requestedPlan ?? refreshed.plans[0];
         if (initialPlan) {
           setSelectionId(initialPlan.id);
           setSession(
