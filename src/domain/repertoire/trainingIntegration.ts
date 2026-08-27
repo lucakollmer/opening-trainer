@@ -9,15 +9,18 @@ import { exerciseStep, type TrainingExercisePlan } from '../training/exercisePla
 
 const MAX_REPLACEMENT_RETURNS = 2;
 
-function correctPly(
+function correctGraphPly(
   previous: TrainingSessionState,
   next: TrainingSessionState,
   plan: TrainingExercisePlan,
 ): TrainingSessionState {
+  const targetPly = exerciseStep(plan, next.targetStepId)?.ply ?? next.targetPly;
   const current = exerciseStep(plan, next.currentStepId);
-  if (current) return { ...next, plyIndex: current.ply };
+  if (current) return { ...next, plyIndex: current.ply, targetPly };
   const prior = exerciseStep(plan, previous.currentStepId);
-  return prior ? { ...next, plyIndex: prior.ply + 1 } : next;
+  return prior
+    ? { ...next, plyIndex: prior.ply + 1, targetPly }
+    : { ...next, targetPly };
 }
 
 export function createGraphTrainingSession(
@@ -46,7 +49,7 @@ export function reduceGraphTrainingSession(
     event.type === 'user-move' && step?.actor === 'user'
       ? tryApplyMove(state.fen, event.move)
       : null;
-  let next = correctPly(
+  let next = correctGraphPly(
     state,
     reduceTrainingSession(state, plan, event),
     plan,
