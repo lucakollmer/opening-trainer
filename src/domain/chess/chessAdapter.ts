@@ -1,4 +1,4 @@
-import { Chess } from 'chess.js';
+import { Chess, type Square } from 'chess.js';
 import { canonicalPositionKey } from './positionKey';
 
 export type PromotionPiece = 'q' | 'r' | 'b' | 'n';
@@ -99,7 +99,7 @@ export function requiresPromotion(
   try {
     const game = new Chess(fen);
     return game
-      .moves({ square: from, verbose: true })
+      .moves({ square: from as Square, verbose: true })
       .some((move) => move.to === to && Boolean(move.promotion));
   } catch {
     return false;
