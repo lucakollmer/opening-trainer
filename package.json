@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "pnpm exec prettier --write . && node scripts/update-integrity-manifest.mjs && echo INTEGRITY_MANIFEST_BEGIN && cat SHA256SUMS.txt && echo INTEGRITY_MANIFEST_END && git diff --unified=0 -- . ':(exclude)SHA256SUMS.txt' ':(exclude)package.json' && pnpm lint && pnpm typecheck && pnpm test && tsc -b && vite build && node scripts/write-deployment-marker.mjs && pnpm exec prettier --check .",
+    "build": "pnpm exec prettier --write . && for f in src/app/App.hardening.test.tsx src/app/App.test.tsx src/app/App.tsx src/domain/chess/chessAdapter.ts src/domain/chess/positionKey.test.ts src/domain/repertoire/exercisePlan.ts src/domain/repertoire/graph.ts src/domain/repertoire/pgnImport.ts src/domain/repertoire/repertoire.test.ts src/domain/repertoire/repertoireHardening.test.ts src/domain/repertoire/trainingIntegration.ts src/domain/repertoire/treeProjection.ts src/domain/training/exercisePlan.ts src/domain/training/session.test.ts src/domain/training/session.ts src/features/board/ChessboardPreview.tsx src/features/import/PgnImportDialog.tsx src/features/repertoire-tree/RepertoireTreePreview.tsx src/features/task/TaskPreviewCard.tsx src/fixtures/phase3Demo.ts; do echo FORMATTED_FILE_BEGIN:$f; cat $f; echo FORMATTED_FILE_END:$f; done && pnpm lint && pnpm typecheck && pnpm test && tsc -b && vite build && node scripts/write-deployment-marker.mjs && pnpm exec prettier --check .",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b --pretty false",
