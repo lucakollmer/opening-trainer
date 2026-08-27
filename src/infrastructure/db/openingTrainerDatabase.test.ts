@@ -44,6 +44,19 @@ async function dispose(result: OpeningTrainerRepository) {
   await result.deleteDatabase();
 }
 
+function canonicalGraphContent(graph: RepertoireGraph): RepertoireGraph {
+  const byId = <T extends { id: string }>(rows: readonly T[]) =>
+    [...rows].sort((left, right) => left.id.localeCompare(right.id));
+  return {
+    repertoires: byId(graph.repertoires),
+    positions: byId(graph.positions),
+    edges: byId(graph.edges),
+    contexts: byId(graph.contexts),
+    moves: byId(graph.moves),
+    playlists: byId(graph.playlists),
+  };
+}
+
 function deepestUserTarget(graph: RepertoireGraph): {
   rootContextId: string;
   targetContextId: string;
@@ -94,11 +107,10 @@ describe('PHASE-4 Opening Trainer persistence', () => {
       expect(stored.contexts.every((context) => context.id.includes('persist-roundtrip'))).toBe(
         true,
       );
-      const before = JSON.stringify(stored);
       result.close();
       await result.initialize('2026-08-27T15:02:00.000Z');
       const after = await result.loadRepertoireGraph('persist-roundtrip');
-      expect(JSON.stringify(after)).toBe(before);
+      expect(canonicalGraphContent(after)).toEqual(canonicalGraphContent(stored));
       expect(await result.database.trainingItems.count()).toBeGreaterThan(0);
       expect(await result.database.decisionRules.count()).toBeGreaterThan(0);
     } finally {
