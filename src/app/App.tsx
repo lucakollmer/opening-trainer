@@ -148,9 +148,7 @@ function importedExercisePlans(graph: RepertoireGraph): TrainingExercisePlan[] {
   return plans;
 }
 
-function persistedPlans(
-  graphs: readonly RepertoireGraph[],
-): {
+function persistedPlans(graphs: readonly RepertoireGraph[]): {
   plans: TrainingExercisePlan[];
   repertoireByPlanId: Map<string, string>;
 } {
@@ -219,9 +217,9 @@ export function App() {
   const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(basePlans);
   const [selectionId, setSelectionId] = useState(defaultPlan.id);
   const [includeDemoAlternative, setIncludeDemoAlternative] = useState(true);
-  const [repertoireByPlanId, setRepertoireByPlanId] = useState<ReadonlyMap<string, string>>(
-    new Map(),
-  );
+  const [repertoireByPlanId, setRepertoireByPlanId] = useState<
+    ReadonlyMap<string, string>
+  >(new Map());
   const [recoverySession, setRecoverySession] = useState<SessionRecord | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const selectedPlan =
@@ -305,7 +303,9 @@ export function App() {
       } catch (error) {
         if (active) {
           setPersistenceError(
-            error instanceof Error ? error.message : 'Local data initialization failed.',
+            error instanceof Error
+              ? error.message
+              : 'Local data initialization failed.',
           );
         }
       }
@@ -323,7 +323,10 @@ export function App() {
   }, [repository]);
 
   useEffect(() => {
-    if (!repertoireByPlanId.has(session.planId) || !hasDurableSessionProgress(session)) {
+    if (
+      !repertoireByPlanId.has(session.planId) ||
+      !hasDurableSessionProgress(session)
+    ) {
       return;
     }
     const snapshot = structuredClone(session);
@@ -478,11 +481,13 @@ export function App() {
     if (!recoverySession) return;
     const id = recoverySession.id;
     setRecoverySession(null);
-    void repository.markSessionAbandoned(id).catch((error: unknown) =>
-      setPersistenceError(
-        error instanceof Error ? error.message : 'Could not abandon saved session.',
-      ),
-    );
+    void repository
+      .markSessionAbandoned(id)
+      .catch((error: unknown) =>
+        setPersistenceError(
+          error instanceof Error ? error.message : 'Could not abandon saved session.',
+        ),
+      );
   };
 
   const hintSquares =
