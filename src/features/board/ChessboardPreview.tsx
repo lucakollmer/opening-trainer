@@ -1,6 +1,10 @@
 import {
   Button,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
@@ -13,7 +17,10 @@ import {
 import { useState, type ChangeEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { Chessboard } from 'react-chessboard';
-import type { PromotionPiece } from '../../domain/chess/chessAdapter';
+import {
+  requiresPromotion,
+  type PromotionPiece,
+} from '../../domain/chess/chessAdapter';
 
 export interface BoardMoveCommand {
   type: 'board.move-requested';
@@ -31,6 +38,7 @@ interface ChessboardPreviewProps {
   hintSquares?: readonly string[];
   reducedMotion?: boolean;
   onMove: (command: BoardMoveCommand) => boolean;
+  onInteractionBlockChange?: (blocked: boolean) => void;
 }
 
 export function ChessboardPreview({
@@ -42,11 +50,16 @@ export function ChessboardPreview({
   hintSquares = [],
   reducedMotion = false,
   onMove,
+  onInteractionBlockChange,
 }: ChessboardPreviewProps) {
   const interactionDisabled = disabled || !userTurn;
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [promotion, setPromotion] = useState<PromotionPiece | ''>('');
+  const [pendingPromotion, setPendingPromotion] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
 
   const submitAccessibleMove = () => {
     if (!from || !to || interactionDisabled) return;
@@ -61,6 +74,18 @@ export function ChessboardPreview({
       setTo('');
       setPromotion('');
     }
+  };
+
+  const closePromotion = () => {
+    setPendingPromotion(null);
+    onInteractionBlockChange?.(false);
+  };
+
+  const choosePromotion = (piece: PromotionPiece) => {
+    if (!pendingPromotion) return;
+    const move = pendingPromotion;
+    closePromotion();
+    onMove({ type: 'board.move-requested', ...move, promotion: piece });
   };
 
   const hintSquareStyles = Object.fromEntries(
@@ -104,6 +129,11 @@ export function ChessboardPreview({
               squareStyles: hintSquareStyles,
               onPieceDrop: ({ sourceSquare, targetSquare }) => {
                 if (interactionDisabled || !targetSquare) return false;
+                if (requiresPromotion(position, sourceSquare, targetSquare)) {
+                  setPendingPromotion({ from: sourceSquare, to: targetSquare });
+                  onInteractionBlockChange?.(true);
+                  return false;
+                }
                 return onMove({
                   type: 'board.move-requested',
                   from: sourceSquare,
@@ -183,6 +213,27 @@ export function ChessboardPreview({
             : 'No hint overlay active.'}
         </Typography>
       </Stack>
+
+      <Dialog
+        open={pendingPromotion !== null}
+        onClose={closePromotion}
+        aria-labelledby="promotion-title"
+      >
+        <DialogTitle id="promotion-title">Choose promotion piece</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Select the piece for this promotion. Training response timing is paused
+            while this dialog is open.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => choosePromotion('q')}>Queen</Button>
+          <Button onClick={() => choosePromotion('r')}>Rook</Button>
+          <Button onClick={() => choosePromotion('b')}>Bishop</Button>
+          <Button onClick={() => choosePromotion('n')}>Knight</Button>
+          <Button onClick={closePromotion}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

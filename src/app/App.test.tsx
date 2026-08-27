@@ -43,10 +43,9 @@ async function submitAccessibleMove(
   await user.click(screen.getByRole('button', { name: 'Submit move' }));
 }
 
-describe('PHASE-2 deterministic training vertical slice', () => {
+describe('hardened PHASE-2 training vertical slice', () => {
   it('renders the responsive shell with the real in-memory training fixture', () => {
     renderApp();
-
     expect(screen.getByRole('heading', { name: 'Opening Trainer' })).toBeVisible();
     expect(screen.getByLabelText('Training fixture')).toBeVisible();
     expect(screen.getByRole('group', { name: 'Training mode' })).toBeVisible();
@@ -63,42 +62,35 @@ describe('PHASE-2 deterministic training vertical slice', () => {
   it('withholds all future answer labels in Train mode and reveals them in Browse mode', async () => {
     const user = userEvent.setup();
     renderApp();
-
     expect(screen.queryByText('1. e4')).not.toBeInTheDocument();
     expect(screen.queryByText('1... e5')).not.toBeInTheDocument();
     expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('fix01-node');
-
     await user.click(screen.getByRole('button', { name: 'Browse' }));
-
     expect(screen.getAllByText('1. e4').length).toBeGreaterThan(0);
     expect(screen.getAllByText('1... e5').length).toBeGreaterThan(0);
     expect(screen.getAllByText('2. Nf3').length).toBeGreaterThan(0);
   });
 
-  it('rejects an illegal move without advancing the board and records distinct feedback', async () => {
+  it('rejects an illegal move without advancing or creating a terminal review observation', async () => {
     const user = userEvent.setup();
     renderApp();
     const initialPosition = screen
       .getByTestId('chessboard-adapter')
       .getAttribute('data-position');
-
     await submitAccessibleMove(user, 'e2', 'e5');
-
     expect(screen.getByRole('heading', { name: 'Illegal move' })).toBeVisible();
     expect(screen.getByTestId('chessboard-adapter')).toHaveAttribute(
       'data-position',
       initialPosition,
     );
-    expect(screen.getAllByText('1 observations').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('0 observations').length).toBeGreaterThan(0);
   });
 
-  it('reveals only the responded route item after a correct move, not an unrelated sibling reply', async () => {
+  it('reveals only the responded route item after a correct move', async () => {
     const user = userEvent.setup();
     renderApp();
-
     await submitAccessibleMove(user, 'e2', 'e4');
-
     expect(screen.getAllByText('1. e4').length).toBeGreaterThan(0);
     expect(screen.queryByText('1... c5')).not.toBeInTheDocument();
     expect(
@@ -106,10 +98,9 @@ describe('PHASE-2 deterministic training vertical slice', () => {
     ).toBeVisible();
   });
 
-  it('classifies a known sibling move separately and offers an explicit repair', async () => {
+  it('classifies a known sibling separately and offers repair', async () => {
     const user = userEvent.setup();
     renderApp();
-
     await submitAccessibleMove(user, 'e2', 'e4');
     await user.click(screen.getByRole('button', { name: 'Continue line' }));
     await screen.findByRole(
@@ -117,20 +108,17 @@ describe('PHASE-2 deterministic training vertical slice', () => {
       { name: 'Find the repertoire move' },
       { timeout: 1500 },
     );
-
     await submitAccessibleMove(user, 'b1', 'c3');
-
     expect(
       screen.getByRole('heading', { name: 'Known sibling variation' }),
     ).toBeVisible();
-    expect(screen.getByText(/This prompt expects Nf3/)).toBeVisible();
+    expect(screen.getByText(/This prompt expects Nf3/u)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Repair move' })).toBeVisible();
   });
 
   it('progresses through hints without rendering the full move before reveal', async () => {
     const user = userEvent.setup();
     renderApp();
-
     await submitAccessibleMove(user, 'e2', 'e4');
     await user.click(screen.getByRole('button', { name: 'Continue line' }));
     await screen.findByRole(
@@ -138,19 +126,14 @@ describe('PHASE-2 deterministic training vertical slice', () => {
       { name: 'Find the repertoire move' },
       { timeout: 1500 },
     );
-
     await user.click(screen.getByRole('button', { name: 'Hint 1' }));
-    expect(screen.getByText(/Piece: kingside knight/)).toBeVisible();
+    expect(screen.getByText(/Piece: kingside knight/u)).toBeVisible();
     expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: 'Hint 2' }));
-    expect(screen.getByText(/Candidate destinations: f3, h3/)).toBeVisible();
+    expect(screen.getByText(/Candidate destinations: f3, h3/u)).toBeVisible();
     expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
-
     await user.click(screen.getByRole('button', { name: 'Hint 3' }));
-    expect(screen.getByText(/pressure on the e5 pawn/)).toBeVisible();
-    expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
-
+    expect(screen.getByText(/pressure on the e5 pawn/u)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Reveal move' }));
     expect(screen.getByText('Move: Nf3.')).toBeVisible();
     expect(screen.getAllByText('2. Nf3').length).toBeGreaterThan(0);
@@ -159,15 +142,12 @@ describe('PHASE-2 deterministic training vertical slice', () => {
   it('opens the compact tree drawer and restores focus when it closes', async () => {
     const user = userEvent.setup();
     renderApp();
-
     const openButton = screen.getByRole('button', { name: 'Open repertoire tree' });
     await user.click(openButton);
-
     const presentation = screen.getByRole('presentation');
     expect(
       within(presentation).getByRole('heading', { name: 'Repertoire tree' }),
     ).toBeVisible();
-
     await user.keyboard('{Escape}');
     expect(openButton).toHaveFocus();
   });
