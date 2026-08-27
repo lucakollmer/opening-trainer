@@ -62,10 +62,7 @@ export interface PlaylistRecord {
 }
 
 export type PlaylistEntryKind =
-  | 'repertoire'
-  | 'include-context'
-  | 'exclude-context'
-  | 'tag';
+  'repertoire' | 'include-context' | 'exclude-context' | 'tag';
 
 export interface PlaylistEntryRecord {
   id: string;
