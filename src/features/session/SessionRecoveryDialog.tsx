@@ -24,9 +24,9 @@ export function SessionRecoveryDialog({
       <DialogTitle>Resume interrupted session?</DialogTitle>
       <DialogContent>
         <Typography variant="body2">
-          Opening Trainer found an unfinished local training session. Resuming
-          restores its exact position, target, hints, repair queue and already
-          committed review evidence without committing those observations again.
+          Opening Trainer found an unfinished local training session. Resuming restores
+          its exact position, target, hints, repair queue and already committed review
+          evidence without committing those observations again.
         </Typography>
       </DialogContent>
       <DialogActions>
