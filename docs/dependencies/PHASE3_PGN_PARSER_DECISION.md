@@ -34,9 +34,13 @@ Either remains a viable future implementation behind the same import boundary. P
 - unsupported or malformed tokens become explicit preview errors rather than being dropped;
 - every SAN move is replayed through `chess.js` from the correct parent FEN;
 - canonical positions, edges and contextual occurrences are validated before commit;
-- preview is isolated and the in-memory repository receives a graph only after full validation.
+- preview is isolated and committed in-memory imports are immutable snapshots that retain source metadata, parsed games, warnings and summary alongside the graph.
 
 The source fingerprint currently uses a deterministic `fnv1a32:` content fingerprint. It is provenance/deduplication metadata, not a security or authenticity digest.
+
+## Conformance matrix
+
+The PHASE-3 hardening suite exercises the bounded parser against nested recursive RAVs, black-to-move FEN games, castling, promotion, en-passant, semicolon comments, combined symbolic and numeric NAGs, escaped header values, multiple independent roots, and the exact 1,000,000-byte input boundary. Chess legality for every special move remains delegated to `chess.js`; these tests validate only structural parsing, metadata preservation and correct parent-state replay.
 
 ## Maintenance boundary
 
