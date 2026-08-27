@@ -61,7 +61,9 @@ export function normalizedAcceptedMoveSet(moves: readonly string[]): string {
 }
 
 export function compileTrainingFixture(fixture: TrainingFixture): TrainingExercisePlan {
-  if (fixture.route.length === 0) throw new Error('A training fixture requires route moves.');
+  if (fixture.route.length === 0) {
+    throw new Error('A training fixture requires route moves.');
+  }
   if (fixture.targetPly < 0 || fixture.targetPly >= fixture.route.length) {
     throw new Error(`Fixture target ply is outside the route: ${fixture.targetPly}`);
   }

@@ -161,6 +161,7 @@ export interface ImportMove {
 }
 
 export interface ImportLine {
+  comment?: string;
   moves: readonly ImportMove[];
 }
 

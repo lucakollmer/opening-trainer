@@ -2,9 +2,17 @@ import { moveFromUci } from '../chess/chessAdapter';
 import type { TrainingExercisePlan, TrainingExerciseStep } from '../training/exercisePlan';
 import { normalizedAcceptedMoveSet } from '../training/exercisePlan';
 import type { TrainingTreeItem } from '../../fixtures/trainingFixtures';
-import { queryAcceptedMoves, trainingItemIdentityKey, validateRepertoireGraph } from './graph';
+import {
+  contextPly,
+  playlistAllowsRouteContext,
+  queryAcceptedMoves,
+  required,
+  trainingItemIdentityKey,
+  validateRepertoireGraph,
+} from './graph';
 import { projectRepertoireTree, toTrainingTreeItems } from './treeProjection';
 import type {
+  Playlist,
   PromptMode,
   RepertoireContext,
   RepertoireGraph,
@@ -19,31 +27,74 @@ export interface GraphExercisePlanOptions {
   playlistId?: string;
 }
 
-function required<T>(value: T | undefined, message: string): T {
-  if (value === undefined) throw new Error(message);
-  return value;
+function contextsById(graph: RepertoireGraph): Map<string, RepertoireContext> {
+  return new Map(graph.contexts.map((context) => [context.id, context]));
 }
 
-function contextDepth(
+function contextAndAncestorsIncluded(
   context: RepertoireContext,
   contexts: ReadonlyMap<string, RepertoireContext>,
-): number {
-  let depth = 0;
+): boolean {
   let current: RepertoireContext | undefined = context;
   const seen = new Set<string>();
-  while (current.parentContextId) {
-    if (seen.has(current.id)) throw new Error(`Context cycle at ${current.id}`);
+  while (current) {
+    if (!current.included || seen.has(current.id)) return false;
     seen.add(current.id);
-    current = required(contexts.get(current.parentContextId), `Missing parent ${current.parentContextId}`);
-    depth += 1;
+    current = current.parentContextId ? contexts.get(current.parentContextId) : undefined;
   }
-  return depth;
+  return true;
+}
+
+function moveOrder(a: RepertoireMove, b: RepertoireMove): number {
+  return a.order - b.order || a.id.localeCompare(b.id);
+}
+
+function playlistFor(
+  graph: RepertoireGraph,
+  playlistId: string | undefined,
+): Playlist | undefined {
+  if (!playlistId) return undefined;
+  return required(
+    graph.playlists.find((item) => item.id === playlistId),
+    `Missing playlist ${playlistId}`,
+  );
+}
+
+function routeContextAllowed(
+  graph: RepertoireGraph,
+  context: RepertoireContext,
+  contexts: ReadonlyMap<string, RepertoireContext>,
+  playlist: Playlist | undefined,
+): boolean {
+  if (!contextAndAncestorsIncluded(context, contexts)) return false;
+  return !playlist || playlistAllowsRouteContext(graph, playlist, context);
+}
+
+function outgoingMoves(
+  graph: RepertoireGraph,
+  contextId: string,
+  contexts: ReadonlyMap<string, RepertoireContext>,
+  playlist: Playlist | undefined,
+): RepertoireMove[] {
+  const context = contexts.get(contextId);
+  if (!context || !routeContextAllowed(graph, context, contexts, playlist)) return [];
+  return graph.moves
+    .filter((move) => move.contextId === contextId && move.included)
+    .filter((move) => {
+      const destination = contexts.get(move.destinationContextId);
+      return Boolean(
+        destination && routeContextAllowed(graph, destination, contexts, playlist),
+      );
+    })
+    .sort(moveOrder);
 }
 
 function canReachContext(
   graph: RepertoireGraph,
   startContextId: string,
   targetContextId: string,
+  contexts: ReadonlyMap<string, RepertoireContext>,
+  playlist: Playlist | undefined,
 ): boolean {
   const stack = [startContextId];
   const visited = new Set<string>();
@@ -52,35 +103,50 @@ function canReachContext(
     if (current === targetContextId) return true;
     if (visited.has(current)) continue;
     visited.add(current);
-    for (const move of graph.moves) {
-      if (move.contextId === current && move.included) stack.push(move.destinationContextId);
+    for (const move of outgoingMoves(graph, current, contexts, playlist)) {
+      stack.push(move.destinationContextId);
     }
   }
   return false;
 }
 
-function moveOrder(a: RepertoireMove, b: RepertoireMove): number {
-  return a.order - b.order || a.id.localeCompare(b.id);
-}
-
-function selectedMoveForContext(
+function buildTree(
   graph: RepertoireGraph,
-  contextId: string,
-  targetContextId: string,
-): RepertoireMove | undefined {
-  const moves = graph.moves
-    .filter((move) => move.contextId === contextId && move.included)
-    .sort(moveOrder);
-  return moves.find((move) => canReachContext(graph, move.destinationContextId, targetContextId)) ?? moves[0];
-}
-
-function buildTree(graph: RepertoireGraph, repertoireId: string): readonly TrainingTreeItem[] {
+  repertoireId: string,
+  playlistId: string | undefined,
+): readonly TrainingTreeItem[] {
   return toTrainingTreeItems(
     projectRepertoireTree(graph, {
       repertoireId,
       mode: 'browse',
+      ...(playlistId ? { playlistId } : {}),
     }),
   );
+}
+
+function knownSiblingUcis(
+  graph: RepertoireGraph,
+  repertoireId: string,
+  positionId: string,
+  acceptedUci: ReadonlySet<string>,
+): readonly string[] {
+  const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
+  const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
+  return [
+    ...new Set(
+      graph.moves
+        .filter((move) => move.actor === 'user' && move.included)
+        .filter((move) => {
+          const context = contexts.get(move.contextId);
+          return (
+            context?.repertoireId === repertoireId &&
+            context.entryPositionId === positionId
+          );
+        })
+        .map((move) => edges.get(move.edgeId)?.uci)
+        .filter((uci): uci is string => Boolean(uci && !acceptedUci.has(uci))),
+    ),
+  ].sort();
 }
 
 export function createGraphExercisePlan(
@@ -92,10 +158,18 @@ export function createGraphExercisePlan(
     graph.repertoires.find((item) => item.id === options.repertoireId),
     `Missing repertoire ${options.repertoireId}`,
   );
-  const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
+  const contexts = contextsById(graph);
   const positions = new Map(graph.positions.map((position) => [position.id, position]));
   const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
-  const root = required(contexts.get(options.rootContextId), `Missing root context ${options.rootContextId}`);
+  const playlist = playlistFor(graph, options.playlistId);
+  if (playlist && !playlist.repertoireIds.includes(repertoire.id)) {
+    throw new Error('Selected playlist does not include the exercise repertoire.');
+  }
+
+  const root = required(
+    contexts.get(options.rootContextId),
+    `Missing root context ${options.rootContextId}`,
+  );
   const target = required(
     contexts.get(options.targetContextId),
     `Missing target context ${options.targetContextId}`,
@@ -103,7 +177,13 @@ export function createGraphExercisePlan(
   if (root.repertoireId !== repertoire.id || target.repertoireId !== repertoire.id) {
     throw new Error('Exercise root and target must belong to the selected repertoire.');
   }
-  if (!canReachContext(graph, root.id, target.id)) {
+  if (!routeContextAllowed(graph, root, contexts, playlist)) {
+    throw new Error('Exercise root is outside the selected playlist route.');
+  }
+  if (!routeContextAllowed(graph, target, contexts, playlist)) {
+    throw new Error('Exercise target is outside the selected playlist route.');
+  }
+  if (!canReachContext(graph, root.id, target.id, contexts, playlist)) {
     throw new Error('Exercise target is not reachable from its root context.');
   }
 
@@ -114,28 +194,28 @@ export function createGraphExercisePlan(
     const contextId = queue.shift()!;
     if (reachable.has(contextId)) continue;
     reachable.add(contextId);
-    graph.moves
-      .filter((move) => move.contextId === contextId && move.included)
-      .sort(moveOrder)
-      .forEach((move) => queue.push(move.destinationContextId));
+    outgoingMoves(graph, contextId, contexts, playlist).forEach((move) =>
+      queue.push(move.destinationContextId),
+    );
   }
 
   const compiled: TrainingExerciseStep[] = [];
-  for (const context of [...contexts.values()]
-    .filter((item) => reachable.has(item.id))
-    .sort((a, b) => contextDepth(a, contexts) - contextDepth(b, contexts) || a.id.localeCompare(b.id))) {
-    const outgoing = graph.moves
-      .filter((move) => move.contextId === context.id && move.included)
-      .sort(moveOrder);
+  const orderedContexts = [...contexts.values()]
+    .filter((context) => reachable.has(context.id))
+    .sort(
+      (a, b) =>
+        contextPly(a, contexts) - contextPly(b, contexts) ||
+        a.pathFingerprint.localeCompare(b.pathFingerprint) ||
+        a.id.localeCompare(b.id),
+    );
+
+  for (const context of orderedContexts) {
+    const outgoing = outgoingMoves(graph, context.id, contexts, playlist);
     if (outgoing.length === 0) continue;
     const actors = new Set(outgoing.map((move) => move.actor));
     if (actors.size !== 1) throw new Error(`Mixed actors in context ${context.id}`);
     const actor = outgoing[0]!.actor;
-    const selected = required(
-      selectedMoveForContext(graph, context.id, target.id),
-      `Missing selected move for ${context.id}`,
-    );
-    const selectedEdge = required(edges.get(selected.edgeId), `Missing selected edge ${selected.edgeId}`);
+
     const accepted =
       actor === 'user'
         ? queryAcceptedMoves(graph, {
@@ -144,7 +224,9 @@ export function createGraphExercisePlan(
             ...(options.playlistId ? { playlistId: options.playlistId } : {}),
             positionId: context.entryPositionId,
             promptMode,
-            ...(promptMode === 'strict' ? { strictPathFingerprint: context.pathFingerprint } : {}),
+            ...(promptMode === 'strict'
+              ? { strictPathFingerprint: context.pathFingerprint }
+              : {}),
           })
         : {
             positionId: context.entryPositionId,
@@ -158,40 +240,81 @@ export function createGraphExercisePlan(
               };
             }),
             normalizedKey: normalizedAcceptedMoveSet(
-              outgoing.map((move) => required(edges.get(move.edgeId), `Missing edge ${move.edgeId}`).uci),
+              outgoing.map(
+                (move) => required(edges.get(move.edgeId), `Missing edge ${move.edgeId}`).uci,
+              ),
             ),
           };
-    if (accepted.moves.length === 0) throw new Error(`Context ${context.id} has no accepted moves.`);
-    const selectedInput = required(moveFromUci(selectedEdge.uci), `Invalid selected UCI ${selectedEdge.uci}`);
+    if (accepted.moves.length === 0) {
+      throw new Error(`Context ${context.id} has no accepted moves.`);
+    }
+
+    const acceptedUcis = new Set(accepted.moves.map((move) => move.uci));
+    const candidateMoves = outgoing.filter((move) => {
+      const edge = edges.get(move.edgeId);
+      return Boolean(edge && acceptedUcis.has(edge.uci));
+    });
+    const selected =
+      candidateMoves.find((move) =>
+        canReachContext(
+          graph,
+          move.destinationContextId,
+          target.id,
+          contexts,
+          playlist,
+        ),
+      ) ?? candidateMoves[0];
+    if (!selected) throw new Error(`Missing selected move for ${context.id}`);
+    const selectedEdge = required(
+      edges.get(selected.edgeId),
+      `Missing selected edge ${selected.edgeId}`,
+    );
+    const selectedInput = moveFromUci(selectedEdge.uci);
+    if (!selectedInput) {
+      throw new Error(`Invalid selected UCI ${selectedEdge.uci}`);
+    }
+
     const nextStepByAcceptedUci: Record<string, string | undefined> = {};
     const treeItemIdByAcceptedUci: Record<string, string> = {};
-    const targetDispositionByAcceptedUci: Record<string, 'preserved' | 'displaced'> = {};
+    const targetDispositionByAcceptedUci: Record<
+      string,
+      'preserved' | 'displaced'
+    > = {};
     for (const acceptedMove of accepted.moves) {
-      const matching = outgoing.filter((move) => move.edgeId === acceptedMove.edgeId);
-      const destination = matching[0]?.destinationContextId ?? acceptedMove.destinationContextIds[0];
+      const matching = candidateMoves.find((move) => move.edgeId === acceptedMove.edgeId);
+      const destination = matching?.destinationContextId ?? acceptedMove.destinationContextIds[0];
       if (!destination) continue;
-      const destinationHasMoves = graph.moves.some(
-        (move) => move.contextId === destination && move.included,
-      );
-      nextStepByAcceptedUci[acceptedMove.uci] = destinationHasMoves ? destination : undefined;
-      treeItemIdByAcceptedUci[acceptedMove.uci] = matching[0]?.id ?? `tree:${destination}`;
+      const destinationHasMoves =
+        outgoingMoves(graph, destination, contexts, playlist).length > 0;
+      nextStepByAcceptedUci[acceptedMove.uci] = destinationHasMoves
+        ? destination
+        : undefined;
+      treeItemIdByAcceptedUci[acceptedMove.uci] =
+        matching?.id ?? `tree:${destination}`;
       targetDispositionByAcceptedUci[acceptedMove.uci] =
-        context.id === target.id || canReachContext(graph, destination, target.id)
+        context.id === target.id ||
+        canReachContext(graph, destination, target.id, contexts, playlist)
           ? 'preserved'
           : 'displaced';
     }
-    const position = required(positions.get(context.entryPositionId), `Missing position ${context.entryPositionId}`);
+
+    const position = required(
+      positions.get(context.entryPositionId),
+      `Missing position ${context.entryPositionId}`,
+    );
     const trainingItemId = trainingItemIdentityKey({
       repertoireId: repertoire.id,
       contextScopeKey: promptMode === 'normal' ? position.key : context.id,
       positionKey: position.key,
       acceptedMoveSetKey: accepted.normalizedKey,
       promptMode,
-      ...(promptMode === 'strict' ? { strictPathFingerprint: context.pathFingerprint } : {}),
+      ...(promptMode === 'strict'
+        ? { strictPathFingerprint: context.pathFingerprint }
+        : {}),
     });
     compiled.push({
       id: context.id,
-      ply: contextDepth(context, contexts),
+      ply: contextPly(context, contexts),
       actor,
       from: selectedInput.from,
       to: selectedInput.to,
@@ -202,6 +325,10 @@ export function createGraphExercisePlan(
       acceptedMoveSetKey: accepted.normalizedKey,
       trainingItemId,
       positionKey: position.key,
+      wrongSiblingUci:
+        actor === 'user'
+          ? knownSiblingUcis(graph, repertoire.id, context.entryPositionId, acceptedUcis)
+          : [],
       nextStepId: nextStepByAcceptedUci[selectedEdge.uci],
       nextStepByAcceptedUci,
       treeItemIdByAcceptedUci,
@@ -214,15 +341,27 @@ export function createGraphExercisePlan(
   }
 
   return {
-    id: `graph-plan:${repertoire.id}:${root.id}:${target.id}:${promptMode}`,
+    id: [
+      'graph-plan',
+      repertoire.id,
+      root.id,
+      target.id,
+      promptMode,
+      options.playlistId ?? 'all',
+    ].join(':'),
     label: repertoire.name,
-    description: `Contextual repertoire exercise targeting ${target.label ?? target.id}.`,
+    description: playlist
+      ? `Contextual repertoire exercise using playlist ${playlist.name}.`
+      : `Contextual repertoire exercise targeting ${target.label ?? target.id}.`,
     orientation: repertoire.userColour,
     userColour: repertoire.userColour,
-    initialFen: required(positions.get(root.entryPositionId), `Missing root position ${root.entryPositionId}`).fen,
+    initialFen: required(
+      positions.get(root.entryPositionId),
+      `Missing root position ${root.entryPositionId}`,
+    ).fen,
     startStepId: root.id,
     targetStepId: target.id,
     steps: compiled,
-    tree: buildTree(graph, repertoire.id),
+    tree: buildTree(graph, repertoire.id, options.playlistId),
   };
 }

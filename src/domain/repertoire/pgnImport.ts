@@ -38,6 +38,7 @@ interface ParsedMove {
 }
 
 interface ParsedLine {
+  comment?: string;
   moves: ParsedMove[];
 }
 
@@ -51,28 +52,45 @@ function sourceLocator(game: number, line: number, column: number): SourceLocato
   return { game, line, column };
 }
 
+function appendText(existing: string | undefined, value: string | undefined): string | undefined {
+  if (!value) return existing;
+  if (!existing) return value;
+  const parts = new Set([...existing.split('\n'), ...value.split('\n')].filter(Boolean));
+  return [...parts].join('\n');
+}
+
 function splitGames(text: string): { headers: Record<string, string>; movetext: string }[] {
   const lines = text.replace(/\r\n?/gu, '\n').split('\n');
   const games: { headers: Record<string, string>; moveLines: string[] }[] = [];
   let current = { headers: {} as Record<string, string>, moveLines: [] as string[] };
   let sawMovetext = false;
   const flush = () => {
-    if (Object.keys(current.headers).length > 0 || current.moveLines.join('').trim()) games.push(current);
+    if (Object.keys(current.headers).length > 0 || current.moveLines.join('').trim()) {
+      games.push(current);
+    }
     current = { headers: {}, moveLines: [] };
     sawMovetext = false;
   };
+
   for (const line of lines) {
-    const match = line.match(/^\s*\[([A-Za-z0-9_]+)\s+"((?:\\.|[^"\\])*)"\]\s*$/u);
+    const match = line.match(
+      /^\s*\[([A-Za-z0-9_]+)\s+"((?:\\.|[^"\\])*)"\]\s*$/u,
+    );
     if (match) {
       if (sawMovetext) flush();
-      current.headers[match[1]!] = match[2]!.replace(/\\"/gu, '"').replace(/\\\\/gu, '\\');
+      current.headers[match[1]!] = match[2]!
+        .replace(/\\"/gu, '"')
+        .replace(/\\\\/gu, '\\');
       continue;
     }
     if (line.trim()) sawMovetext = true;
     current.moveLines.push(line);
   }
   flush();
-  return games.map((game) => ({ headers: game.headers, movetext: game.moveLines.join('\n') }));
+  return games.map((game) => ({
+    headers: game.headers,
+    movetext: game.moveLines.join('\n'),
+  }));
 }
 
 function tokenize(text: string, game: number): Token[] {
@@ -89,6 +107,7 @@ function tokenize(text: string, game: number): Token[] {
     }
     index += 1;
   };
+
   while (index < text.length) {
     const char = text[index]!;
     if (/\s/u.test(char)) {
@@ -97,7 +116,11 @@ function tokenize(text: string, game: number): Token[] {
     }
     const locator = sourceLocator(game, line, column);
     if (char === '(' || char === ')') {
-      tokens.push({ kind: char === '(' ? 'lparen' : 'rparen', value: char, locator });
+      tokens.push({
+        kind: char === '(' ? 'lparen' : 'rparen',
+        value: char,
+        locator,
+      });
       advance(char);
       continue;
     }
@@ -115,7 +138,9 @@ function tokenize(text: string, game: number): Token[] {
         value += next;
         advance(next);
       }
-      if (!closed) throw Object.assign(new Error('Unterminated PGN comment.'), { locator });
+      if (!closed) {
+        throw Object.assign(new Error('Unterminated PGN comment.'), { locator });
+      }
       tokens.push({ kind: 'comment', value: value.trim(), locator });
       continue;
     }
@@ -136,10 +161,15 @@ function tokenize(text: string, game: number): Token[] {
         value += text[index]!;
         advance(text[index]!);
       }
-      if (!value) throw Object.assign(new Error('Invalid empty numeric annotation glyph.'), { locator });
+      if (!value) {
+        throw Object.assign(new Error('Invalid empty numeric annotation glyph.'), {
+          locator,
+        });
+      }
       tokens.push({ kind: 'nag', value: `$${value}`, locator });
       continue;
     }
+
     let value = '';
     while (index < text.length && !/[\s(){};]/u.test(text[index]!)) {
       value += text[index]!;
@@ -148,6 +178,26 @@ function tokenize(text: string, game: number): Token[] {
     if (value) tokens.push({ kind: 'symbol', value, locator });
   }
   return tokens;
+}
+
+function assertBalancedVariations(tokens: readonly Token[]): void {
+  const openings: SourceLocator[] = [];
+  for (const token of tokens) {
+    if (token.kind === 'lparen') {
+      openings.push(token.locator);
+    } else if (token.kind === 'rparen') {
+      if (openings.length === 0) {
+        throw Object.assign(new Error('Unmatched PGN variation terminator.'), {
+          locator: token.locator,
+        });
+      }
+      openings.pop();
+    }
+  }
+  const locator = openings.at(-1);
+  if (locator) {
+    throw Object.assign(new Error('Unterminated PGN variation.'), { locator });
+  }
 }
 
 function stripMoveNumber(symbol: string): string {
@@ -162,35 +212,52 @@ function splitSymbolicNag(symbol: string): { san: string; nag?: string } {
 function parseLine(
   tokens: readonly Token[],
   start: number,
-  rootComment: { value?: string },
 ): { line: ParsedLine; next: number } {
   const moves: ParsedMove[] = [];
+  let comment: string | undefined;
   let index = start;
   while (index < tokens.length) {
     const token = tokens[index]!;
-    if (token.kind === 'rparen') return { line: { moves }, next: index + 1 };
+    if (token.kind === 'rparen') {
+      return {
+        line: { ...(comment ? { comment } : {}), moves },
+        next: index + 1,
+      };
+    }
     if (token.kind === 'lparen') {
       const previous = moves.at(-1);
-      if (!previous) throw Object.assign(new Error('Variation has no preceding move.'), { locator: token.locator });
-      const parsed = parseLine(tokens, index + 1, {});
+      if (!previous) {
+        throw Object.assign(new Error('Variation has no preceding move.'), {
+          locator: token.locator,
+        });
+      }
+      const parsed = parseLine(tokens, index + 1);
       previous.variations.push(parsed.line);
       index = parsed.next;
       continue;
     }
     if (token.kind === 'comment') {
       const previous = moves.at(-1);
-      if (previous) previous.comment = previous.comment ? `${previous.comment}\n${token.value}` : token.value;
-      else rootComment.value = rootComment.value ? `${rootComment.value}\n${token.value}` : token.value;
+      if (previous) {
+        previous.comment = appendText(previous.comment, token.value);
+      } else {
+        comment = appendText(comment, token.value);
+      }
       index += 1;
       continue;
     }
     if (token.kind === 'nag') {
       const previous = moves.at(-1);
-      if (!previous) throw Object.assign(new Error('NAG has no preceding move.'), { locator: token.locator });
+      if (!previous) {
+        throw Object.assign(new Error('NAG has no preceding move.'), {
+          locator: token.locator,
+        });
+      }
       previous.nags.push(token.value);
       index += 1;
       continue;
     }
+
     const stripped = stripMoveNumber(token.value);
     if (!stripped || /^\d+\.{1,3}$/u.test(token.value)) {
       index += 1;
@@ -201,7 +268,11 @@ function parseLine(
       continue;
     }
     const split = splitSymbolicNag(stripped);
-    if (!split.san) throw Object.assign(new Error('Empty move token.'), { locator: token.locator });
+    if (!split.san) {
+      throw Object.assign(new Error('Empty move token.'), {
+        locator: token.locator,
+      });
+    }
     moves.push({
       san: split.san,
       nags: split.nag ? [split.nag] : [],
@@ -210,23 +281,18 @@ function parseLine(
     });
     index += 1;
   }
-  return { line: { moves }, next: index };
+  return { line: { ...(comment ? { comment } : {}), moves }, next: index };
 }
 
 function parseGames(text: string): ParsedGame[] {
   return splitGames(text).map((source, gameIndex) => {
     const tokens = tokenize(source.movetext, gameIndex + 1);
-    const rootComment: { value?: string } = {};
-    const parsed = parseLine(tokens, 0, rootComment);
-    if (parsed.next !== tokens.length) {
-      throw Object.assign(new Error('Unexpected unmatched variation terminator.'), {
-        locator: tokens[parsed.next - 1]?.locator,
-      });
-    }
+    assertBalancedVariations(tokens);
+    const parsed = parseLine(tokens, 0);
     return {
       headers: source.headers,
-      ...(rootComment.value ? { rootComment: rootComment.value } : {}),
-      line: parsed.line,
+      ...(parsed.line.comment ? { rootComment: parsed.line.comment } : {}),
+      line: { moves: parsed.line.moves },
     };
   });
 }
@@ -247,8 +313,19 @@ function fnv1a(text: string): string {
 
 function graphFromParsed(
   parsedGames: readonly ParsedGame[],
-  options: { repertoireId: string; repertoireName: string; userColour: Colour; sourceLabel: string; sourceHash: string },
-): { graph: RepertoireGraph; games: ImportGame[]; warnings: ImportWarning[]; summary: ImportCandidate['summary'] } {
+  options: {
+    repertoireId: string;
+    repertoireName: string;
+    userColour: Colour;
+    sourceLabel: string;
+    sourceHash: string;
+  },
+): {
+  graph: RepertoireGraph;
+  games: ImportGame[];
+  warnings: ImportWarning[];
+  summary: ImportCandidate['summary'];
+} {
   const positions: PositionNode[] = [];
   const edges: MoveEdge[] = [];
   const contexts: RepertoireContext[] = [];
@@ -279,6 +356,16 @@ function graphFromParsed(
     return position;
   };
 
+  const replaceContext = (context: RepertoireContext) => {
+    const index = contexts.findIndex((item) => item.id === context.id);
+    if (index >= 0) contexts[index] = context;
+  };
+
+  const replaceMove = (move: RepertoireMove) => {
+    const index = moves.findIndex((item) => item.id === move.id);
+    if (index >= 0) moves[index] = move;
+  };
+
   const resolveLine = (
     parsed: ParsedLine,
     baseFen: string,
@@ -287,6 +374,8 @@ function graphFromParsed(
     let fen = baseFen;
     let context = baseContext;
     const resolvedMoves: ImportMove[] = [];
+    if (parsed.comment) commentCount += 1;
+
     for (const parsedMove of parsed.moves) {
       const beforeFen = fen;
       const beforeContext = context;
@@ -294,10 +383,16 @@ function graphFromParsed(
       try {
         game = new Chess(beforeFen);
       } catch (error) {
-        throw Object.assign(new Error(`Invalid source position: ${error instanceof Error ? error.message : 'invalid FEN'}`), {
-          locator: parsedMove.locator,
-        });
+        throw Object.assign(
+          new Error(
+            `Invalid source position: ${
+              error instanceof Error ? error.message : 'invalid FEN'
+            }`,
+          ),
+          { locator: parsedMove.locator },
+        );
       }
+
       let move;
       try {
         move = game.move(parsedMove.san);
@@ -305,10 +400,12 @@ function graphFromParsed(
         move = null;
       }
       if (!move) {
-        throw Object.assign(new Error(`Illegal or unparseable PGN move: ${parsedMove.san}`), {
-          locator: parsedMove.locator,
-        });
+        throw Object.assign(
+          new Error(`Illegal or unparseable PGN move: ${parsedMove.san}`),
+          { locator: parsedMove.locator },
+        );
       }
+
       const uci = `${move.from}${move.to}${move.promotion ?? ''}`;
       const sourcePosition = ensurePosition(beforeFen);
       const targetPosition = ensurePosition(game.fen());
@@ -321,14 +418,17 @@ function graphFromParsed(
           toPositionId: targetPosition.id,
           uci,
           san: move.san,
-          ...(move.promotion ? { promotion: move.promotion as 'q' | 'r' | 'b' | 'n' } : {}),
+          ...(move.promotion
+            ? { promotion: move.promotion as 'q' | 'r' | 'b' | 'n' }
+            : {}),
         };
         edges.push(edge);
         edgeBySourceUci.set(edgeKey, edge);
       } else if (edge.toPositionId !== targetPosition.id || edge.san !== move.san) {
-        throw Object.assign(new Error(`Conflicting duplicate branch for ${move.san}.`), {
-          locator: parsedMove.locator,
-        });
+        throw Object.assign(
+          new Error(`Conflicting duplicate branch for ${move.san}.`),
+          { locator: parsedMove.locator },
+        );
       }
 
       const childKey = `${beforeContext.id}:${edge.id}`;
@@ -347,7 +447,15 @@ function graphFromParsed(
         };
         contexts.push(child);
         childByParentEdge.set(childKey, child);
+      } else if (parsedMove.comment) {
+        child = {
+          ...child,
+          note: appendText(child.note, parsedMove.comment),
+        };
+        replaceContext(child);
+        childByParentEdge.set(childKey, child);
       }
+
       const moveKey = `${beforeContext.id}:${edge.id}`;
       let repertoireMove = moveByContextEdge.get(moveKey);
       if (!repertoireMove) {
@@ -366,6 +474,18 @@ function graphFromParsed(
         moves.push(repertoireMove);
         moveByContextEdge.set(moveKey, repertoireMove);
       } else {
+        repertoireMove = {
+          ...repertoireMove,
+          note: appendText(repertoireMove.note, parsedMove.comment),
+          nags: [
+            ...new Set([
+              ...(repertoireMove.nags ?? []),
+              ...parsedMove.nags,
+            ]),
+          ],
+        };
+        replaceMove(repertoireMove);
+        moveByContextEdge.set(moveKey, repertoireMove);
         warnings.push({
           code: 'DUPLICATE_BRANCH_CONSOLIDATED',
           message: `Duplicate branch ${move.san} was consolidated.`,
@@ -390,7 +510,10 @@ function graphFromParsed(
       fen = game.fen();
       context = child;
     }
-    return { moves: resolvedMoves };
+    return {
+      ...(parsed.comment ? { comment: parsed.comment } : {}),
+      moves: resolvedMoves,
+    };
   };
 
   for (const [index, parsedGame] of parsedGames.entries()) {
@@ -415,6 +538,7 @@ function graphFromParsed(
         message: `Game ${index + 1} shares an existing root and was consolidated.`,
       });
     }
+
     const mainLine = resolveLine(parsedGame.line, initialFen, root);
     if (parsedGame.rootComment) commentCount += 1;
     resolvedGames.push({
@@ -428,7 +552,9 @@ function graphFromParsed(
     id: options.repertoireId,
     name: options.repertoireName,
     userColour: options.userColour,
-    rootContextIds: [...new Set([...rootByPosition.values()].map((context) => context.id))],
+    rootContextIds: [
+      ...new Set([...rootByPosition.values()].map((context) => context.id)),
+    ],
     source: {
       kind: 'pgn',
       label: options.sourceLabel,
@@ -475,6 +601,29 @@ function importError(error: unknown): ImportError {
   };
 }
 
+function emptyCandidateGraph(): RepertoireGraph {
+  return {
+    repertoires: [],
+    positions: [],
+    edges: [],
+    contexts: [],
+    moves: [],
+    playlists: [],
+  };
+}
+
+function emptySummary(): ImportCandidate['summary'] {
+  return {
+    games: 0,
+    positions: 0,
+    moves: 0,
+    contexts: 0,
+    variations: 0,
+    comments: 0,
+    nags: 0,
+  };
+}
+
 export function previewPgnImport(
   pgn: string,
   options: {
@@ -496,11 +645,17 @@ export function previewPgnImport(
       source,
       games: [],
       warnings: [],
-      errors: [{ code: 'PGN_TOO_LARGE', message: `PGN exceeds ${MAX_PGN_BYTES} bytes.` }],
-      proposedGraph: { repertoires: [], positions: [], edges: [], contexts: [], moves: [], playlists: [] },
-      summary: { games: 0, positions: 0, moves: 0, contexts: 0, variations: 0, comments: 0, nags: 0 },
+      errors: [
+        {
+          code: 'PGN_TOO_LARGE',
+          message: `PGN exceeds ${MAX_PGN_BYTES} bytes.`,
+        },
+      ],
+      proposedGraph: emptyCandidateGraph(),
+      summary: emptySummary(),
     };
   }
+
   try {
     const parsed = parseGames(pgn);
     if (parsed.length === 0 || parsed.every((game) => game.line.moves.length === 0)) {
@@ -527,8 +682,8 @@ export function previewPgnImport(
       games: [],
       warnings: [],
       errors: [importError(error)],
-      proposedGraph: { repertoires: [], positions: [], edges: [], contexts: [], moves: [], playlists: [] },
-      summary: { games: 0, positions: 0, moves: 0, contexts: 0, variations: 0, comments: 0, nags: 0 },
+      proposedGraph: emptyCandidateGraph(),
+      summary: emptySummary(),
     };
   }
 }
@@ -541,11 +696,16 @@ export class InMemoryImportRepository implements ImportCommitRepository {
   readonly graphs = new Map<string, RepertoireGraph>();
 
   createRepertoire(candidate: ImportCandidate): void {
-    if (candidate.errors.length > 0 || candidate.proposedGraph.repertoires.length !== 1) {
+    if (
+      candidate.errors.length > 0 ||
+      candidate.proposedGraph.repertoires.length !== 1
+    ) {
       throw new Error('Only a valid import preview can be committed.');
     }
     const repertoire = candidate.proposedGraph.repertoires[0]!;
-    if (this.graphs.has(repertoire.id)) throw new Error(`Repertoire already exists: ${repertoire.id}`);
+    if (this.graphs.has(repertoire.id)) {
+      throw new Error(`Repertoire already exists: ${repertoire.id}`);
+    }
     validateRepertoireGraph(candidate.proposedGraph);
     this.graphs.set(repertoire.id, candidate.proposedGraph);
   }

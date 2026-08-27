@@ -13,22 +13,22 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import {
-  InMemoryImportRepository,
-  previewPgnImport,
-} from '../../domain/repertoire/pgnImport';
-import type { Colour, ImportCandidate, RepertoireGraph } from '../../domain/repertoire/types';
+import { previewPgnImport } from '../../domain/repertoire/pgnImport';
+import type { Colour, ImportCandidate } from '../../domain/repertoire/types';
 
 interface PgnImportDialogProps {
   open: boolean;
   onClose: () => void;
-  onCommit: (graph: RepertoireGraph) => void;
+  onCommit: (candidate: ImportCandidate) => void;
 }
 
-export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProps) {
-  const repositoryRef = useRef(new InMemoryImportRepository());
+export function PgnImportDialog({
+  open,
+  onClose,
+  onCommit,
+}: PgnImportDialogProps) {
   const [pgn, setPgn] = useState('');
   const [name, setName] = useState('Imported repertoire');
   const [colour, setColour] = useState<Colour>('white');
@@ -37,7 +37,8 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
 
   const preview = () => {
     setCommitError(null);
-    const repertoireId = `import-${Date.now().toString(36)}`;
+    const repertoireId =
+      globalThis.crypto?.randomUUID?.() ?? `import-${Date.now().toString(36)}`;
     setCandidate(
       previewPgnImport(pgn, {
         repertoireId,
@@ -60,13 +61,14 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
   const commit = () => {
     if (!candidate || candidate.errors.length > 0) return;
     try {
-      repositoryRef.current.createRepertoire(candidate);
-      onCommit(candidate.proposedGraph);
+      onCommit(candidate);
       setCandidate(null);
       setCommitError(null);
       onClose();
     } catch (error) {
-      setCommitError(error instanceof Error ? error.message : 'Import commit failed.');
+      setCommitError(
+        error instanceof Error ? error.message : 'Import commit failed.',
+      );
     }
   };
 
@@ -82,7 +84,7 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
           <TextField
             label="Repertoire name"
             value={name}
-            onChange={(event) => {
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
               setName(event.target.value);
               setCandidate(null);
             }}
@@ -111,12 +113,12 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
             multiline
             minRows={10}
             value={pgn}
-            onChange={(event) => {
+            onChange={(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
               setPgn(event.target.value);
               setCandidate(null);
               setCommitError(null);
             }}
-            inputProps={{ spellCheck: false }}
+            slotProps={{ htmlInput: { spellCheck: false } }}
           />
           {candidate ? (
             candidate.errors.length > 0 ? (
@@ -133,9 +135,11 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
             ) : (
               <Stack spacing={1}>
                 <Alert severity="success">
-                  Preview valid: {candidate.summary.games} game(s), {candidate.summary.positions}{' '}
-                  canonical positions, {candidate.summary.moves} contextual moves,{' '}
-                  {candidate.summary.variations} recursive variation(s).
+                  Preview valid: {candidate.summary.games} game(s),{' '}
+                  {candidate.summary.positions} canonical positions,{' '}
+                  {candidate.summary.moves} contextual moves,{' '}
+                  {candidate.summary.variations} recursive variation(s),{' '}
+                  {candidate.summary.comments} comment(s) and {candidate.summary.nags} NAG(s).
                 </Alert>
                 {candidate.warnings.map((warning, index) => (
                   <Alert severity="warning" key={`${warning.code}-${index}`}>
@@ -153,7 +157,11 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
         <Button onClick={preview} disabled={!pgn.trim()}>
           Preview
         </Button>
-        <Button variant="contained" onClick={commit} disabled={!candidate || candidate.errors.length > 0}>
+        <Button
+          variant="contained"
+          onClick={commit}
+          disabled={!candidate || candidate.errors.length > 0}
+        >
           Create repertoire
         </Button>
       </DialogActions>

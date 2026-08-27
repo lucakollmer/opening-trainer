@@ -8,10 +8,12 @@ import {
   Container,
   Drawer,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
+  Switch,
   ToggleButton,
   ToggleButtonGroup,
   Toolbar,
@@ -19,7 +21,13 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material';
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type MouseEvent,
+} from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   ChessboardPreview,
@@ -34,13 +42,17 @@ import {
   type TrainingExercisePlan,
 } from '../domain/training/exercisePlan';
 import { createGraphExercisePlan } from '../domain/repertoire/exercisePlan';
+import { InMemoryImportRepository } from '../domain/repertoire/pgnImport';
 import {
   createGraphTrainingSession,
   reduceGraphTrainingSession,
 } from '../domain/repertoire/trainingIntegration';
-import type { RepertoireGraph } from '../domain/repertoire/types';
+import type { ImportCandidate, RepertoireGraph } from '../domain/repertoire/types';
 import { phase2TrainingFixtures, type TrainingMode } from '../fixtures/trainingFixtures';
-import { phase3DemoPlan } from '../fixtures/phase3Demo';
+import {
+  phase3DemoFilteredPlan,
+  phase3DemoPlan,
+} from '../fixtures/phase3Demo';
 
 const phase2Plans = phase2TrainingFixtures.map(compileTrainingFixture);
 const defaultPlan = phase2Plans[0]!;
@@ -73,7 +85,9 @@ function importedExercisePlan(graph: RepertoireGraph): TrainingExercisePlan {
     return bDepth - aDepth || a.localeCompare(b);
   });
   const targetContextId = userContextIds[0];
-  if (!targetContextId) throw new Error('Imported repertoire contains no user decision.');
+  if (!targetContextId) {
+    throw new Error('Imported repertoire contains no user decision.');
+  }
   return createGraphExercisePlan(graph, {
     repertoireId: repertoire.id,
     rootContextId,
@@ -86,16 +100,23 @@ export function App() {
   const [treeOpen, setTreeOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(basePlans);
-  const [planId, setPlanId] = useState(defaultPlan.id);
+  const [selectionId, setSelectionId] = useState(defaultPlan.id);
+  const [includeDemoAlternative, setIncludeDemoAlternative] = useState(true);
+  const selectedPlan =
+    plans.find((candidate) => candidate.id === selectionId) ?? defaultPlan;
+  const plan =
+    selectionId === phase3DemoPlan.id && !includeDemoAlternative
+      ? phase3DemoFilteredPlan
+      : selectedPlan;
   const [session, setSession] = useState(() =>
     createGraphTrainingSession(defaultPlan, nowMs(), {
       sessionId: sessionId(defaultPlan),
     }),
   );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
+  const importRepositoryRef = useRef(new InMemoryImportRepository());
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
-  const plan = plans.find((candidate) => candidate.id === planId) ?? defaultPlan;
   const currentStep = currentFixtureStep(session, plan);
   const totalPlies = Math.max(1, ...plan.steps.map((step) => step.ply + 1));
 
@@ -130,8 +151,7 @@ export function App() {
     return undefined;
   }, [mode, plan, reducedMotion, session.status]);
 
-  const selectPlan = (nextPlan: TrainingExercisePlan) => {
-    setPlanId(nextPlan.id);
+  const beginPlan = (nextPlan: TrainingExercisePlan) => {
     setSession(
       createGraphTrainingSession(nextPlan, nowMs(), {
         sessionId: sessionId(nextPlan),
@@ -141,16 +161,27 @@ export function App() {
 
   const handlePlanChange = (nextPlanId: string) => {
     const nextPlan = plans.find((candidate) => candidate.id === nextPlanId);
-    if (nextPlan) selectPlan(nextPlan);
+    if (!nextPlan) return;
+    setSelectionId(nextPlan.id);
+    setIncludeDemoAlternative(true);
+    beginPlan(nextPlan);
   };
 
-  const handleImportedGraph = (graph: RepertoireGraph) => {
-    const importedPlan = importedExercisePlan(graph);
+  const handleDemoAlternativeChange = (checked: boolean) => {
+    setIncludeDemoAlternative(checked);
+    beginPlan(checked ? phase3DemoPlan : phase3DemoFilteredPlan);
+  };
+
+  const handleImportedCandidate = (candidate: ImportCandidate) => {
+    const importedPlan = importedExercisePlan(candidate.proposedGraph);
+    importRepositoryRef.current.createRepertoire(candidate);
     setPlans((current) => [
-      ...current.filter((candidate) => candidate.id !== importedPlan.id),
+      ...current.filter((item) => item.id !== importedPlan.id),
       importedPlan,
     ]);
-    selectPlan(importedPlan);
+    setSelectionId(importedPlan.id);
+    setIncludeDemoAlternative(true);
+    beginPlan(importedPlan);
   };
 
   const handleMove = (command: BoardMoveCommand): boolean => {
@@ -179,7 +210,9 @@ export function App() {
   };
 
   const hintSquares =
-    session.hintLevel >= 2 && session.hintLevel < 4 && currentStep?.actor === 'user'
+    session.hintLevel >= 2 &&
+    session.hintLevel < 4 &&
+    currentStep?.actor === 'user'
       ? (currentStep.hint?.candidateDestinations ?? [])
       : [];
   const lastMove = session.lastMove
@@ -198,7 +231,11 @@ export function App() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar position="static" color="primary" elevation={0}>
         <Toolbar sx={{ gap: 1, flexWrap: 'wrap', py: 1 }}>
-          <Typography component="h1" variant="h6" sx={{ fontWeight: 700, mr: 'auto' }}>
+          <Typography
+            component="h1"
+            variant="h6"
+            sx={{ fontWeight: 700, mr: 'auto' }}
+          >
             Opening Trainer
           </Typography>
           <FormControl size="small" sx={{ minWidth: 240 }}>
@@ -206,7 +243,7 @@ export function App() {
             <Select
               labelId="repertoire-label"
               label="Training fixture"
-              value={plan.id}
+              value={selectionId}
               onChange={(event: SelectChangeEvent<string>) =>
                 handlePlanChange(String(event.target.value))
               }
@@ -218,6 +255,21 @@ export function App() {
               ))}
             </Select>
           </FormControl>
+          {selectionId === phase3DemoPlan.id ? (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={includeDemoAlternative}
+                  onChange={(_: ChangeEvent<HTMLInputElement>, checked: boolean) =>
+                    handleDemoAlternativeChange(checked)
+                  }
+                  inputProps={{ 'aria-label': 'Include alternative branch' }}
+                />
+              }
+              label="Include alternative branch"
+              sx={{ mx: 0 }}
+            />
+          ) : null}
           <ToggleButtonGroup
             size="small"
             exclusive
@@ -231,9 +283,17 @@ export function App() {
             <ToggleButton value="browse">Browse</ToggleButton>
           </ToggleButtonGroup>
           <Chip size="small" label={`${session.evidence.length} observations`} />
-          <Chip size="small" variant="outlined" label={`${session.plyIndex}/${totalPlies} plies`} />
+          <Chip
+            size="small"
+            variant="outlined"
+            label={`${session.plyIndex}/${totalPlies} plies`}
+          />
           <Tooltip title="Import PGN repertoire">
-            <IconButton color="inherit" aria-label="Import PGN repertoire" onClick={() => setImportOpen(true)}>
+            <IconButton
+              color="inherit"
+              aria-label="Import PGN repertoire"
+              onClick={() => setImportOpen(true)}
+            >
               <UploadFileOutlinedIcon />
             </IconButton>
           </Tooltip>
@@ -275,7 +335,13 @@ export function App() {
             alignItems: 'start',
           }}
         >
-          <Box sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}>
+          <Box
+            sx={{
+              gridArea: 'tree',
+              display: { xs: 'none', md: 'block' },
+              minWidth: 0,
+            }}
+          >
             {tree}
           </Box>
           <Box sx={{ gridArea: 'board', minWidth: 0 }}>
@@ -297,32 +363,48 @@ export function App() {
               plan={plan}
               onHint={() =>
                 setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'request-hint' }),
+                  reduceGraphTrainingSession(current, plan, {
+                    type: 'request-hint',
+                  }),
                 )
               }
               onReveal={() =>
                 setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'reveal', nowMs: nowMs() }),
+                  reduceGraphTrainingSession(current, plan, {
+                    type: 'reveal',
+                    nowMs: nowMs(),
+                  }),
                 )
               }
               onContinue={() =>
                 setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'continue', nowMs: nowMs() }),
+                  reduceGraphTrainingSession(current, plan, {
+                    type: 'continue',
+                    nowMs: nowMs(),
+                  }),
                 )
               }
               onRetest={() =>
                 setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'start-retest', nowMs: nowMs() }),
+                  reduceGraphTrainingSession(current, plan, {
+                    type: 'start-retest',
+                    nowMs: nowMs(),
+                  }),
                 )
               }
               onCompleteSession={() =>
                 setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'complete-session' }),
+                  reduceGraphTrainingSession(current, plan, {
+                    type: 'complete-session',
+                  }),
                 )
               }
               onRestart={() =>
                 setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'restart', nowMs: nowMs() }),
+                  reduceGraphTrainingSession(current, plan, {
+                    type: 'restart',
+                    nowMs: nowMs(),
+                  }),
                 )
               }
               onAbandon={() =>
@@ -346,7 +428,11 @@ export function App() {
       >
         {tree}
       </Drawer>
-      <PgnImportDialog open={importOpen} onClose={() => setImportOpen(false)} onCommit={handleImportedGraph} />
+      <PgnImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onCommit={handleImportedCandidate}
+      />
     </Box>
   );
 }

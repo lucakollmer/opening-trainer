@@ -27,7 +27,13 @@ export function createGraphTrainingSession(
 ): TrainingSessionState {
   const state = createTrainingSession(plan, nowMs, options);
   const start = exerciseStep(plan, state.currentStepId);
-  return start ? { ...state, plyIndex: start.ply, targetPly: exerciseStep(plan, plan.targetStepId)?.ply ?? state.targetPly } : state;
+  return start
+    ? {
+        ...state,
+        plyIndex: start.ply,
+        targetPly: exerciseStep(plan, plan.targetStepId)?.ply ?? state.targetPly,
+      }
+    : state;
 }
 
 export function reduceGraphTrainingSession(
@@ -40,9 +46,18 @@ export function reduceGraphTrainingSession(
     event.type === 'user-move' && step?.actor === 'user'
       ? tryApplyMove(state.fen, event.move)
       : null;
-  let next = correctPly(state, reduceTrainingSession(state, plan, event), plan);
+  let next = correctPly(
+    state,
+    reduceTrainingSession(state, plan, event),
+    plan,
+  );
 
-  if (applied?.kind !== 'applied' || !step?.acceptedUci.includes(applied.move.uci)) return next;
+  if (
+    applied?.kind !== 'applied' ||
+    !step?.acceptedUci.includes(applied.move.uci)
+  ) {
+    return next;
+  }
 
   const chosenTreeItemId = step.treeItemIdByAcceptedUci?.[applied.move.uci];
   if (chosenTreeItemId && chosenTreeItemId !== step.treeItemId) {
@@ -51,13 +66,23 @@ export function reduceGraphTrainingSession(
       ...next,
       treeRevealedItemIds: next.treeRevealedItemIds
         .filter((id) => id !== step.treeItemId || before.has(id))
-        .concat(next.treeRevealedItemIds.includes(chosenTreeItemId) ? [] : [chosenTreeItemId]),
+        .concat(
+          next.treeRevealedItemIds.includes(chosenTreeItemId)
+            ? []
+            : [chosenTreeItemId],
+        ),
     };
   }
 
-  if (step.targetDispositionByAcceptedUci?.[applied.move.uci] !== 'displaced') return next;
+  if (step.targetDispositionByAcceptedUci?.[applied.move.uci] !== 'displaced') {
+    return next;
+  }
   if (state.currentStepId === state.targetStepId) return next;
-  if (next.retestQueue.some((ticket) => ticket.targetStepId === state.targetStepId)) return next;
+  if (
+    next.retestQueue.some((ticket) => ticket.targetStepId === state.targetStepId)
+  ) {
+    return next;
+  }
   const attempts = next.retestAttemptsByStep[state.targetStepId] ?? 0;
   if (attempts >= MAX_REPLACEMENT_RETURNS) return next;
   const sourceObservationId = next.evidence.at(-1)?.id;

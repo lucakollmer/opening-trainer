@@ -17,7 +17,7 @@ function uniqueIds<T extends { id: string }>(items: readonly T[], label: string)
   }
 }
 
-function required<T>(value: T | undefined, message: string): T {
+export function required<T>(value: T | undefined, message: string): T {
   if (value === undefined) throw new Error(message);
   return value;
 }
@@ -26,7 +26,42 @@ function contextsById(graph: RepertoireGraph): Map<string, RepertoireContext> {
   return new Map(graph.contexts.map((context) => [context.id, context]));
 }
 
-function isDescendantOrSelf(
+export function contextPly(
+  context: RepertoireContext,
+  byId: ReadonlyMap<string, RepertoireContext>,
+): number {
+  let ply = 0;
+  let current = context;
+  const visited = new Set<string>();
+  while (current.parentContextId) {
+    if (visited.has(current.id)) {
+      throw new Error(`Context cycle detected at ${current.id}`);
+    }
+    visited.add(current.id);
+    current = required(
+      byId.get(current.parentContextId),
+      `Dangling parent context: ${current.id}`,
+    );
+    ply += 1;
+  }
+  return ply;
+}
+
+function contextAndAncestorsIncluded(
+  context: RepertoireContext,
+  byId: ReadonlyMap<string, RepertoireContext>,
+): boolean {
+  let current: RepertoireContext | undefined = context;
+  const visited = new Set<string>();
+  while (current) {
+    if (!current.included || visited.has(current.id)) return false;
+    visited.add(current.id);
+    current = current.parentContextId ? byId.get(current.parentContextId) : undefined;
+  }
+  return true;
+}
+
+export function isDescendantOrSelf(
   contextId: string,
   ancestorId: string,
   byId: ReadonlyMap<string, RepertoireContext>,
@@ -42,32 +77,80 @@ function isDescendantOrSelf(
   return false;
 }
 
-export function playlistAllowsContext(
+function playlistBaseAllowsContext(
   graph: RepertoireGraph,
   playlist: Playlist,
   context: RepertoireContext,
-  ply?: number,
+  byId: ReadonlyMap<string, RepertoireContext>,
+  ply: number,
 ): boolean {
   const repertoire = graph.repertoires.find((item) => item.id === context.repertoireId);
-  if (!repertoire || !playlist.repertoireIds.includes(repertoire.id)) return false;
+  if (!repertoire || repertoire.archivedAt || !playlist.repertoireIds.includes(repertoire.id)) {
+    return false;
+  }
   if (playlist.colour && playlist.colour !== repertoire.userColour) return false;
-  if (playlist.maxPly !== undefined && ply !== undefined && ply > playlist.maxPly) return false;
-  if (playlist.tags.length > 0 && !playlist.tags.some((tag) => context.tags.includes(tag))) {
-    return false;
-  }
+  if (playlist.maxPly !== undefined && ply > playlist.maxPly) return false;
+  if (!contextAndAncestorsIncluded(context, byId)) return false;
+  return !playlist.excludedContextIds.some((excluded) =>
+    isDescendantOrSelf(context.id, excluded, byId),
+  );
+}
 
-  const byId = contextsById(graph);
-  if (
-    playlist.excludedContextIds.some((excluded) =>
-      isDescendantOrSelf(context.id, excluded, byId),
-    )
-  ) {
-    return false;
-  }
+function insideIncludedSubtree(
+  context: RepertoireContext,
+  playlist: Playlist,
+  byId: ReadonlyMap<string, RepertoireContext>,
+): boolean {
   if (playlist.includedContextIds.length === 0) return true;
   return playlist.includedContextIds.some((included) =>
     isDescendantOrSelf(context.id, included, byId),
   );
+}
+
+export function playlistAllowsContext(
+  graph: RepertoireGraph,
+  playlist: Playlist,
+  context: RepertoireContext,
+  ply = contextPly(context, contextsById(graph)),
+): boolean {
+  const byId = contextsById(graph);
+  if (!playlistBaseAllowsContext(graph, playlist, context, byId, ply)) return false;
+  if (!insideIncludedSubtree(context, playlist, byId)) return false;
+  return (
+    playlist.tags.length === 0 || playlist.tags.some((tag) => context.tags.includes(tag))
+  );
+}
+
+export function playlistAllowsRouteContext(
+  graph: RepertoireGraph,
+  playlist: Playlist,
+  context: RepertoireContext,
+): boolean {
+  const byId = contextsById(graph);
+  const ply = contextPly(context, byId);
+  if (!playlistBaseAllowsContext(graph, playlist, context, byId, ply)) return false;
+
+  const isOnIncludedRoute =
+    playlist.includedContextIds.length === 0 ||
+    playlist.includedContextIds.some(
+      (included) =>
+        isDescendantOrSelf(context.id, included, byId) ||
+        isDescendantOrSelf(included, context.id, byId),
+    );
+  if (!isOnIncludedRoute) return false;
+  if (playlist.tags.length === 0) return true;
+  if (playlist.tags.some((tag) => context.tags.includes(tag))) return true;
+
+  return graph.contexts.some((candidate) => {
+    if (candidate.repertoireId !== context.repertoireId) return false;
+    if (!isDescendantOrSelf(candidate.id, context.id, byId)) return false;
+    const candidatePly = contextPly(candidate, byId);
+    if (!playlistBaseAllowsContext(graph, playlist, candidate, byId, candidatePly)) {
+      return false;
+    }
+    if (!insideIncludedSubtree(candidate, playlist, byId)) return false;
+    return playlist.tags.some((tag) => candidate.tags.includes(tag));
+  });
 }
 
 export function validateRepertoireGraph(graph: RepertoireGraph): void {
@@ -82,12 +165,19 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
   const positions = new Map(graph.positions.map((item) => [item.id, item]));
   const edges = new Map(graph.edges.map((item) => [item.id, item]));
   const contexts = contextsById(graph);
+  const positionKeys = new Map<string, string>();
   const edgeKeys = new Map<string, string>();
+  const pathKeys = new Map<string, string>();
 
   for (const position of graph.positions) {
     if (canonicalPositionKey(position.fen) !== position.key) {
       throw new Error(`Position key mismatch: ${position.id}`);
     }
+    const existing = positionKeys.get(position.key);
+    if (existing && existing !== position.id) {
+      throw new Error(`Duplicate canonical position nodes: ${existing}, ${position.id}`);
+    }
+    positionKeys.set(position.key, position.id);
   }
 
   for (const edge of graph.edges) {
@@ -121,7 +211,16 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
       repertoires.get(context.repertoireId),
       `Dangling context repertoire: ${context.id}`,
     );
-    required(positions.get(context.entryPositionId), `Dangling context position: ${context.id}`);
+    required(
+      positions.get(context.entryPositionId),
+      `Dangling context position: ${context.id}`,
+    );
+    const pathKey = `${repertoire.id}:${context.pathFingerprint}`;
+    const priorPath = pathKeys.get(pathKey);
+    if (priorPath && priorPath !== context.id) {
+      throw new Error(`Duplicate contextual path identity: ${context.pathFingerprint}`);
+    }
+    pathKeys.set(pathKey, context.id);
     if (context.parentContextId) {
       const parent = required(
         contexts.get(context.parentContextId),
@@ -133,32 +232,50 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
     }
   }
 
+  for (const context of graph.contexts) contextPly(context, contexts);
+
+  const rootIds = new Set<string>();
   for (const repertoire of graph.repertoires) {
+    if (new Set(repertoire.rootContextIds).size !== repertoire.rootContextIds.length) {
+      throw new Error(`Duplicate repertoire root context: ${repertoire.id}`);
+    }
     for (const rootId of repertoire.rootContextIds) {
-      const root = required(contexts.get(rootId), `Missing repertoire root context: ${rootId}`);
+      const root = required(
+        contexts.get(rootId),
+        `Missing repertoire root context: ${rootId}`,
+      );
       if (root.repertoireId !== repertoire.id || root.parentContextId) {
         throw new Error(`Invalid repertoire root context: ${rootId}`);
       }
+      rootIds.add(rootId);
     }
   }
-
   for (const context of graph.contexts) {
-    const seen = new Set<string>();
-    let current: RepertoireContext | undefined = context;
-    while (current) {
-      if (seen.has(current.id)) throw new Error(`Context cycle detected at ${current.id}`);
-      seen.add(current.id);
-      current = current.parentContextId ? contexts.get(current.parentContextId) : undefined;
+    if (!context.parentContextId && !rootIds.has(context.id)) {
+      throw new Error(`Unregistered root context: ${context.id}`);
     }
   }
 
   const movesByContext = new Map<string, typeof graph.moves>();
+  const incomingByContext = new Map<string, number>();
+  const contextualMoveKeys = new Set<string>();
   for (const move of graph.moves) {
-    const context = required(contexts.get(move.contextId), `Dangling move context: ${move.id}`);
+    const context = required(
+      contexts.get(move.contextId),
+      `Dangling move context: ${move.id}`,
+    );
     const edge = required(edges.get(move.edgeId), `Dangling move edge: ${move.id}`);
     const destination = required(
       contexts.get(move.destinationContextId),
       `Dangling move destination context: ${move.id}`,
+    );
+    const repertoire = required(
+      repertoires.get(context.repertoireId),
+      `Missing repertoire for move ${move.id}`,
+    );
+    const sourcePosition = required(
+      positions.get(context.entryPositionId),
+      `Missing source position for move ${move.id}`,
     );
     if (edge.fromPositionId !== context.entryPositionId) {
       throw new Error(`Move edge does not start at its context: ${move.id}`);
@@ -169,8 +286,43 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
     if (destination.parentContextId !== context.id) {
       throw new Error(`Move destination must be a child context: ${move.id}`);
     }
+    if (destination.repertoireId !== context.repertoireId) {
+      throw new Error(`Move crosses repertoire contexts: ${move.id}`);
+    }
+    if (destination.pathFingerprint !== `${context.pathFingerprint}/${edge.uci}`) {
+      throw new Error(`Move destination path fingerprint mismatch: ${move.id}`);
+    }
+    const contextualKey = `${context.id}:${edge.id}`;
+    if (contextualMoveKeys.has(contextualKey)) {
+      throw new Error(`Duplicate contextual move: ${contextualKey}`);
+    }
+    contextualMoveKeys.add(contextualKey);
+
+    const turn = sourcePosition.fen.split(/\s+/u)[1];
+    const expectedActor =
+      (turn === 'w' ? 'white' : 'black') === repertoire.userColour
+        ? 'user'
+        : 'opponent';
+    if (move.actor !== expectedActor) throw new Error(`Move actor mismatch: ${move.id}`);
+    if (!Number.isInteger(move.order) || move.order < 0) {
+      throw new Error(`Invalid move order: ${move.id}`);
+    }
+    incomingByContext.set(
+      destination.id,
+      (incomingByContext.get(destination.id) ?? 0) + 1,
+    );
     const current = movesByContext.get(move.contextId) ?? [];
     movesByContext.set(move.contextId, [...current, move]);
+  }
+
+  for (const context of graph.contexts) {
+    const incoming = incomingByContext.get(context.id) ?? 0;
+    if (context.parentContextId && incoming !== 1) {
+      throw new Error(`Context must have exactly one contextual incoming move: ${context.id}`);
+    }
+    if (!context.parentContextId && incoming !== 0) {
+      throw new Error(`Root context has an incoming move: ${context.id}`);
+    }
   }
 
   for (const [contextId, moves] of movesByContext) {
@@ -179,16 +331,21 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
     if (moves[0]?.actor === 'user' && !moves.some((move) => move.included)) {
       throw new Error(`User decision has no accepted move: ${contextId}`);
     }
-    const orderKeys = new Set<string>();
-    for (const move of moves) {
-      const key = `${move.order}:${move.edgeId}`;
-      if (orderKeys.has(key)) throw new Error(`Duplicate move ordering entry: ${contextId}`);
-      orderKeys.add(key);
-    }
+    const orders = [...moves.map((move) => move.order)].sort((a, b) => a - b);
+    orders.forEach((order, index) => {
+      if (order !== index) throw new Error(`Non-contiguous move order in context: ${contextId}`);
+    });
   }
 
   for (const playlist of graph.playlists) {
-    for (const repertoireId of playlist.repertoireIds) {
+    if (
+      playlist.maxPly !== undefined &&
+      (!Number.isInteger(playlist.maxPly) || playlist.maxPly < 0)
+    ) {
+      throw new Error(`Invalid playlist maxPly: ${playlist.id}`);
+    }
+    const repertoireIds = new Set(playlist.repertoireIds);
+    for (const repertoireId of repertoireIds) {
       const repertoire = required(
         repertoires.get(repertoireId),
         `Playlist references missing repertoire: ${playlist.id}`,
@@ -197,8 +354,17 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
         throw new Error(`Playlist references archived repertoire: ${playlist.id}`);
       }
     }
-    for (const contextId of [...playlist.includedContextIds, ...playlist.excludedContextIds]) {
-      required(contexts.get(contextId), `Playlist references missing context: ${playlist.id}`);
+    for (const contextId of [
+      ...playlist.includedContextIds,
+      ...playlist.excludedContextIds,
+    ]) {
+      const context = required(
+        contexts.get(contextId),
+        `Playlist references missing context: ${playlist.id}`,
+      );
+      if (!repertoireIds.has(context.repertoireId)) {
+        throw new Error(`Playlist context is outside its repertoire set: ${playlist.id}`);
+      }
     }
   }
 }
@@ -207,6 +373,13 @@ export function queryAcceptedMoves(
   graph: RepertoireGraph,
   query: DecisionQuery,
 ): AcceptedMoveSet {
+  const repertoire = required(
+    graph.repertoires.find((item) => item.id === query.repertoireId),
+    `Missing repertoire: ${query.repertoireId}`,
+  );
+  if (repertoire.archivedAt) {
+    return { positionId: query.positionId, moves: [], normalizedKey: '' };
+  }
   const contexts = contextsById(graph);
   const playlist = query.playlistId
     ? required(
@@ -219,7 +392,11 @@ export function queryAcceptedMoves(
     .filter((context): context is RepertoireContext => context !== undefined)
     .filter((context) => context.repertoireId === query.repertoireId)
     .filter((context) => context.entryPositionId === query.positionId)
-    .filter((context) => !playlist || playlistAllowsContext(graph, playlist, context))
+    .filter((context) => contextAndAncestorsIncluded(context, contexts))
+    .filter(
+      (context) =>
+        !playlist || playlistAllowsRouteContext(graph, playlist, context),
+    )
     .filter(
       (context) =>
         query.promptMode !== 'strict' ||
@@ -234,7 +411,17 @@ export function queryAcceptedMoves(
   >();
   for (const context of active) {
     for (const move of graph.moves) {
-      if (move.contextId !== context.id || move.actor !== 'user' || !move.included) continue;
+      if (move.contextId !== context.id || move.actor !== 'user' || !move.included) {
+        continue;
+      }
+      const destination = contexts.get(move.destinationContextId);
+      if (!destination || !contextAndAncestorsIncluded(destination, contexts)) continue;
+      if (
+        playlist &&
+        !playlistAllowsRouteContext(graph, playlist, destination)
+      ) {
+        continue;
+      }
       const edge = required(edgeById.get(move.edgeId), `Missing edge for move ${move.id}`);
       const existing = grouped.get(edge.uci);
       if (existing) {

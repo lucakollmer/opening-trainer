@@ -134,9 +134,17 @@ export function TaskPreviewCard({
               size="small"
               label={session.runKind === 'retest' ? 'Retest run' : 'Primary run'}
             />
-            <Chip size="small" variant="outlined" label={`${session.evidence.length} observations`} />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`${session.evidence.length} observations`}
+            />
             {session.retestQueue.length > 0 ? (
-              <Chip size="small" variant="outlined" label={`${session.retestQueue.length} retest queued`} />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${session.retestQueue.length} retest queued`}
+              />
             ) : null}
             <Typography variant="caption" color="text.secondary">
               {session.status}
@@ -149,10 +157,14 @@ export function TaskPreviewCard({
           <Alert severity={content.severity} aria-live="polite">
             {content.message}
           </Alert>
-          {hint ? <Alert severity={session.hintLevel === 4 ? 'warning' : 'info'}>{hint}</Alert> : null}
+          {hint ? (
+            <Alert severity={session.hintLevel === 4 ? 'warning' : 'info'}>
+              {hint}
+            </Alert>
+          ) : null}
           <Typography variant="body2" color="text.secondary">
-            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Review observations
-            and retest tickets remain in-memory until the persistence phase.
+            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Review
+            observations and retest tickets remain in-memory until the persistence phase.
           </Typography>
         </Stack>
       </CardContent>
@@ -161,8 +173,12 @@ export function TaskPreviewCard({
         {hintAllowed && session.hintLevel < 3 ? (
           <Button onClick={onHint}>Hint {session.hintLevel + 1}</Button>
         ) : null}
-        {hintAllowed && session.hintLevel < 4 ? <Button onClick={onReveal}>Reveal move</Button> : null}
-        {session.status === 'correct-feedback' ? <Button onClick={onContinue}>Continue line</Button> : null}
+        {hintAllowed && session.hintLevel < 4 ? (
+          <Button onClick={onReveal}>Reveal move</Button>
+        ) : null}
+        {session.status === 'correct-feedback' ? (
+          <Button onClick={onContinue}>Continue line</Button>
+        ) : null}
         {session.status === 'wrong-variation-feedback' ||
         session.status === 'outside-repertoire-feedback' ||
         session.status === 'answer-revealed' ? (
@@ -171,7 +187,9 @@ export function TaskPreviewCard({
         {session.status === 'line-complete' && readyRetests > 0 ? (
           <Button onClick={onRetest}>Run queued retest</Button>
         ) : null}
-        {session.status === 'line-complete' ? <Button onClick={onCompleteSession}>Complete session</Button> : null}
+        {session.status === 'line-complete' ? (
+          <Button onClick={onCompleteSession}>Complete session</Button>
+        ) : null}
         {session.status === 'session-complete' || session.status === 'abandoned' ? (
           <Button onClick={onRestart}>Restart session</Button>
         ) : null}
