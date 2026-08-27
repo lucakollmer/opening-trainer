@@ -1,5 +1,8 @@
 import { moveFromUci } from '../chess/chessAdapter';
-import type { TrainingExercisePlan, TrainingExerciseStep } from '../training/exercisePlan';
+import type {
+  TrainingExercisePlan,
+  TrainingExerciseStep,
+} from '../training/exercisePlan';
 import { normalizedAcceptedMoveSet } from '../training/exercisePlan';
 import type { TrainingTreeItem } from '../../fixtures/trainingFixtures';
 import {
@@ -40,7 +43,9 @@ function contextAndAncestorsIncluded(
   while (current) {
     if (!current.included || seen.has(current.id)) return false;
     seen.add(current.id);
-    current = current.parentContextId ? contexts.get(current.parentContextId) : undefined;
+    current = current.parentContextId
+      ? contexts.get(current.parentContextId)
+      : undefined;
   }
   return true;
 }
@@ -232,7 +237,10 @@ export function createGraphExercisePlan(
         : {
             positionId: context.entryPositionId,
             moves: outgoing.map((move) => {
-              const edge = required(edges.get(move.edgeId), `Missing edge ${move.edgeId}`);
+              const edge = required(
+                edges.get(move.edgeId),
+                `Missing edge ${move.edgeId}`,
+              );
               return {
                 edgeId: edge.id,
                 uci: edge.uci,
@@ -242,7 +250,8 @@ export function createGraphExercisePlan(
             }),
             normalizedKey: normalizedAcceptedMoveSet(
               outgoing.map(
-                (move) => required(edges.get(move.edgeId), `Missing edge ${move.edgeId}`).uci,
+                (move) =>
+                  required(edges.get(move.edgeId), `Missing edge ${move.edgeId}`).uci,
               ),
             ),
           };
@@ -277,21 +286,21 @@ export function createGraphExercisePlan(
 
     const nextStepByAcceptedUci: Record<string, string | undefined> = {};
     const treeItemIdByAcceptedUci: Record<string, string> = {};
-    const targetDispositionByAcceptedUci: Record<
-      string,
-      'preserved' | 'displaced'
-    > = {};
+    const targetDispositionByAcceptedUci: Record<string, 'preserved' | 'displaced'> =
+      {};
     for (const acceptedMove of accepted.moves) {
-      const matching = candidateMoves.find((move) => move.edgeId === acceptedMove.edgeId);
-      const destination = matching?.destinationContextId ?? acceptedMove.destinationContextIds[0];
+      const matching = candidateMoves.find(
+        (move) => move.edgeId === acceptedMove.edgeId,
+      );
+      const destination =
+        matching?.destinationContextId ?? acceptedMove.destinationContextIds[0];
       if (!destination) continue;
       const destinationHasMoves =
         outgoingMoves(graph, destination, contexts, playlist).length > 0;
       nextStepByAcceptedUci[acceptedMove.uci] = destinationHasMoves
         ? destination
         : undefined;
-      treeItemIdByAcceptedUci[acceptedMove.uci] =
-        matching?.id ?? `tree:${destination}`;
+      treeItemIdByAcceptedUci[acceptedMove.uci] = matching?.id ?? `tree:${destination}`;
       targetDispositionByAcceptedUci[acceptedMove.uci] =
         context.id === target.id ||
         canReachContext(graph, destination, target.id, contexts, playlist)
@@ -329,7 +338,12 @@ export function createGraphExercisePlan(
       positionKey: position.key,
       wrongSiblingUci:
         actor === 'user'
-          ? knownSiblingUcis(graph, repertoire.id, context.entryPositionId, acceptedUcis)
+          ? knownSiblingUcis(
+              graph,
+              repertoire.id,
+              context.entryPositionId,
+              acceptedUcis,
+            )
           : [],
       nextStepId: nextStepByAcceptedUci[selectedEdge.uci],
       nextStepByAcceptedUci,
@@ -339,7 +353,9 @@ export function createGraphExercisePlan(
   }
 
   if (!compiled.some((step) => step.id === target.id && step.actor === 'user')) {
-    throw new Error('Target context must resolve to a user decision with accepted moves.');
+    throw new Error(
+      'Target context must resolve to a user decision with accepted moves.',
+    );
   }
 
   return {

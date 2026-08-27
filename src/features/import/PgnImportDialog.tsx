@@ -24,11 +24,7 @@ interface PgnImportDialogProps {
   onCommit: (candidate: ImportCandidate) => void;
 }
 
-export function PgnImportDialog({
-  open,
-  onClose,
-  onCommit,
-}: PgnImportDialogProps) {
+export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProps) {
   const [pgn, setPgn] = useState('');
   const [name, setName] = useState('Imported repertoire');
   const [colour, setColour] = useState<Colour>('white');
@@ -66,9 +62,7 @@ export function PgnImportDialog({
       setCommitError(null);
       onClose();
     } catch (error) {
-      setCommitError(
-        error instanceof Error ? error.message : 'Import commit failed.',
-      );
+      setCommitError(error instanceof Error ? error.message : 'Import commit failed.');
     }
   };
 
@@ -78,8 +72,9 @@ export function PgnImportDialog({
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            Preview is isolated and does not mutate repertoire state. Recursive variations,
-            comments and NAGs are preserved before an explicit create-repertoire commit.
+            Preview is isolated and does not mutate repertoire state. Recursive
+            variations, comments and NAGs are preserved before an explicit
+            create-repertoire commit.
           </Typography>
           <TextField
             label="Repertoire name"
@@ -146,7 +141,8 @@ export function PgnImportDialog({
                   {candidate.summary.positions} canonical positions,{' '}
                   {candidate.summary.moves} contextual moves,{' '}
                   {candidate.summary.variations} recursive variation(s),{' '}
-                  {candidate.summary.comments} comment(s) and {candidate.summary.nags} NAG(s).
+                  {candidate.summary.comments} comment(s) and {candidate.summary.nags}{' '}
+                  NAG(s).
                 </Alert>
                 {candidate.warnings.map((warning, index) => (
                   <Alert severity="warning" key={`${warning.code}-${index}`}>

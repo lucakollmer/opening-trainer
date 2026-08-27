@@ -52,14 +52,21 @@ function sourceLocator(game: number, line: number, column: number): SourceLocato
   return { game, line, column };
 }
 
-function appendText(existing: string | undefined, value: string | undefined): string | undefined {
+function appendText(
+  existing: string | undefined,
+  value: string | undefined,
+): string | undefined {
   if (!value) return existing;
   if (!existing) return value;
-  const parts = new Set([...existing.split('\n'), ...value.split('\n')].filter(Boolean));
+  const parts = new Set(
+    [...existing.split('\n'), ...value.split('\n')].filter(Boolean),
+  );
   return [...parts].join('\n');
 }
 
-function splitGames(text: string): { headers: Record<string, string>; movetext: string }[] {
+function splitGames(
+  text: string,
+): { headers: Record<string, string>; movetext: string }[] {
   const lines = text.replace(/\r\n?/gu, '\n').split('\n');
   const games: { headers: Record<string, string>; moveLines: string[] }[] = [];
   let current = { headers: {} as Record<string, string>, moveLines: [] as string[] };
@@ -73,9 +80,7 @@ function splitGames(text: string): { headers: Record<string, string>; movetext: 
   };
 
   for (const line of lines) {
-    const match = line.match(
-      /^\s*\[([A-Za-z0-9_]+)\s+"((?:\\.|[^"\\])*)"\]\s*$/u,
-    );
+    const match = line.match(/^\s*\[([A-Za-z0-9_]+)\s+"((?:\\.|[^"\\])*)"\]\s*$/u);
     if (match) {
       if (sawMovetext) flush();
       current.headers[match[1]!] = match[2]!
@@ -477,12 +482,7 @@ function graphFromParsed(
         repertoireMove = {
           ...repertoireMove,
           note: appendText(repertoireMove.note, parsedMove.comment),
-          nags: [
-            ...new Set([
-              ...(repertoireMove.nags ?? []),
-              ...parsedMove.nags,
-            ]),
-          ],
+          nags: [...new Set([...(repertoireMove.nags ?? []), ...parsedMove.nags])],
         };
         replaceMove(repertoireMove);
         moveByContextEdge.set(moveKey, repertoireMove);

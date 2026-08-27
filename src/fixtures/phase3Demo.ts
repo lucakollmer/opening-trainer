@@ -16,9 +16,7 @@ export const phase3DemoCandidate = previewPgnImport(phase3DemoPgn, {
 
 if (phase3DemoCandidate.errors.length > 0) {
   throw new Error(
-    `Bundled PHASE-3 demo failed to import: ${
-      phase3DemoCandidate.errors[0]!.message
-    }`,
+    `Bundled PHASE-3 demo failed to import: ${phase3DemoCandidate.errors[0]!.message}`,
   );
 }
 
@@ -49,9 +47,8 @@ const targetMove = phase3DemoGraph.moves.find(
   (move) =>
     move.actor === 'user' &&
     edges.get(move.edgeId)?.san === 'Nc3' &&
-    phase3DemoGraph.moves.filter(
-      (candidate) => candidate.contextId === move.contextId,
-    ).length === 1,
+    phase3DemoGraph.moves.filter((candidate) => candidate.contextId === move.contextId)
+      .length === 1,
 );
 if (!targetMove) throw new Error('Bundled PHASE-3 demo target context is missing.');
 
@@ -78,15 +75,12 @@ export const phase3DemoPlan = createGraphExercisePlan(phase3DemoGraph, {
   targetContextId: targetMove.contextId,
 });
 
-export const phase3DemoFilteredPlan = createGraphExercisePlan(
-  phase3DemoPlaylistGraph,
-  {
-    repertoireId: 'phase3-demo-repertoire',
-    rootContextId,
-    targetContextId: targetMove.contextId,
-    playlistId: phase3DemoPlaylist.id,
-  },
-);
+export const phase3DemoFilteredPlan = createGraphExercisePlan(phase3DemoPlaylistGraph, {
+  repertoireId: 'phase3-demo-repertoire',
+  rootContextId,
+  targetContextId: targetMove.contextId,
+  playlistId: phase3DemoPlaylist.id,
+});
 
 export const phase3DemoAlternativeContextId = branchContext.id;
 export const phase3DemoAlternativeDestinationId = alternativeMove.destinationContextId;

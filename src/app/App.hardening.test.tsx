@@ -47,7 +47,9 @@ describe('PHASE-3 application hardening', () => {
     expect(screen.getByRole('heading', { name: 'Session abandoned' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Restart session' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Restart session' }));
-    expect(screen.getByRole('heading', { name: 'Find the repertoire move' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Find the repertoire move' }),
+    ).toBeVisible();
     expect(screen.getAllByText('0 observations').length).toBeGreaterThan(0);
   });
 

@@ -179,9 +179,7 @@ describe('training shell with PHASE-3 graph integration', () => {
     expect(
       screen.getByRole('heading', { name: 'Correct repertoire move' }),
     ).toBeVisible();
-    expect(
-      screen.getByText(/replacement target work has been queued/u),
-    ).toBeVisible();
+    expect(screen.getByText(/replacement target work has been queued/u)).toBeVisible();
   });
 
   it('edits playlist inclusion in memory and stops accepting the excluded branch', async () => {
@@ -213,9 +211,7 @@ describe('training shell with PHASE-3 graph integration', () => {
     renderApp();
     const before = screen.getByLabelText('Training fixture').textContent;
     await user.click(screen.getByRole('button', { name: 'Import PGN repertoire' }));
-    expect(
-      screen.getByRole('dialog', { name: 'Import PGN repertoire' }),
-    ).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Import PGN repertoire' })).toBeVisible();
     fireEvent.change(screen.getByRole('textbox', { name: 'PGN text' }), {
       target: {
         value:

@@ -225,14 +225,19 @@ describe('PHASE-3 hardening', () => {
       nowMs: 1,
     });
     state = reduceGraphTrainingSession(state, plan, { type: 'continue', nowMs: 2 });
-    state = reduceGraphTrainingSession(state, plan, { type: 'opponent-tick', nowMs: 3 });
+    state = reduceGraphTrainingSession(state, plan, {
+      type: 'opponent-tick',
+      nowMs: 3,
+    });
     expect(state.currentStepId).toBe(branch.id);
     state = reduceGraphTrainingSession(state, plan, {
       type: 'user-move',
       move: { from: 'd2', to: 'd4' },
       nowMs: 4,
     });
-    expect(state.feedback?.message).toContain('Accepted repertoire moves here are Nc3 or Nf3.');
+    expect(state.feedback?.message).toContain(
+      'Accepted repertoire moves here are Nc3 or Nf3.',
+    );
   });
 
   it('uses graph path ply rather than flattened step index when starting a retest', () => {
@@ -244,7 +249,9 @@ describe('PHASE-3 hardening', () => {
       rootContextId: repertoire.rootContextIds[0]!,
       targetContextId: target.id,
     });
-    const mismatched = plan.steps.find((step, index) => step.actor === 'user' && step.ply !== index);
+    const mismatched = plan.steps.find(
+      (step, index) => step.actor === 'user' && step.ply !== index,
+    );
     expect(mismatched).toBeDefined();
     const initial = createGraphTrainingSession(plan, 0, { sessionId: 'ply-retest' });
     const ready: TrainingSessionState = {

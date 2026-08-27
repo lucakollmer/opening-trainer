@@ -26,9 +26,7 @@ export interface TrainingExerciseStep {
   nextStepId?: string;
   nextStepByAcceptedUci: Readonly<Record<string, string | undefined>>;
   treeItemIdByAcceptedUci?: Readonly<Record<string, string>>;
-  targetDispositionByAcceptedUci?: Readonly<
-    Record<string, 'preserved' | 'displaced'>
-  >;
+  targetDispositionByAcceptedUci?: Readonly<Record<string, 'preserved' | 'displaced'>>;
 }
 
 export interface TrainingExercisePlan {
@@ -60,7 +58,9 @@ function treeIds(items: readonly TrainingTreeItem[]): Set<string> {
   return result;
 }
 
-function maskTrainingTree(items: readonly TrainingTreeItem[]): readonly TrainingTreeItem[] {
+function maskTrainingTree(
+  items: readonly TrainingTreeItem[],
+): readonly TrainingTreeItem[] {
   return items.map((item) => ({
     ...item,
     visibleLabel: item.maskedLabel,
@@ -97,7 +97,9 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     const positionKey = canonicalPositionKey(fen);
     const routeUci = `${step.from}${step.to}${step.promotion ?? ''}`;
     if (!step.acceptedUci.includes(routeUci)) {
-      throw new Error(`Route move ${routeUci} is absent from accepted set at ${step.id}`);
+      throw new Error(
+        `Route move ${routeUci} is absent from accepted set at ${step.id}`,
+      );
     }
 
     const acceptedSan: string[] = [];

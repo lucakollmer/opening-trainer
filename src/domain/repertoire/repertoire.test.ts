@@ -37,10 +37,7 @@ function outgoingSans(graph: RepertoireGraph, contextId: string): string[] {
     .sort();
 }
 
-function contextsByExactOutgoing(
-  graph: RepertoireGraph,
-  sans: readonly string[],
-) {
+function contextsByExactOutgoing(graph: RepertoireGraph, sans: readonly string[]) {
   const expected = [...sans].sort().join('|');
   return graph.contexts.filter(
     (context) => outgoingSans(graph, context.id).join('|') === expected,
@@ -101,9 +98,9 @@ describe('PHASE-3 repertoire graph and import', () => {
       },
     );
     expect(leadingComment.errors).toEqual([]);
-    expect(
-      leadingComment.games[0]?.mainLine.moves[2]?.variations[0]?.comment,
-    ).toBe('alternative plan');
+    expect(leadingComment.games[0]?.mainLine.moves[2]?.variations[0]?.comment).toBe(
+      'alternative plan',
+    );
   });
 
   it('rejects malformed recursive variation boundaries instead of flattening them', () => {
@@ -146,9 +143,7 @@ describe('PHASE-3 repertoire graph and import', () => {
       normal.steps.find((step) => step.id === context.id),
     );
     expect(normalSteps[0]?.positionKey).toBe(normalSteps[1]?.positionKey);
-    expect(normalSteps[0]?.acceptedMoveSetKey).toBe(
-      normalSteps[1]?.acceptedMoveSetKey,
-    );
+    expect(normalSteps[0]?.acceptedMoveSetKey).toBe(normalSteps[1]?.acceptedMoveSetKey);
     expect(normalSteps[0]?.trainingItemId).toBe(normalSteps[1]?.trainingItemId);
 
     const strict = createGraphExercisePlan(graph, {
@@ -238,9 +233,9 @@ describe('PHASE-3 repertoire graph and import', () => {
       nowMs: 200,
     });
     expect(state.status).toBe('correct-feedback');
-    expect(
-      state.retestQueue.some((ticket) => ticket.targetStepId === target.id),
-    ).toBe(true);
+    expect(state.retestQueue.some((ticket) => ticket.targetStepId === target.id)).toBe(
+      true,
+    );
     expect(state.feedback?.message).toContain(
       'replacement target work has been queued',
     );

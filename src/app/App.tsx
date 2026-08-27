@@ -21,13 +21,7 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material';
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type MouseEvent,
-} from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   ChessboardPreview,
@@ -58,10 +52,7 @@ import {
   type TrainingMode,
   type TrainingTreeItem,
 } from '../fixtures/trainingFixtures';
-import {
-  phase3DemoFilteredPlan,
-  phase3DemoPlan,
-} from '../fixtures/phase3Demo';
+import { phase3DemoFilteredPlan, phase3DemoPlan } from '../fixtures/phase3Demo';
 
 const phase2Plans = phase2TrainingFixtures.map(compileTrainingFixture);
 const defaultPlan = phase2Plans[0]!;
@@ -86,7 +77,9 @@ function isDescendantOf(
     if (current.id === rootContextId) return true;
     if (seen.has(current.id)) return false;
     seen.add(current.id);
-    current = current.parentContextId ? contexts.get(current.parentContextId) : undefined;
+    current = current.parentContextId
+      ? contexts.get(current.parentContextId)
+      : undefined;
   }
   return false;
 }
@@ -303,9 +296,7 @@ export function App() {
   };
 
   const hintSquares =
-    session.hintLevel >= 2 &&
-    session.hintLevel < 4 &&
-    currentStep?.actor === 'user'
+    session.hintLevel >= 2 && session.hintLevel < 4 && currentStep?.actor === 'user'
       ? (currentStep.hint?.candidateDestinations ?? [])
       : [];
   const lastMove = session.lastMove
@@ -328,11 +319,7 @@ export function App() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <AppBar position="static" color="primary" elevation={0}>
         <Toolbar sx={{ gap: 1, flexWrap: 'wrap', py: 1 }}>
-          <Typography
-            component="h1"
-            variant="h6"
-            sx={{ fontWeight: 700, mr: 'auto' }}
-          >
+          <Typography component="h1" variant="h6" sx={{ fontWeight: 700, mr: 'auto' }}>
             Opening Trainer
           </Typography>
           <FormControl size="small" sx={{ minWidth: 240 }}>

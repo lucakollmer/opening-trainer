@@ -96,10 +96,23 @@ export function ChessboardPreview({
   );
 
   return (
-    <Paper component="section" aria-labelledby="board-heading" sx={{ p: { xs: 1, sm: 2 } }}>
+    <Paper
+      component="section"
+      aria-labelledby="board-heading"
+      sx={{ p: { xs: 1, sm: 2 } }}
+    >
       <Stack spacing={1.5}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-          <Typography id="board-heading" component="h2" variant="h6" sx={{ flexGrow: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+        >
+          <Typography
+            id="board-heading"
+            component="h2"
+            variant="h6"
+            sx={{ flexGrow: 1 }}
+          >
             Training board
           </Typography>
           <Chip size="small" label={userTurn ? 'Your move' : 'Waiting'} />
@@ -142,7 +155,9 @@ export function ChessboardPreview({
               value={from}
               disabled={interactionDisabled}
               slotProps={{ htmlInput: { maxLength: 2, inputMode: 'text' } }}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setFrom(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setFrom(event.target.value)
+              }
             />
             <TextField
               size="small"
@@ -150,9 +165,15 @@ export function ChessboardPreview({
               value={to}
               disabled={interactionDisabled}
               slotProps={{ htmlInput: { maxLength: 2, inputMode: 'text' } }}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setTo(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setTo(event.target.value)
+              }
             />
-            <FormControl size="small" sx={{ minWidth: 130 }} disabled={interactionDisabled}>
+            <FormControl
+              size="small"
+              sx={{ minWidth: 130 }}
+              disabled={interactionDisabled}
+            >
               <InputLabel id="promotion-label">Promotion</InputLabel>
               <Select
                 labelId="promotion-label"
@@ -172,7 +193,9 @@ export function ChessboardPreview({
             <Button
               variant="outlined"
               disabled={
-                interactionDisabled || from.trim().length !== 2 || to.trim().length !== 2
+                interactionDisabled ||
+                from.trim().length !== 2 ||
+                to.trim().length !== 2
               }
               onClick={submitAccessibleMove}
             >
@@ -182,18 +205,25 @@ export function ChessboardPreview({
         </Stack>
 
         <Typography variant="caption" color="text.secondary">
-          {lastMove ? `Last move: ${lastMove[0]}–${lastMove[1]}. ` : 'No move submitted. '}
+          {lastMove
+            ? `Last move: ${lastMove[0]}–${lastMove[1]}. `
+            : 'No move submitted. '}
           {hintSquares.length > 0
             ? `Hint destinations highlighted: ${hintSquares.join(', ')}.`
             : 'No hint overlay active.'}
         </Typography>
       </Stack>
 
-      <Dialog open={pendingPromotion !== null} onClose={closePromotion} aria-labelledby="promotion-title">
+      <Dialog
+        open={pendingPromotion !== null}
+        onClose={closePromotion}
+        aria-labelledby="promotion-title"
+      >
         <DialogTitle id="promotion-title">Choose promotion piece</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Select the piece for this promotion. Training response timing is paused while this dialog is open.
+            Select the piece for this promotion. Training response timing is paused
+            while this dialog is open.
           </Typography>
         </DialogContent>
         <DialogActions>

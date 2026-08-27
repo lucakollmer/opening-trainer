@@ -49,16 +49,9 @@ export function reduceGraphTrainingSession(
     event.type === 'user-move' && step?.actor === 'user'
       ? tryApplyMove(state.fen, event.move)
       : null;
-  let next = correctGraphPly(
-    state,
-    reduceTrainingSession(state, plan, event),
-    plan,
-  );
+  let next = correctGraphPly(state, reduceTrainingSession(state, plan, event), plan);
 
-  if (
-    applied?.kind !== 'applied' ||
-    !step?.acceptedUci.includes(applied.move.uci)
-  ) {
+  if (applied?.kind !== 'applied' || !step?.acceptedUci.includes(applied.move.uci)) {
     return next;
   }
 
@@ -70,9 +63,7 @@ export function reduceGraphTrainingSession(
       treeRevealedItemIds: next.treeRevealedItemIds
         .filter((id) => id !== step.treeItemId || before.has(id))
         .concat(
-          next.treeRevealedItemIds.includes(chosenTreeItemId)
-            ? []
-            : [chosenTreeItemId],
+          next.treeRevealedItemIds.includes(chosenTreeItemId) ? [] : [chosenTreeItemId],
         ),
     };
   }
@@ -81,9 +72,7 @@ export function reduceGraphTrainingSession(
     return next;
   }
   if (state.currentStepId === state.targetStepId) return next;
-  if (
-    next.retestQueue.some((ticket) => ticket.targetStepId === state.targetStepId)
-  ) {
+  if (next.retestQueue.some((ticket) => ticket.targetStepId === state.targetStepId)) {
     return next;
   }
   const attempts = next.retestAttemptsByStep[state.targetStepId] ?? 0;

@@ -137,7 +137,9 @@ export function projectRepertoireTree(
 
   return repertoire.rootContextIds
     .map((id) => contexts.get(id))
-    .filter((context): context is RepertoireContext => Boolean(context && routeAllowed(context)))
+    .filter((context): context is RepertoireContext =>
+      Boolean(context && routeAllowed(context)),
+    )
     .sort((a, b) => a.id.localeCompare(b.id))
     .map(build);
 }

@@ -25,10 +25,7 @@ function collectExpandedItemIds(items: readonly TrainingTreeItem[]): string[] {
 }
 
 function collectItemIds(items: readonly TrainingTreeItem[]): string[] {
-  return items.flatMap((item) => [
-    item.id,
-    ...collectItemIds(item.children ?? []),
-  ]);
+  return items.flatMap((item) => [item.id, ...collectItemIds(item.children ?? [])]);
 }
 
 function TreeLabel({

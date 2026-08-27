@@ -85,7 +85,11 @@ function playlistBaseAllowsContext(
   ply: number,
 ): boolean {
   const repertoire = graph.repertoires.find((item) => item.id === context.repertoireId);
-  if (!repertoire || repertoire.archivedAt || !playlist.repertoireIds.includes(repertoire.id)) {
+  if (
+    !repertoire ||
+    repertoire.archivedAt ||
+    !playlist.repertoireIds.includes(repertoire.id)
+  ) {
     return false;
   }
   if (playlist.colour && playlist.colour !== repertoire.userColour) return false;
@@ -136,7 +140,8 @@ export function playlistAllowsRouteContext(
   const graphContext = byId.get(context.id);
   if (!graphContext) return false;
   const ply = contextPly(graphContext, byId);
-  if (!playlistBaseAllowsContext(graph, playlist, graphContext, byId, ply)) return false;
+  if (!playlistBaseAllowsContext(graph, playlist, graphContext, byId, ply))
+    return false;
 
   const isOnIncludedRoute =
     playlist.includedContextIds.length === 0 ||
@@ -183,7 +188,9 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
     }
     const existing = positionKeys.get(position.key);
     if (existing && existing !== position.id) {
-      throw new Error(`Duplicate canonical position nodes: ${existing}, ${position.id}`);
+      throw new Error(
+        `Duplicate canonical position nodes: ${existing}, ${position.id}`,
+      );
     }
     positionKeys.set(position.key, position.id);
   }
@@ -201,7 +208,8 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
     if (!input) throw new Error(`Invalid UCI on edge ${edge.id}: ${edge.uci}`);
     const applied = tryApplyMove(source.fen, input);
     if (applied.kind !== 'applied') throw new Error(`Illegal edge: ${edge.id}`);
-    if (applied.move.san !== edge.san) throw new Error(`SAN mismatch on edge: ${edge.id}`);
+    if (applied.move.san !== edge.san)
+      throw new Error(`SAN mismatch on edge: ${edge.id}`);
     if (applied.move.positionKey !== target.key) {
       throw new Error(`Edge result mismatch: ${edge.id}`);
     }
@@ -311,7 +319,8 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
       (turn === 'w' ? 'white' : 'black') === repertoire.userColour
         ? 'user'
         : 'opponent';
-    if (move.actor !== expectedActor) throw new Error(`Move actor mismatch: ${move.id}`);
+    if (move.actor !== expectedActor)
+      throw new Error(`Move actor mismatch: ${move.id}`);
     if (!Number.isInteger(move.order) || move.order < 0) {
       throw new Error(`Invalid move order: ${move.id}`);
     }
@@ -326,7 +335,9 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
   for (const context of graph.contexts) {
     const incoming = incomingByContext.get(context.id) ?? 0;
     if (context.parentContextId && incoming !== 1) {
-      throw new Error(`Context must have exactly one contextual incoming move: ${context.id}`);
+      throw new Error(
+        `Context must have exactly one contextual incoming move: ${context.id}`,
+      );
     }
     if (!context.parentContextId && incoming !== 0) {
       throw new Error(`Root context has an incoming move: ${context.id}`);
@@ -341,7 +352,8 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
     }
     const orders = [...moves.map((move) => move.order)].sort((a, b) => a - b);
     orders.forEach((order, index) => {
-      if (order !== index) throw new Error(`Non-contiguous move order in context: ${contextId}`);
+      if (order !== index)
+        throw new Error(`Non-contiguous move order in context: ${contextId}`);
     });
   }
 
@@ -371,7 +383,9 @@ export function validateRepertoireGraph(graph: RepertoireGraph): void {
         `Playlist references missing context: ${playlist.id}`,
       );
       if (!repertoireIds.has(context.repertoireId)) {
-        throw new Error(`Playlist context is outside its repertoire set: ${playlist.id}`);
+        throw new Error(
+          `Playlist context is outside its repertoire set: ${playlist.id}`,
+        );
       }
     }
   }
@@ -402,8 +416,7 @@ export function queryAcceptedMoves(
     .filter((context) => context.entryPositionId === query.positionId)
     .filter((context) => contextAndAncestorsIncluded(context, contexts))
     .filter(
-      (context) =>
-        !playlist || playlistAllowsRouteContext(graph, playlist, context),
+      (context) => !playlist || playlistAllowsRouteContext(graph, playlist, context),
     )
     .filter(
       (context) =>
@@ -424,13 +437,13 @@ export function queryAcceptedMoves(
       }
       const destination = contexts.get(move.destinationContextId);
       if (!destination || !contextAndAncestorsIncluded(destination, contexts)) continue;
-      if (
-        playlist &&
-        !playlistAllowsRouteContext(graph, playlist, destination)
-      ) {
+      if (playlist && !playlistAllowsRouteContext(graph, playlist, destination)) {
         continue;
       }
-      const edge = required(edgeById.get(move.edgeId), `Missing edge for move ${move.id}`);
+      const edge = required(
+        edgeById.get(move.edgeId),
+        `Missing edge for move ${move.id}`,
+      );
       const existing = grouped.get(edge.uci);
       if (existing) {
         if (!existing.destinationContextIds.includes(move.destinationContextId)) {

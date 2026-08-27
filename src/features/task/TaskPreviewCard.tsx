@@ -41,7 +41,8 @@ function defaultContent(session: TrainingSessionState) {
       return {
         severity: 'info' as const,
         title: 'Opponent reply',
-        message: 'The deterministic repertoire opponent is following the selected route.',
+        message:
+          'The deterministic repertoire opponent is following the selected route.',
       };
     case 'hint-offered':
       return {
@@ -61,13 +62,15 @@ function defaultContent(session: TrainingSessionState) {
       return {
         severity: 'success' as const,
         title: 'Line complete',
-        message: 'The selected repertoire route has been replayed from the initial position.',
+        message:
+          'The selected repertoire route has been replayed from the initial position.',
       };
     case 'session-complete':
       return {
         severity: 'success' as const,
         title: 'Session complete',
-        message: 'This run kept observations in memory only; no scheduler state was updated.',
+        message:
+          'This run kept observations in memory only; no scheduler state was updated.',
       };
     case 'abandoned':
       return {
@@ -164,7 +167,8 @@ export function TaskPreviewCard({
           ) : null}
           <Typography variant="body2" color="text.secondary">
             Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Review
-            observations and retest tickets remain in-memory until the persistence phase.
+            observations and retest tickets remain in-memory until the persistence
+            phase.
           </Typography>
         </Stack>
       </CardContent>
@@ -193,7 +197,9 @@ export function TaskPreviewCard({
         {session.status === 'session-complete' || session.status === 'abandoned' ? (
           <Button onClick={onRestart}>Restart session</Button>
         ) : null}
-        {!['session-complete', 'abandoned', 'line-complete'].includes(session.status) ? (
+        {!['session-complete', 'abandoned', 'line-complete'].includes(
+          session.status,
+        ) ? (
           <Button onClick={onAbandon}>End session</Button>
         ) : null}
       </CardActions>
