@@ -25,7 +25,9 @@ describe('canonicalPositionKey', () => {
     const reordered = 'r3k2r/8/8/8/8/8/8/R3K2R w qkQK - 0 1';
     const withoutRights = 'r3k2r/8/8/8/8/8/8/R3K2R w - - 0 1';
     expect(canonicalPositionKey(reordered)).toBe(canonicalPositionKey(standard));
-    expect(canonicalPositionKey(standard)).not.toBe(canonicalPositionKey(withoutRights));
+    expect(canonicalPositionKey(standard)).not.toBe(
+      canonicalPositionKey(withoutRights),
+    );
   });
 
   it('drops a nominal en-passant square when no legal capture exists', () => {
