@@ -17,6 +17,7 @@ export interface TrainingExerciseStep {
   san: string;
   treeItemId: string;
   acceptedUci: readonly string[];
+  acceptedSan: readonly string[];
   acceptedMoveSetKey: string;
   trainingItemId: string;
   positionKey: string;
@@ -40,7 +41,10 @@ export interface TrainingExercisePlan {
   startStepId: string;
   targetStepId: string;
   steps: readonly TrainingExerciseStep[];
+  /** Train-safe tree. Unrevealed answer SAN is structurally absent. */
   tree: readonly TrainingTreeItem[];
+  /** Full-label tree used only by Browse mode or explicit post-response disclosure. */
+  browseTree: readonly TrainingTreeItem[];
 }
 
 function treeIds(items: readonly TrainingTreeItem[]): Set<string> {
@@ -54,6 +58,14 @@ function treeIds(items: readonly TrainingTreeItem[]): Set<string> {
   };
   visit(items);
   return result;
+}
+
+function maskTrainingTree(items: readonly TrainingTreeItem[]): readonly TrainingTreeItem[] {
+  return items.map((item) => ({
+    ...item,
+    visibleLabel: item.maskedLabel,
+    ...(item.children ? { children: maskTrainingTree(item.children) } : {}),
+  }));
 }
 
 export function normalizedAcceptedMoveSet(moves: readonly string[]): string {
@@ -88,6 +100,7 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
       throw new Error(`Route move ${routeUci} is absent from accepted set at ${step.id}`);
     }
 
+    const acceptedSan: string[] = [];
     for (const acceptedUci of step.acceptedUci) {
       const input = moveFromUci(acceptedUci);
       if (!input) throw new Error(`Invalid accepted UCI ${acceptedUci} at ${step.id}`);
@@ -95,6 +108,7 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
       if (accepted.kind !== 'applied') {
         throw new Error(`Accepted move ${acceptedUci} is not legal at ${step.id}`);
       }
+      if (!acceptedSan.includes(accepted.move.san)) acceptedSan.push(accepted.move.san);
     }
 
     const routeResult = tryApplyMove(fen, {
@@ -115,6 +129,7 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     compiled.push({
       ...step,
       ply: index,
+      acceptedSan,
       acceptedMoveSetKey: normalizedAcceptedMoveSet(step.acceptedUci),
       trainingItemId: `${fixture.id}:decision:${positionKey}:${normalizedAcceptedMoveSet(step.acceptedUci)}`,
       positionKey,
@@ -147,7 +162,8 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     startStepId: compiled[0]!.id,
     targetStepId: target.id,
     steps: compiled,
-    tree: fixture.tree,
+    tree: maskTrainingTree(fixture.tree),
+    browseTree: fixture.tree,
   };
 }
 
