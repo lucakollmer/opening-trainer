@@ -28,6 +28,15 @@ describe('canonicalPositionKey', () => {
     expect(canonicalPositionKey(standard)).not.toBe(canonicalPositionKey(withoutRights));
   });
 
+  it('rejects malformed castling rights instead of silently cleaning them', () => {
+    expect(() =>
+      canonicalPositionKey('r3k2r/8/8/8/8/8/8/R3K2R w KKKq - 0 1'),
+    ).toThrow(/Invalid castling rights/u);
+    expect(() =>
+      canonicalPositionKey('r3k2r/8/8/8/8/8/8/R3K2R w KQx - 0 1'),
+    ).toThrow(/Invalid castling rights/u);
+  });
+
   it('drops a nominal en-passant square when no legal capture exists', () => {
     const nominal = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
     const none = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
