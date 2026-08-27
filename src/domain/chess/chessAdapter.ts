@@ -41,9 +41,7 @@ export function moveFromUci(uci: string): ChessMoveInput | null {
   return {
     from: normalized.slice(0, 2),
     to: normalized.slice(2, 4),
-    ...(normalized.length === 5
-      ? { promotion: normalized[4] as PromotionPiece }
-      : {}),
+    ...(normalized.length === 5 ? { promotion: normalized[4] as PromotionPiece } : {}),
   };
 }
 
@@ -91,11 +89,7 @@ export function applyMove(fen: string, input: ChessMoveInput): AppliedChessMove 
   return result.kind === 'applied' ? result.move : null;
 }
 
-export function requiresPromotion(
-  fen: string,
-  from: string,
-  to: string,
-): boolean {
+export function requiresPromotion(fen: string, from: string, to: string): boolean {
   try {
     const game = new Chess(fen);
     return game
