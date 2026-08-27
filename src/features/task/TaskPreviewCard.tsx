@@ -166,8 +166,9 @@ export function TaskPreviewCard({
             </Alert>
           ) : null}
           <Typography variant="body2" color="text.secondary">
-            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Raw review
-            observations and retest tickets are tracked separately from scheduler state.
+            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Raw
+            review observations and retest tickets are tracked separately from scheduler
+            state.
           </Typography>
         </Stack>
       </CardContent>
