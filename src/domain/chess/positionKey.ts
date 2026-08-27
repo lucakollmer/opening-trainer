@@ -5,6 +5,9 @@ const CASTLING_ORDER = ['K', 'Q', 'k', 'q'] as const;
 
 function canonicalCastling(castling: string): string {
   if (castling === '-') return '-';
+  if (!/^[KQkq]+$/u.test(castling) || new Set(castling).size !== castling.length) {
+    throw new Error('Invalid castling rights in FEN.');
+  }
   const available = new Set(castling.split(''));
   const normalized = CASTLING_ORDER.filter((right) => available.has(right)).join('');
   return normalized || '-';
