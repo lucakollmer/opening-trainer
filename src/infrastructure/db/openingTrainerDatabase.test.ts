@@ -72,8 +72,7 @@ function deepestUserTarget(graph: RepertoireGraph): {
     .filter((context) => userContextIds.has(context.id))
     .sort(
       (a, b) =>
-        contextPly(b, contexts) - contextPly(a, contexts) ||
-        a.id.localeCompare(b.id),
+        contextPly(b, contexts) - contextPly(a, contexts) || a.id.localeCompare(b.id),
     )[0]!;
   return {
     rootContextId: repertoire.rootContextIds[0]!,
@@ -101,12 +100,12 @@ describe('PHASE-4 Opening Trainer persistence', () => {
         candidate('persist-roundtrip'),
         '2026-08-27T15:01:00.000Z',
       );
-      expect(stored.positions.every((position) => position.id.startsWith('position:'))).toBe(
-        true,
-      );
-      expect(stored.contexts.every((context) => context.id.includes('persist-roundtrip'))).toBe(
-        true,
-      );
+      expect(
+        stored.positions.every((position) => position.id.startsWith('position:')),
+      ).toBe(true);
+      expect(
+        stored.contexts.every((context) => context.id.includes('persist-roundtrip')),
+      ).toBe(true);
       result.close();
       await result.initialize('2026-08-27T15:02:00.000Z');
       const after = await result.loadRepertoireGraph('persist-roundtrip');
@@ -147,9 +146,9 @@ describe('PHASE-4 Opening Trainer persistence', () => {
         .where('repertoireId')
         .equals('branch-atomic')
         .toArray();
-      expect(rules.every((rule) => rule.contextId !== alternative.destinationContextId)).toBe(
-        true,
-      );
+      expect(
+        rules.every((rule) => rule.contextId !== alternative.destinationContextId),
+      ).toBe(true);
       await validateDatabaseIntegrity(result.database);
     } finally {
       await dispose(result);
@@ -293,10 +292,7 @@ describe('PHASE-4 Opening Trainer persistence', () => {
         /confirmation/u,
       );
       expect(await result.database.repertoires.count()).toBe(1);
-      await result.clearUserData(
-        'RESET LOCAL DATA',
-        '2026-08-27T15:11:00.000Z',
-      );
+      await result.clearUserData('RESET LOCAL DATA', '2026-08-27T15:11:00.000Z');
       expect(await result.database.repertoires.count()).toBe(0);
       expect(await result.database.meta.count()).toBe(1);
     } finally {
