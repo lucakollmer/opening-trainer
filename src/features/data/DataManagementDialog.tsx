@@ -149,8 +149,8 @@ export function DataManagementDialog({
           <Stack spacing={1}>
             <Typography variant="subtitle1">Restore complete backup</Typography>
             <Typography variant="body2" color="text.secondary">
-              The file is validated in staging first. Existing local data is not
-              changed until you explicitly confirm replacement.
+              The file is validated in staging first. Existing local data is not changed
+              until you explicitly confirm replacement.
             </Typography>
             <Button component="label" variant="outlined" disabled={busy}>
               Choose JSON backup
@@ -169,8 +169,8 @@ export function DataManagementDialog({
                 {restorePreview.backup.exportedAt}: {restorePreview.summary.repertoires}{' '}
                 repertoire(s), {restorePreview.summary.playlists} playlist(s),{' '}
                 {restorePreview.summary.reviewLogs} review observation(s) and{' '}
-                {restorePreview.summary.sessions} session(s). Confirming below
-                replaces the current Opening Trainer local data atomically.
+                {restorePreview.summary.sessions} session(s). Confirming below replaces
+                the current Opening Trainer local data atomically.
               </Alert>
             ) : null}
             {restorePreview?.warnings.map((warning) => (
@@ -196,8 +196,8 @@ export function DataManagementDialog({
             <Typography variant="subtitle1">Repertoire PGN</Typography>
             <Typography variant="body2" color="text.secondary">
               PGN export contains repertoire moves, variations and representable
-              annotations only. It is not a complete backup and does not contain
-              review history, sessions or settings.
+              annotations only. It is not a complete backup and does not contain review
+              history, sessions or settings.
             </Typography>
             <Button
               variant="outlined"
