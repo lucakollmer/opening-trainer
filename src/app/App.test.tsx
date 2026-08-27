@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { App } from './App';
@@ -188,7 +188,7 @@ describe('training shell with PHASE-3 graph integration', () => {
     const user = userEvent.setup();
     renderApp();
     await selectPhase3Demo(user);
-    const inclusion = screen.getByRole('checkbox', {
+    const inclusion = screen.getByRole('switch', {
       name: 'Include alternative branch',
     });
     expect(inclusion).toBeChecked();
@@ -226,9 +226,11 @@ describe('training shell with PHASE-3 graph integration', () => {
     expect(screen.getByText(/Preview valid: 1 game/u)).toBeVisible();
     expect(screen.getByText(/1 recursive variation/u)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(
-      screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
+      ).not.toBeInTheDocument(),
+    );
     expect(screen.getByLabelText('Training fixture').textContent).toBe(before);
   });
 
@@ -245,9 +247,11 @@ describe('training shell with PHASE-3 graph integration', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     expect(screen.getByText(/Preview valid: 1 game/u)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Create repertoire' }));
-    expect(
-      screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
+      ).not.toBeInTheDocument(),
+    );
     expect(screen.getByLabelText('Training fixture')).toHaveTextContent(
       'Imported Queen Pawn',
     );
