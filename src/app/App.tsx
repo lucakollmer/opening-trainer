@@ -5,6 +5,7 @@ import {
   Alert,
   AppBar,
   Box,
+  Button,
   Chip,
   Container,
   Drawer,
@@ -209,19 +210,31 @@ function hasDurableSessionProgress(session: SessionRecord['state']): boolean {
   );
 }
 
-export function App() {
+export interface AppProps {
+  initialDemoFixtures?: boolean;
+}
+
+export function App({
+  initialDemoFixtures = import.meta.env.MODE === 'test',
+}: AppProps = {}) {
   const [mode, setMode] = useState<TrainingMode>('train');
   const [treeOpen, setTreeOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
-  const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(basePlans);
-  const [selectionId, setSelectionId] = useState(defaultPlan.id);
+  const [bootReady, setBootReady] = useState(initialDemoFixtures);
+  const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(() =>
+    initialDemoFixtures ? basePlans : [],
+  );
+  const [selectionId, setSelectionId] = useState(
+    initialDemoFixtures ? defaultPlan.id : '',
+  );
   const [includeDemoAlternative, setIncludeDemoAlternative] = useState(true);
   const [repertoireByPlanId, setRepertoireByPlanId] = useState<
     ReadonlyMap<string, string>
   >(new Map());
   const [recoverySession, setRecoverySession] = useState<SessionRecord | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
+  const hasWorkspace = plans.length > 0;
   const selectedPlan =
     plans.find((candidate) => candidate.id === selectionId) ?? defaultPlan;
   const plan =
@@ -250,8 +263,9 @@ export function App() {
   const refreshPersistedPlans = async (activateFirst = false) => {
     const stored = persistedPlans(await repository.listRepertoireGraphs());
     const storedIds = new Set(stored.plans.map((item) => item.id));
+    const bundledPlans = initialDemoFixtures ? basePlans : [];
     const nextPlans = [
-      ...basePlans.filter((item) => !storedIds.has(item.id)),
+      ...bundledPlans.filter((item) => !storedIds.has(item.id)),
       ...stored.plans,
     ];
     setPlans(nextPlans);
@@ -278,17 +292,18 @@ export function App() {
         const refreshed = await refreshPersistedPlans();
         if (!active) return;
         const requestedPlanId = await repository.getSetting<string>('active-plan-id');
-        if (
-          requestedPlanId &&
-          refreshed.allPlans.some((candidate) => candidate.id === requestedPlanId)
-        ) {
-          const requestedPlan = refreshed.allPlans.find(
-            (candidate) => candidate.id === requestedPlanId,
-          )!;
-          setSelectionId(requestedPlanId);
+        const requestedPlan = requestedPlanId
+          ? refreshed.allPlans.find((candidate) => candidate.id === requestedPlanId)
+          : undefined;
+        const initialPlan =
+          requestedPlan ??
+          refreshed.plans[0] ??
+          (initialDemoFixtures ? refreshed.allPlans[0] : undefined);
+        if (initialPlan) {
+          setSelectionId(initialPlan.id);
           setSession(
-            createGraphTrainingSession(requestedPlan, nowMs(), {
-              sessionId: sessionId(requestedPlan),
+            createGraphTrainingSession(initialPlan, nowMs(), {
+              sessionId: sessionId(initialPlan),
             }),
           );
         }
@@ -308,6 +323,8 @@ export function App() {
               : 'Local data initialization failed.',
           );
         }
+      } finally {
+        if (active) setBootReady(true);
       }
     })();
 
@@ -376,6 +393,14 @@ export function App() {
         sessionId: sessionId(nextPlan),
       }),
     );
+  };
+
+  const loadBundledDemo = () => {
+    setPlans(basePlans);
+    setSelectionId(defaultPlan.id);
+    setIncludeDemoAlternative(true);
+    setMode('train');
+    beginPlan(defaultPlan);
   };
 
   const handlePlanChange = (nextPlanId: string) => {
@@ -517,61 +542,65 @@ export function App() {
           <Typography component="h1" variant="h6" sx={{ fontWeight: 700, mr: 'auto' }}>
             Opening Trainer
           </Typography>
-          <FormControl size="small" sx={{ minWidth: 240 }}>
-            <InputLabel id="repertoire-label">Training fixture</InputLabel>
-            <Select
-              labelId="repertoire-label"
-              label="Training fixture"
-              value={selectionId}
-              onChange={(event: SelectChangeEvent<string>) =>
-                handlePlanChange(String(event.target.value))
-              }
-            >
-              {plans.map((candidate) => (
-                <MenuItem key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Chip
-            size="small"
-            variant="outlined"
-            label={selectedRepertoireId ? 'Saved locally' : 'Demo fixture'}
-          />
-          {selectionId === phase3DemoPlan.id ? (
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={includeDemoAlternative}
-                  onChange={(_: ChangeEvent<HTMLInputElement>, checked: boolean) =>
-                    handleDemoAlternativeChange(checked)
+          {hasWorkspace ? (
+            <>
+              <FormControl size="small" sx={{ minWidth: 240 }}>
+                <InputLabel id="repertoire-label">Training fixture</InputLabel>
+                <Select
+                  labelId="repertoire-label"
+                  label="Training fixture"
+                  value={selectionId}
+                  onChange={(event: SelectChangeEvent<string>) =>
+                    handlePlanChange(String(event.target.value))
                   }
-                  slotProps={{ input: { 'aria-label': 'Include alternative branch' } }}
+                >
+                  {plans.map((candidate) => (
+                    <MenuItem key={candidate.id} value={candidate.id}>
+                      {candidate.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Chip
+                size="small"
+                variant="outlined"
+                label={selectedRepertoireId ? 'Saved locally' : 'Demo fixture'}
+              />
+              {selectionId === phase3DemoPlan.id ? (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={includeDemoAlternative}
+                      onChange={(_: ChangeEvent<HTMLInputElement>, checked: boolean) =>
+                        handleDemoAlternativeChange(checked)
+                      }
+                      slotProps={{ input: { 'aria-label': 'Include alternative branch' } }}
+                    />
+                  }
+                  label="Include alternative branch"
+                  sx={{ mx: 0 }}
                 />
-              }
-              label="Include alternative branch"
-              sx={{ mx: 0 }}
-            />
+              ) : null}
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={mode}
+                aria-label="Training mode"
+                onChange={(_: MouseEvent<HTMLElement>, nextMode: TrainingMode | null) => {
+                  if (nextMode) handleModeChange(nextMode);
+                }}
+              >
+                <ToggleButton value="train">Train</ToggleButton>
+                <ToggleButton value="browse">Browse</ToggleButton>
+              </ToggleButtonGroup>
+              <Chip size="small" label={`${session.evidence.length} observations`} />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${session.plyIndex}/${totalPlies} plies`}
+              />
+            </>
           ) : null}
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={mode}
-            aria-label="Training mode"
-            onChange={(_: MouseEvent<HTMLElement>, nextMode: TrainingMode | null) => {
-              if (nextMode) handleModeChange(nextMode);
-            }}
-          >
-            <ToggleButton value="train">Train</ToggleButton>
-            <ToggleButton value="browse">Browse</ToggleButton>
-          </ToggleButtonGroup>
-          <Chip size="small" label={`${session.evidence.length} observations`} />
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${session.plyIndex}/${totalPlies} plies`}
-          />
           <Tooltip title="Import PGN repertoire">
             <IconButton
               color="inherit"
@@ -581,17 +610,19 @@ export function App() {
               <UploadFileOutlinedIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Open repertoire tree">
-            <IconButton
-              ref={treeButtonRef}
-              color="inherit"
-              aria-label="Open repertoire tree"
-              onClick={() => setTreeOpen(true)}
-              sx={{ display: { xs: 'inline-flex', md: 'none' } }}
-            >
-              <AccountTreeOutlinedIcon />
-            </IconButton>
-          </Tooltip>
+          {hasWorkspace ? (
+            <Tooltip title="Open repertoire tree">
+              <IconButton
+                ref={treeButtonRef}
+                color="inherit"
+                aria-label="Open repertoire tree"
+                onClick={() => setTreeOpen(true)}
+                sx={{ display: { xs: 'inline-flex', md: 'none' } }}
+              >
+                <AccountTreeOutlinedIcon />
+              </IconButton>
+            </Tooltip>
+          ) : null}
           <Tooltip title="Local data and recovery">
             <IconButton
               color="inherit"
@@ -614,104 +645,144 @@ export function App() {
             {persistenceError}
           </Alert>
         ) : null}
-        <Box
-          className="training-workspace"
-          sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateAreas: {
-              xs: '"board" "task"',
-              md: '"tree board" "tree task"',
-              lg: '"tree board task"',
-            },
-            gridTemplateColumns: {
-              xs: 'minmax(0, 1fr)',
-              md: 'minmax(240px, 300px) minmax(0, 1fr)',
-              lg: 'minmax(250px, 300px) minmax(420px, 1fr) minmax(300px, 360px)',
-            },
-            alignItems: 'start',
-          }}
-        >
+        {!bootReady ? (
+          <Typography color="text.secondary">Opening local data…</Typography>
+        ) : !hasWorkspace ? (
           <Box
             sx={{
-              gridArea: 'tree',
-              display: { xs: 'none', md: 'block' },
-              minWidth: 0,
+              maxWidth: 640,
+              mx: 'auto',
+              py: { xs: 6, md: 10 },
+              textAlign: 'center',
             }}
           >
-            {tree}
+            <Typography component="h2" variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+              No repertoire yet
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              No repertoire is stored on this device. Import a PGN to create one, or load the
+              bundled demo without saving it.
+            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 1,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Button
+                variant="contained"
+                startIcon={<UploadFileOutlinedIcon />}
+                onClick={() => setImportOpen(true)}
+              >
+                Import PGN
+              </Button>
+              <Button variant="outlined" onClick={loadBundledDemo}>
+                Load demo repertoire
+              </Button>
+            </Box>
           </Box>
-          <Box sx={{ gridArea: 'board', minWidth: 0 }}>
-            <ChessboardPreview
-              position={session.fen}
-              orientation={plan.orientation}
-              userTurn={mode === 'train' && canSubmitUserMove(session)}
-              disabled={mode === 'browse'}
-              lastMove={lastMove}
-              hintSquares={hintSquares}
-              reducedMotion={reducedMotion}
-              onMove={handleMove}
-              onInteractionBlockChange={handleInteractionBlockChange}
-            />
+        ) : (
+          <Box
+            className="training-workspace"
+            sx={{
+              display: 'grid',
+              gap: 2,
+              gridTemplateAreas: {
+                xs: '"board" "task"',
+                md: '"tree board" "tree task"',
+                lg: '"tree board task"',
+              },
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                md: 'minmax(240px, 300px) minmax(0, 1fr)',
+                lg: 'minmax(250px, 300px) minmax(420px, 1fr) minmax(300px, 360px)',
+              },
+              alignItems: 'start',
+            }}
+          >
+            <Box
+              sx={{
+                gridArea: 'tree',
+                display: { xs: 'none', md: 'block' },
+                minWidth: 0,
+              }}
+            >
+              {tree}
+            </Box>
+            <Box sx={{ gridArea: 'board', minWidth: 0 }}>
+              <ChessboardPreview
+                position={session.fen}
+                orientation={plan.orientation}
+                userTurn={mode === 'train' && canSubmitUserMove(session)}
+                disabled={mode === 'browse'}
+                lastMove={lastMove}
+                hintSquares={hintSquares}
+                reducedMotion={reducedMotion}
+                onMove={handleMove}
+                onInteractionBlockChange={handleInteractionBlockChange}
+              />
+            </Box>
+            <Box sx={{ gridArea: 'task', minWidth: 0 }}>
+              <TaskPreviewCard
+                session={session}
+                plan={plan}
+                onHint={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'request-hint',
+                    }),
+                  )
+                }
+                onReveal={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'reveal',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onContinue={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'continue',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onRetest={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'start-retest',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onCompleteSession={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'complete-session',
+                    }),
+                  )
+                }
+                onRestart={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'restart',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onAbandon={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, { type: 'abandon' }),
+                  )
+                }
+              />
+            </Box>
           </Box>
-          <Box sx={{ gridArea: 'task', minWidth: 0 }}>
-            <TaskPreviewCard
-              session={session}
-              plan={plan}
-              onHint={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'request-hint',
-                  }),
-                )
-              }
-              onReveal={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'reveal',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onContinue={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'continue',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onRetest={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'start-retest',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onCompleteSession={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'complete-session',
-                  }),
-                )
-              }
-              onRestart={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'restart',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onAbandon={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'abandon' }),
-                )
-              }
-            />
-          </Box>
-        </Box>
+        )}
       </Container>
 
       <Drawer
