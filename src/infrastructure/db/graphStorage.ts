@@ -78,7 +78,8 @@ export function canonicalizeGraphForPersistence(
   const edgeIdByOld = new Map(
     source.edges.map((edge) => {
       const fromPositionId = positionIdByOld.get(edge.fromPositionId);
-      if (!fromPositionId) throw new Error(`Missing source position ${edge.fromPositionId}.`);
+      if (!fromPositionId)
+        throw new Error(`Missing source position ${edge.fromPositionId}.`);
       return [edge.id, persistentEdgeId(fromPositionId, edge.uci)] as const;
     }),
   );
@@ -128,8 +129,12 @@ export function canonicalizeGraphForPersistence(
   }));
   const playlists = source.playlists.map((playlist) => ({
     ...playlist,
-    includedContextIds: playlist.includedContextIds.map((id) => contextIdByOld.get(id)!),
-    excludedContextIds: playlist.excludedContextIds.map((id) => contextIdByOld.get(id)!),
+    includedContextIds: playlist.includedContextIds.map((id) =>
+      contextIdByOld.get(id)!,
+    ),
+    excludedContextIds: playlist.excludedContextIds.map((id) =>
+      contextIdByOld.get(id)!,
+    ),
     createdAt: timestampOrNow(playlist.createdAt, now),
     updatedAt: now,
   }));
@@ -299,7 +304,8 @@ export function deriveTrainingRows(
     });
     if (accepted.moves.length === 0) continue;
     const position = positions.get(context.entryPositionId);
-    if (!position) throw new Error(`Missing decision position ${context.entryPositionId}.`);
+    if (!position)
+      throw new Error(`Missing decision position ${context.entryPositionId}.`);
     const contextScopeKey = position.key;
     const trainingItemId = trainingItemIdentityKey({
       repertoireId: context.repertoireId,
