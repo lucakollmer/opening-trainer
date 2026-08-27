@@ -24,6 +24,13 @@ function collectExpandedItemIds(items: readonly TrainingTreeItem[]): string[] {
   ]);
 }
 
+function collectItemIds(items: readonly TrainingTreeItem[]): string[] {
+  return items.flatMap((item) => [
+    item.id,
+    ...collectItemIds(item.children ?? []),
+  ]);
+}
+
 function TreeLabel({
   item,
   mode,
@@ -86,6 +93,8 @@ export function RepertoireTreePreview({
   revealedItemIds,
   currentItemId,
 }: RepertoireTreePreviewProps) {
+  const treeIdentity = collectItemIds(items).join('|');
+
   return (
     <Paper
       component="section"
@@ -104,6 +113,7 @@ export function RepertoireTreePreview({
           </Typography>
         </div>
         <SimpleTreeView
+          key={treeIdentity}
           defaultExpandedItems={collectExpandedItemIds(items)}
           aria-label="Repertoire tree"
         >
