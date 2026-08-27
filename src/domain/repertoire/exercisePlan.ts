@@ -114,11 +114,12 @@ function buildTree(
   graph: RepertoireGraph,
   repertoireId: string,
   playlistId: string | undefined,
+  mode: 'train' | 'browse',
 ): readonly TrainingTreeItem[] {
   return toTrainingTreeItems(
     projectRepertoireTree(graph, {
       repertoireId,
-      mode: 'browse',
+      mode,
       ...(playlistId ? { playlistId } : {}),
     }),
   );
@@ -322,6 +323,7 @@ export function createGraphExercisePlan(
       san: selectedEdge.san,
       treeItemId: selected.id,
       acceptedUci: accepted.moves.map((move) => move.uci),
+      acceptedSan: accepted.moves.map((move) => move.san),
       acceptedMoveSetKey: accepted.normalizedKey,
       trainingItemId,
       positionKey: position.key,
@@ -362,6 +364,7 @@ export function createGraphExercisePlan(
     startStepId: root.id,
     targetStepId: target.id,
     steps: compiled,
-    tree: buildTree(graph, repertoire.id, options.playlistId),
+    tree: buildTree(graph, repertoire.id, options.playlistId, 'train'),
+    browseTree: buildTree(graph, repertoire.id, options.playlistId, 'browse'),
   };
 }
