@@ -42,13 +42,22 @@ import {
   type TrainingExercisePlan,
 } from '../domain/training/exercisePlan';
 import { createGraphExercisePlan } from '../domain/repertoire/exercisePlan';
-import { InMemoryImportRepository } from '../domain/repertoire/pgnImport';
+import { contextPly } from '../domain/repertoire/graph';
+import { InMemoryImportRepository } from '../domain/repertoire/importRepository';
 import {
   createGraphTrainingSession,
   reduceGraphTrainingSession,
 } from '../domain/repertoire/trainingIntegration';
-import type { ImportCandidate, RepertoireGraph } from '../domain/repertoire/types';
-import { phase2TrainingFixtures, type TrainingMode } from '../fixtures/trainingFixtures';
+import type {
+  ImportCandidate,
+  RepertoireContext,
+  RepertoireGraph,
+} from '../domain/repertoire/types';
+import {
+  phase2TrainingFixtures,
+  type TrainingMode,
+  type TrainingTreeItem,
+} from '../fixtures/trainingFixtures';
 import {
   phase3DemoFilteredPlan,
   phase3DemoPlan,
@@ -66,33 +75,100 @@ function sessionId(plan: TrainingExercisePlan) {
   return globalThis.crypto?.randomUUID?.() ?? `${plan.id}-${nowMs()}`;
 }
 
-function importedExercisePlan(graph: RepertoireGraph): TrainingExercisePlan {
+function isDescendantOf(
+  context: RepertoireContext,
+  rootContextId: string,
+  contexts: ReadonlyMap<string, RepertoireContext>,
+): boolean {
+  let current: RepertoireContext | undefined = context;
+  const seen = new Set<string>();
+  while (current) {
+    if (current.id === rootContextId) return true;
+    if (seen.has(current.id)) return false;
+    seen.add(current.id);
+    current = current.parentContextId ? contexts.get(current.parentContextId) : undefined;
+  }
+  return false;
+}
+
+function importedExercisePlans(graph: RepertoireGraph): TrainingExercisePlan[] {
   const repertoire = graph.repertoires[0];
   if (!repertoire) throw new Error('Imported graph has no repertoire.');
-  const rootContextId = repertoire.rootContextIds[0];
-  if (!rootContextId) throw new Error('Imported repertoire has no root context.');
   const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
-  const userContextIds = [
-    ...new Set(
-      graph.moves
-        .filter((move) => move.included && move.actor === 'user')
-        .map((move) => move.contextId),
-    ),
-  ];
-  userContextIds.sort((a, b) => {
-    const aDepth = contexts.get(a)?.pathFingerprint.split('/').length ?? 0;
-    const bDepth = contexts.get(b)?.pathFingerprint.split('/').length ?? 0;
-    return bDepth - aDepth || a.localeCompare(b);
+  const userDecisionIds = new Set(
+    graph.moves
+      .filter((move) => move.included && move.actor === 'user')
+      .map((move) => move.contextId),
+  );
+
+  const plans = repertoire.rootContextIds.flatMap((rootContextId, rootIndex) => {
+    const root = contexts.get(rootContextId);
+    if (!root) return [];
+    const targets = graph.contexts
+      .filter(
+        (context) =>
+          context.repertoireId === repertoire.id &&
+          userDecisionIds.has(context.id) &&
+          isDescendantOf(context, root.id, contexts),
+      )
+      .sort(
+        (a, b) =>
+          contextPly(b, contexts) - contextPly(a, contexts) ||
+          a.pathFingerprint.localeCompare(b.pathFingerprint) ||
+          a.id.localeCompare(b.id),
+      );
+    const target = targets[0];
+    if (!target) return [];
+    const plan = createGraphExercisePlan(graph, {
+      repertoireId: repertoire.id,
+      rootContextId: root.id,
+      targetContextId: target.id,
+    });
+    return [
+      {
+        ...plan,
+        label:
+          repertoire.rootContextIds.length > 1
+            ? `${repertoire.name} · ${root.label ?? `Line ${rootIndex + 1}`}`
+            : repertoire.name,
+      },
+    ];
   });
-  const targetContextId = userContextIds[0];
-  if (!targetContextId) {
-    throw new Error('Imported repertoire contains no user decision.');
+
+  if (plans.length === 0) {
+    throw new Error('Imported repertoire contains no trainable user decision.');
   }
-  return createGraphExercisePlan(graph, {
-    repertoireId: repertoire.id,
-    rootContextId,
-    targetContextId,
-  });
+  return plans;
+}
+
+function fullTreeLabels(items: readonly TrainingTreeItem[]): Map<string, string> {
+  const labels = new Map<string, string>();
+  const visit = (nodes: readonly TrainingTreeItem[]) => {
+    for (const item of nodes) {
+      labels.set(item.id, item.visibleLabel);
+      visit(item.children ?? []);
+    }
+  };
+  visit(items);
+  return labels;
+}
+
+function revealTrainTreeLabels(
+  items: readonly TrainingTreeItem[],
+  browseItems: readonly TrainingTreeItem[],
+  revealedItemIds: readonly string[],
+): readonly TrainingTreeItem[] {
+  const labels = fullTreeLabels(browseItems);
+  const revealed = new Set(revealedItemIds);
+  const visit = (nodes: readonly TrainingTreeItem[]): readonly TrainingTreeItem[] =>
+    nodes.map((item) => ({
+      ...item,
+      visibleLabel: revealed.has(item.id)
+        ? (labels.get(item.id) ?? item.visibleLabel)
+        : item.visibleLabel,
+      ...(item.children ? { children: visit(item.children) } : {}),
+    }));
+  return visit(items);
 }
 
 export function App() {
@@ -164,24 +240,41 @@ export function App() {
     if (!nextPlan) return;
     setSelectionId(nextPlan.id);
     setIncludeDemoAlternative(true);
+    setMode('train');
     beginPlan(nextPlan);
   };
 
   const handleDemoAlternativeChange = (checked: boolean) => {
     setIncludeDemoAlternative(checked);
+    setMode('train');
     beginPlan(checked ? phase3DemoPlan : phase3DemoFilteredPlan);
   };
 
   const handleImportedCandidate = (candidate: ImportCandidate) => {
-    const importedPlan = importedExercisePlan(candidate.proposedGraph);
+    const importedPlans = importedExercisePlans(candidate.proposedGraph);
     importRepositoryRef.current.createRepertoire(candidate);
+    const importedIds = new Set(importedPlans.map((item) => item.id));
     setPlans((current) => [
-      ...current.filter((item) => item.id !== importedPlan.id),
-      importedPlan,
+      ...current.filter((item) => !importedIds.has(item.id)),
+      ...importedPlans,
     ]);
-    setSelectionId(importedPlan.id);
+    const firstPlan = importedPlans[0]!;
+    setSelectionId(firstPlan.id);
     setIncludeDemoAlternative(true);
-    beginPlan(importedPlan);
+    setMode('train');
+    beginPlan(firstPlan);
+  };
+
+  const handleModeChange = (nextMode: TrainingMode) => {
+    if (nextMode === mode) return;
+    if (mode === 'train' && nextMode === 'browse') {
+      setSession((current) =>
+        ['session-complete', 'abandoned'].includes(current.status)
+          ? current
+          : reduceGraphTrainingSession(current, plan, { type: 'abandon' }),
+      );
+    }
+    setMode(nextMode);
   };
 
   const handleMove = (command: BoardMoveCommand): boolean => {
@@ -218,10 +311,14 @@ export function App() {
   const lastMove = session.lastMove
     ? ([session.lastMove.from, session.lastMove.to] as const)
     : undefined;
+  const displayedTree =
+    mode === 'browse'
+      ? plan.browseTree
+      : revealTrainTreeLabels(plan.tree, plan.browseTree, session.treeRevealedItemIds);
   const tree = (
     <RepertoireTreePreview
       mode={mode}
-      items={plan.tree}
+      items={displayedTree}
       revealedItemIds={session.treeRevealedItemIds}
       currentItemId={currentStep?.treeItemId}
     />
@@ -276,7 +373,7 @@ export function App() {
             value={mode}
             aria-label="Training mode"
             onChange={(_: MouseEvent<HTMLElement>, nextMode: TrainingMode | null) => {
-              if (nextMode) setMode(nextMode);
+              if (nextMode) handleModeChange(nextMode);
             }}
           >
             <ToggleButton value="train">Train</ToggleButton>
