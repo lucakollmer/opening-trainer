@@ -51,7 +51,8 @@ export function exportRepertoirePgn(
     const edge = edges.get(move.edgeId);
     if (!context || !edge) throw new Error(`Cannot export dangling move ${move.id}.`);
     const position = positions.get(context.entryPositionId);
-    if (!position) throw new Error(`Cannot export missing position ${context.entryPositionId}.`);
+    if (!position)
+      throw new Error(`Cannot export missing position ${context.entryPositionId}.`);
     const nags = move.nags?.length ? ` ${move.nags.join(' ')}` : '';
     const note = move.note ?? move.purpose;
     return `${movePrefix(position.fen)} ${edge.san}${nags}${commentText(note)}`;
@@ -62,7 +63,8 @@ export function exportRepertoirePgn(
     visited: ReadonlySet<string>,
   ): string => {
     const destination = contexts.get(move.destinationContextId);
-    if (!destination) throw new Error(`Missing destination ${move.destinationContextId}.`);
+    if (!destination)
+      throw new Error(`Missing destination ${move.destinationContextId}.`);
     const nextVisited = new Set(visited);
     nextVisited.add(move.contextId);
     const continuation = renderContext(destination, nextVisited);
@@ -86,7 +88,8 @@ export function exportRepertoirePgn(
       .slice(1)
       .map((variation) => `(${renderMoveAndContinuation(variation, nextVisited)})`);
     const destination = contexts.get(main.destinationContextId);
-    if (!destination) throw new Error(`Missing destination ${main.destinationContextId}.`);
+    if (!destination)
+      throw new Error(`Missing destination ${main.destinationContextId}.`);
     const continuation = renderContext(destination, nextVisited);
     return [mainText, ...variations, continuation].filter(Boolean).join(' ');
   };
