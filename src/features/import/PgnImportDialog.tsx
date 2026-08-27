@@ -96,7 +96,7 @@ export function PgnImportDialog({
               label="Your colour"
               value={colour}
               onChange={(event: SelectChangeEvent<Colour>) => {
-                setColour(event.target.value as Colour);
+                setColour(event.target.value);
                 setCandidate(null);
               }}
             >
@@ -106,7 +106,14 @@ export function PgnImportDialog({
           </FormControl>
           <Button component="label" variant="outlined">
             Choose local PGN file
-            <input hidden type="file" accept=".pgn,text/plain" onChange={loadFile} />
+            <input
+              hidden
+              type="file"
+              accept=".pgn,text/plain"
+              onChange={(event) => {
+                void loadFile(event);
+              }}
+            />
           </Button>
           <TextField
             label="PGN text"
