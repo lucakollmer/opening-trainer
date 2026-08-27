@@ -82,7 +82,9 @@ describe('hardened training session reducer', () => {
     const white = playCorrectly(fix01White);
     expect(white.status).toBe('line-complete');
     expect(white.evidence.filter((item) => item.outcome === 'correct')).toHaveLength(4);
-    expect(white.evidence.filter((item) => item.evidenceRole === 'targeted')).toHaveLength(1);
+    expect(
+      white.evidence.filter((item) => item.evidenceRole === 'targeted'),
+    ).toHaveLength(1);
     expect(playCorrectly(fix02Black).status).toBe('line-complete');
   });
 
@@ -247,8 +249,14 @@ describe('hardened training session reducer', () => {
 
   it('subtracts a blocking promotion-dialog pause from response duration', () => {
     let state = createTrainingSession(fix01White, 1000, { sessionId: 'pause' });
-    state = reduceTrainingSession(state, fix01White, { type: 'pause-attempt', nowMs: 1100 });
-    state = reduceTrainingSession(state, fix01White, { type: 'resume-attempt', nowMs: 5100 });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'pause-attempt',
+      nowMs: 1100,
+    });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'resume-attempt',
+      nowMs: 5100,
+    });
     state = reduceTrainingSession(state, fix01White, {
       type: 'user-move',
       move: { from: 'e2', to: 'e4' },
