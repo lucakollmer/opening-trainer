@@ -54,7 +54,9 @@ describe('hardened PHASE-2 training vertical slice', () => {
       'white',
     );
     expect(screen.getByRole('heading', { name: 'Repertoire tree' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Find the repertoire move' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Find the repertoire move' }),
+    ).toBeVisible();
   });
 
   it('withholds all future answer labels in Train mode and reveals them in Browse mode', async () => {
@@ -91,7 +93,9 @@ describe('hardened PHASE-2 training vertical slice', () => {
     await submitAccessibleMove(user, 'e2', 'e4');
     expect(screen.getAllByText('1. e4').length).toBeGreaterThan(0);
     expect(screen.queryByText('1... c5')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Correct repertoire move' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Correct repertoire move' }),
+    ).toBeVisible();
   });
 
   it('classifies a known sibling separately and offers repair', async () => {
@@ -99,9 +103,15 @@ describe('hardened PHASE-2 training vertical slice', () => {
     renderApp();
     await submitAccessibleMove(user, 'e2', 'e4');
     await user.click(screen.getByRole('button', { name: 'Continue line' }));
-    await screen.findByRole('heading', { name: 'Find the repertoire move' }, { timeout: 1500 });
+    await screen.findByRole(
+      'heading',
+      { name: 'Find the repertoire move' },
+      { timeout: 1500 },
+    );
     await submitAccessibleMove(user, 'b1', 'c3');
-    expect(screen.getByRole('heading', { name: 'Known sibling variation' })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Known sibling variation' }),
+    ).toBeVisible();
     expect(screen.getByText(/This prompt expects Nf3/u)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Repair move' })).toBeVisible();
   });
@@ -111,7 +121,11 @@ describe('hardened PHASE-2 training vertical slice', () => {
     renderApp();
     await submitAccessibleMove(user, 'e2', 'e4');
     await user.click(screen.getByRole('button', { name: 'Continue line' }));
-    await screen.findByRole('heading', { name: 'Find the repertoire move' }, { timeout: 1500 });
+    await screen.findByRole(
+      'heading',
+      { name: 'Find the repertoire move' },
+      { timeout: 1500 },
+    );
     await user.click(screen.getByRole('button', { name: 'Hint 1' }));
     expect(screen.getByText(/Piece: kingside knight/u)).toBeVisible();
     expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
@@ -131,7 +145,9 @@ describe('hardened PHASE-2 training vertical slice', () => {
     const openButton = screen.getByRole('button', { name: 'Open repertoire tree' });
     await user.click(openButton);
     const presentation = screen.getByRole('presentation');
-    expect(within(presentation).getByRole('heading', { name: 'Repertoire tree' })).toBeVisible();
+    expect(
+      within(presentation).getByRole('heading', { name: 'Repertoire tree' }),
+    ).toBeVisible();
     await user.keyboard('{Escape}');
     expect(openButton).toHaveFocus();
   });
