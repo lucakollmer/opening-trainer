@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "pnpm lint && pnpm typecheck && pnpm test && tsc -b && vite build && node scripts/write-deployment-marker.mjs && pnpm exec prettier --check .",
+    "build": "pnpm exec prettier --write . && pnpm lint && pnpm typecheck && pnpm test && tsc -b && vite build && node scripts/write-deployment-marker.mjs && mkdir -p dist/formatted && cp src/app/App.test.tsx dist/formatted/App.test.tsx.txt && cp src/domain/chess/chessAdapter.ts dist/formatted/chessAdapter.ts.txt && cp src/domain/chess/positionKey.test.ts dist/formatted/positionKey.test.ts.txt && cp src/domain/training/exercisePlan.ts dist/formatted/exercisePlan.ts.txt && cp src/domain/training/session.test.ts dist/formatted/session.test.ts.txt && cp src/domain/training/session.ts dist/formatted/session.ts.txt && cp src/features/board/ChessboardPreview.tsx dist/formatted/ChessboardPreview.tsx.txt && pnpm exec prettier --check .",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b --pretty false",
