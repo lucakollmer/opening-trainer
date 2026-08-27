@@ -28,24 +28,24 @@ This prevents independent PGN imports from colliding on candidate-local IDs such
 
 ## Tables
 
-| Table | Primary purpose | Important indexes |
-| --- | --- | --- |
-| `meta` | database/portable schema metadata | `id` |
-| `repertoires` | repertoire identity, colour and source | `id`, `name`, `userColour`, `updatedAt` |
-| `repertoireContexts` | contextual/path identity | `id`, `repertoireId`, `parentContextId`, `entryPositionId`, unique repertoire/path |
-| `positions` | canonical chess positions | `id`, unique canonical `key` |
-| `moveEdges` | canonical legal graph edges | `id`, `fromPositionId`, unique source/UCI |
-| `repertoireMoves` | contextual use of graph edges | `id`, `contextId`, `edgeId`, destination, actor |
-| `decisionRules` | current scheduler-neutral accepted sets | `id`, repertoire/context/position/training-item |
-| `playlists` | playlist metadata | `id`, `name`, `updatedAt` |
-| `playlistEntries` | normalized repertoire/context/tag playlist membership | `id`, `playlistId`, `kind`, `value` |
-| `trainingItems` | contextual memory identities without FSRS state | `id`, repertoire, position, accepted-set, mode, status |
-| `reviewLogs` | raw immutable review observations | `id`, training-item, session, timestamp, outcome |
-| `sessions` | resumable/terminal session snapshots | `id`, `planId`, `status`, `updatedAt` |
-| `settings` | small versionable local settings | `id`, `updatedAt` |
-| `imports` | PGN/import provenance and summary | `id`, repertoire, import timestamp |
-| `openingNames` | reserved MVP opening-name metadata | `id`, repertoire/context |
-| `confusionRelations` | scheduler-neutral sibling-confusion evidence | `id`, expected item, confused context |
+| Table                | Primary purpose                                       | Important indexes                                                                  |
+| -------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `meta`               | database/portable schema metadata                     | `id`                                                                               |
+| `repertoires`        | repertoire identity, colour and source                | `id`, `name`, `userColour`, `updatedAt`                                            |
+| `repertoireContexts` | contextual/path identity                              | `id`, `repertoireId`, `parentContextId`, `entryPositionId`, unique repertoire/path |
+| `positions`          | canonical chess positions                             | `id`, unique canonical `key`                                                       |
+| `moveEdges`          | canonical legal graph edges                           | `id`, `fromPositionId`, unique source/UCI                                          |
+| `repertoireMoves`    | contextual use of graph edges                         | `id`, `contextId`, `edgeId`, destination, actor                                    |
+| `decisionRules`      | current scheduler-neutral accepted sets               | `id`, repertoire/context/position/training-item                                    |
+| `playlists`          | playlist metadata                                     | `id`, `name`, `updatedAt`                                                          |
+| `playlistEntries`    | normalized repertoire/context/tag playlist membership | `id`, `playlistId`, `kind`, `value`                                                |
+| `trainingItems`      | contextual memory identities without FSRS state       | `id`, repertoire, position, accepted-set, mode, status                             |
+| `reviewLogs`         | raw immutable review observations                     | `id`, training-item, session, timestamp, outcome                                   |
+| `sessions`           | resumable/terminal session snapshots                  | `id`, `planId`, `status`, `updatedAt`                                              |
+| `settings`           | small versionable local settings                      | `id`, `updatedAt`                                                                  |
+| `imports`            | PGN/import provenance and summary                     | `id`, repertoire, import timestamp                                                 |
+| `openingNames`       | reserved MVP opening-name metadata                    | `id`, repertoire/context                                                           |
+| `confusionRelations` | scheduler-neutral sibling-confusion evidence          | `id`, expected item, confused context                                              |
 
 `decisionRules` and active `trainingItems` are derived from the canonical repertoire
 graph. When accepted branch content changes, current decision rules are rebuilt.
