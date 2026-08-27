@@ -103,13 +103,17 @@ function requireNumber(record: Record<string, unknown>, key: string): number {
   return value;
 }
 
-function assertRecordArray(value: unknown, name: string): asserts value is Record<string, unknown>[] {
+function assertRecordArray(
+  value: unknown,
+  name: string,
+): asserts value is Record<string, unknown>[] {
   if (!Array.isArray(value)) throw new Error(`Backup table ${name} must be an array.`);
   const seen = new Set<string>();
   value.forEach((item, index) => {
     if (!isObject(item)) throw new Error(`Backup table ${name}[${index}] is invalid.`);
     const id = requireString(item, 'id');
-    if (seen.has(id)) throw new Error(`Backup table ${name} contains duplicate ID ${id}.`);
+    if (seen.has(id))
+      throw new Error(`Backup table ${name} contains duplicate ID ${id}.`);
     seen.add(id);
   });
 }
@@ -154,9 +158,13 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
   }
   for (const session of data.sessions) {
     if (
-      session.committedObservationIds.some((observationId) => !reviewIds.has(observationId))
+      session.committedObservationIds.some(
+        (observationId) => !reviewIds.has(observationId),
+      )
     ) {
-      throw new Error(`Session ${session.id} references missing committed observation.`);
+      throw new Error(
+        `Session ${session.id} references missing committed observation.`,
+      );
     }
   }
   for (const item of data.imports) {
@@ -341,7 +349,8 @@ export function previewBackupJson(text: string): BackupPreview {
     throw new Error(`Backup version ${version} is not supported.`);
   }
   requireString(parsed, 'exportedAt');
-  if (!isObject(parsed.databaseMeta)) throw new Error('Backup database metadata is invalid.');
+  if (!isObject(parsed.databaseMeta))
+    throw new Error('Backup database metadata is invalid.');
   const databaseMetaObject = parsed.databaseMeta;
   requireString(databaseMetaObject, 'id');
   const databaseSchemaVersion = requireNumber(
@@ -369,7 +378,9 @@ export function previewBackupJson(text: string): BackupPreview {
   validateBackupData(backup.data);
   const warnings: string[] = [];
   if (backup.data.sessions.some((session) => session.status !== 'session-complete')) {
-    warnings.push('The backup contains session state that may be resumable after restore.');
+    warnings.push(
+      'The backup contains session state that may be resumable after restore.',
+    );
   }
   return {
     backup,
