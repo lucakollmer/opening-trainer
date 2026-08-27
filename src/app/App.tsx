@@ -571,7 +571,9 @@ export function App({
                       onChange={(_: ChangeEvent<HTMLInputElement>, checked: boolean) =>
                         handleDemoAlternativeChange(checked)
                       }
-                      slotProps={{ input: { 'aria-label': 'Include alternative branch' } }}
+                      slotProps={{
+                        input: { 'aria-label': 'Include alternative branch' },
+                      }}
                     />
                   }
                   label="Include alternative branch"
@@ -583,7 +585,10 @@ export function App({
                 exclusive
                 value={mode}
                 aria-label="Training mode"
-                onChange={(_: MouseEvent<HTMLElement>, nextMode: TrainingMode | null) => {
+                onChange={(
+                  _: MouseEvent<HTMLElement>,
+                  nextMode: TrainingMode | null,
+                ) => {
                   if (nextMode) handleModeChange(nextMode);
                 }}
               >
@@ -657,8 +662,8 @@ export function App({
               No repertoire yet
             </Typography>
             <Typography color="text.secondary" sx={{ mb: 3 }}>
-              No repertoire is stored on this device. Import a PGN to create one, or load the
-              bundled demo without saving it.
+              No repertoire is stored on this device. Import a PGN to create one, or
+              load the bundled demo without saving it.
             </Typography>
             <Box
               sx={{
