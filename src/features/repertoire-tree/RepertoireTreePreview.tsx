@@ -87,11 +87,7 @@ export function RepertoireTreePreview({
   currentItemId,
 }: RepertoireTreePreviewProps) {
   return (
-    <Paper
-      component="section"
-      aria-labelledby="tree-heading"
-      sx={{ p: 2, minWidth: 0 }}
-    >
+    <Paper component="section" aria-labelledby="tree-heading" sx={{ p: 2, minWidth: 0 }}>
       <Stack spacing={1}>
         <div>
           <Typography id="tree-heading" component="h2" variant="h6">
@@ -100,12 +96,12 @@ export function RepertoireTreePreview({
           <Typography variant="body2" color="text.secondary">
             {mode === 'train'
               ? 'Played or explicitly revealed moves are shown; unrelated future answers remain withheld.'
-              : 'Browse mode shows the complete synthetic fixture.'}
+              : 'Browse mode shows the complete repertoire projection, including transposition markers.'}
           </Typography>
         </div>
         <SimpleTreeView
           defaultExpandedItems={collectExpandedItemIds(items)}
-          aria-label="Synthetic repertoire tree"
+          aria-label="Repertoire tree"
         >
           {items.map((item) => renderItem(item, mode, revealedItemIds, currentItemId))}
         </SimpleTreeView>

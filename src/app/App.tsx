@@ -1,5 +1,6 @@
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import {
   AppBar,
   Box,
@@ -24,50 +25,87 @@ import {
   ChessboardPreview,
   type BoardMoveCommand,
 } from '../features/board/ChessboardPreview';
+import { PgnImportDialog } from '../features/import/PgnImportDialog';
 import { RepertoireTreePreview } from '../features/repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../features/task/TaskPreviewCard';
+import { canSubmitUserMove, currentFixtureStep } from '../domain/training/session';
 import {
-  canSubmitUserMove,
-  createTrainingSession,
-  currentFixtureStep,
-  reduceTrainingSession,
-} from '../domain/training/session';
+  compileTrainingFixture,
+  type TrainingExercisePlan,
+} from '../domain/training/exercisePlan';
+import { createGraphExercisePlan } from '../domain/repertoire/exercisePlan';
 import {
-  fix01White,
-  phase2TrainingFixtures,
-  type TrainingFixture,
-  type TrainingMode,
-} from '../fixtures/trainingFixtures';
+  createGraphTrainingSession,
+  reduceGraphTrainingSession,
+} from '../domain/repertoire/trainingIntegration';
+import type { RepertoireGraph } from '../domain/repertoire/types';
+import { phase2TrainingFixtures, type TrainingMode } from '../fixtures/trainingFixtures';
+import { phase3DemoPlan } from '../fixtures/phase3Demo';
+
+const phase2Plans = phase2TrainingFixtures.map(compileTrainingFixture);
+const defaultPlan = phase2Plans[0]!;
+const basePlans: readonly TrainingExercisePlan[] = [...phase2Plans, phase3DemoPlan];
 
 function nowMs() {
   return Date.now();
 }
 
+function sessionId(plan: TrainingExercisePlan) {
+  return globalThis.crypto?.randomUUID?.() ?? `${plan.id}-${nowMs()}`;
+}
+
+function importedExercisePlan(graph: RepertoireGraph): TrainingExercisePlan {
+  const repertoire = graph.repertoires[0];
+  if (!repertoire) throw new Error('Imported graph has no repertoire.');
+  const rootContextId = repertoire.rootContextIds[0];
+  if (!rootContextId) throw new Error('Imported repertoire has no root context.');
+  const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
+  const userContextIds = [
+    ...new Set(
+      graph.moves
+        .filter((move) => move.included && move.actor === 'user')
+        .map((move) => move.contextId),
+    ),
+  ];
+  userContextIds.sort((a, b) => {
+    const aDepth = contexts.get(a)?.pathFingerprint.split('/').length ?? 0;
+    const bDepth = contexts.get(b)?.pathFingerprint.split('/').length ?? 0;
+    return bDepth - aDepth || a.localeCompare(b);
+  });
+  const targetContextId = userContextIds[0];
+  if (!targetContextId) throw new Error('Imported repertoire contains no user decision.');
+  return createGraphExercisePlan(graph, {
+    repertoireId: repertoire.id,
+    rootContextId,
+    targetContextId,
+  });
+}
+
 export function App() {
   const [mode, setMode] = useState<TrainingMode>('train');
   const [treeOpen, setTreeOpen] = useState(false);
-  const [fixtureId, setFixtureId] = useState<string>(fix01White.id);
+  const [importOpen, setImportOpen] = useState(false);
+  const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(basePlans);
+  const [planId, setPlanId] = useState(defaultPlan.id);
   const [session, setSession] = useState(() =>
-    createTrainingSession(fix01White, nowMs(), {
-      sessionId: globalThis.crypto?.randomUUID?.() ?? `${fix01White.id}-${nowMs()}`,
+    createGraphTrainingSession(defaultPlan, nowMs(), {
+      sessionId: sessionId(defaultPlan),
     }),
   );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
-  const fixture: TrainingFixture =
-    phase2TrainingFixtures.find((candidate) => candidate.id === fixtureId) ??
-    fix01White;
-  const currentStep = currentFixtureStep(session, fixture);
+  const plan = plans.find((candidate) => candidate.id === planId) ?? defaultPlan;
+  const currentStep = currentFixtureStep(session, plan);
+  const totalPlies = Math.max(1, ...plan.steps.map((step) => step.ply + 1));
 
   useEffect(() => {
     if (mode !== 'train') return undefined;
-
     if (session.status === 'opponent-moving') {
       const timer = window.setTimeout(
         () =>
           setSession((current) =>
-            reduceTrainingSession(current, fixture, {
+            reduceGraphTrainingSession(current, plan, {
               type: 'opponent-tick',
               nowMs: nowMs(),
             }),
@@ -76,12 +114,11 @@ export function App() {
       );
       return () => window.clearTimeout(timer);
     }
-
     if (session.status === 'correct-feedback') {
       const timer = window.setTimeout(
         () =>
           setSession((current) =>
-            reduceTrainingSession(current, fixture, {
+            reduceGraphTrainingSession(current, plan, {
               type: 'continue',
               nowMs: nowMs(),
             }),
@@ -90,28 +127,35 @@ export function App() {
       );
       return () => window.clearTimeout(timer);
     }
-
     return undefined;
-  }, [fixture, mode, reducedMotion, session.status]);
+  }, [mode, plan, reducedMotion, session.status]);
 
-  const handleFixtureChange = (nextFixtureId: string) => {
-    const nextFixture = phase2TrainingFixtures.find(
-      (candidate) => candidate.id === nextFixtureId,
-    );
-    if (!nextFixture) return;
-
-    setFixtureId(nextFixture.id);
+  const selectPlan = (nextPlan: TrainingExercisePlan) => {
+    setPlanId(nextPlan.id);
     setSession(
-      createTrainingSession(nextFixture, nowMs(), {
-        sessionId: globalThis.crypto?.randomUUID?.() ?? `${nextFixture.id}-${nowMs()}`,
+      createGraphTrainingSession(nextPlan, nowMs(), {
+        sessionId: sessionId(nextPlan),
       }),
     );
   };
 
+  const handlePlanChange = (nextPlanId: string) => {
+    const nextPlan = plans.find((candidate) => candidate.id === nextPlanId);
+    if (nextPlan) selectPlan(nextPlan);
+  };
+
+  const handleImportedGraph = (graph: RepertoireGraph) => {
+    const importedPlan = importedExercisePlan(graph);
+    setPlans((current) => [
+      ...current.filter((candidate) => candidate.id !== importedPlan.id),
+      importedPlan,
+    ]);
+    selectPlan(importedPlan);
+  };
+
   const handleMove = (command: BoardMoveCommand): boolean => {
     if (mode !== 'train') return false;
-
-    const next = reduceTrainingSession(session, fixture, {
+    const next = reduceGraphTrainingSession(session, plan, {
       type: 'user-move',
       move: {
         from: command.from,
@@ -127,7 +171,7 @@ export function App() {
 
   const handleInteractionBlockChange = (blocked: boolean) => {
     setSession((current) =>
-      reduceTrainingSession(current, fixture, {
+      reduceGraphTrainingSession(current, plan, {
         type: blocked ? 'pause-attempt' : 'resume-attempt',
         nowMs: nowMs(),
       }),
@@ -141,11 +185,10 @@ export function App() {
   const lastMove = session.lastMove
     ? ([session.lastMove.from, session.lastMove.to] as const)
     : undefined;
-
   const tree = (
     <RepertoireTreePreview
       mode={mode}
-      items={fixture.tree}
+      items={plan.tree}
       revealedItemIds={session.treeRevealedItemIds}
       currentItemId={currentStep?.treeItemId}
     />
@@ -158,25 +201,23 @@ export function App() {
           <Typography component="h1" variant="h6" sx={{ fontWeight: 700, mr: 'auto' }}>
             Opening Trainer
           </Typography>
-
-          <FormControl size="small" sx={{ minWidth: 210 }}>
+          <FormControl size="small" sx={{ minWidth: 240 }}>
             <InputLabel id="repertoire-label">Training fixture</InputLabel>
             <Select
               labelId="repertoire-label"
               label="Training fixture"
-              value={fixture.id}
+              value={plan.id}
               onChange={(event: SelectChangeEvent<string>) =>
-                handleFixtureChange(String(event.target.value))
+                handlePlanChange(String(event.target.value))
               }
             >
-              {phase2TrainingFixtures.map((candidate) => (
+              {plans.map((candidate) => (
                 <MenuItem key={candidate.id} value={candidate.id}>
                   {candidate.label}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-
           <ToggleButtonGroup
             size="small"
             exclusive
@@ -189,14 +230,13 @@ export function App() {
             <ToggleButton value="train">Train</ToggleButton>
             <ToggleButton value="browse">Browse</ToggleButton>
           </ToggleButtonGroup>
-
           <Chip size="small" label={`${session.evidence.length} observations`} />
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${session.plyIndex}/${fixture.route.length} plies`}
-          />
-
+          <Chip size="small" variant="outlined" label={`${session.plyIndex}/${totalPlies} plies`} />
+          <Tooltip title="Import PGN repertoire">
+            <IconButton color="inherit" aria-label="Import PGN repertoire" onClick={() => setImportOpen(true)}>
+              <UploadFileOutlinedIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Open repertoire tree">
             <IconButton
               ref={treeButtonRef}
@@ -235,16 +275,13 @@ export function App() {
             alignItems: 'start',
           }}
         >
-          <Box
-            sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}
-          >
+          <Box sx={{ gridArea: 'tree', display: { xs: 'none', md: 'block' }, minWidth: 0 }}>
             {tree}
           </Box>
-
           <Box sx={{ gridArea: 'board', minWidth: 0 }}>
             <ChessboardPreview
               position={session.fen}
-              orientation={fixture.orientation}
+              orientation={plan.orientation}
               userTurn={mode === 'train' && canSubmitUserMove(session)}
               disabled={mode === 'browse'}
               lastMove={lastMove}
@@ -254,56 +291,43 @@ export function App() {
               onInteractionBlockChange={handleInteractionBlockChange}
             />
           </Box>
-
           <Box sx={{ gridArea: 'task', minWidth: 0 }}>
             <TaskPreviewCard
               session={session}
-              fixture={fixture}
+              plan={plan}
               onHint={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, { type: 'request-hint' }),
+                  reduceGraphTrainingSession(current, plan, { type: 'request-hint' }),
                 )
               }
               onReveal={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, {
-                    type: 'reveal',
-                    nowMs: nowMs(),
-                  }),
+                  reduceGraphTrainingSession(current, plan, { type: 'reveal', nowMs: nowMs() }),
                 )
               }
               onContinue={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, {
-                    type: 'continue',
-                    nowMs: nowMs(),
-                  }),
+                  reduceGraphTrainingSession(current, plan, { type: 'continue', nowMs: nowMs() }),
                 )
               }
               onRetest={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, {
-                    type: 'start-retest',
-                    nowMs: nowMs(),
-                  }),
+                  reduceGraphTrainingSession(current, plan, { type: 'start-retest', nowMs: nowMs() }),
                 )
               }
               onCompleteSession={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, { type: 'complete-session' }),
+                  reduceGraphTrainingSession(current, plan, { type: 'complete-session' }),
                 )
               }
               onRestart={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, {
-                    type: 'restart',
-                    nowMs: nowMs(),
-                  }),
+                  reduceGraphTrainingSession(current, plan, { type: 'restart', nowMs: nowMs() }),
                 )
               }
               onAbandon={() =>
                 setSession((current) =>
-                  reduceTrainingSession(current, fixture, { type: 'abandon' }),
+                  reduceGraphTrainingSession(current, plan, { type: 'abandon' }),
                 )
               }
             />
@@ -322,6 +346,7 @@ export function App() {
       >
         {tree}
       </Drawer>
+      <PgnImportDialog open={importOpen} onClose={() => setImportOpen(false)} onCommit={handleImportedGraph} />
     </Box>
   );
 }

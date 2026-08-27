@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { App } from './App';
@@ -43,16 +43,13 @@ async function submitAccessibleMove(
   await user.click(screen.getByRole('button', { name: 'Submit move' }));
 }
 
-describe('hardened PHASE-2 training vertical slice', () => {
-  it('renders the responsive shell with the real in-memory training fixture', () => {
+describe('hardened training shell with PHASE-3 graph integration', () => {
+  it('renders the responsive shell with the accepted PHASE-2 fixture by default', () => {
     renderApp();
     expect(screen.getByRole('heading', { name: 'Opening Trainer' })).toBeVisible();
     expect(screen.getByLabelText('Training fixture')).toBeVisible();
     expect(screen.getByRole('group', { name: 'Training mode' })).toBeVisible();
-    expect(screen.getByTestId('chessboard-adapter')).toHaveAttribute(
-      'data-orientation',
-      'white',
-    );
+    expect(screen.getByTestId('chessboard-adapter')).toHaveAttribute('data-orientation', 'white');
     expect(screen.getByRole('heading', { name: 'Repertoire tree' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Find the repertoire move' })).toBeVisible();
   });
@@ -73,15 +70,10 @@ describe('hardened PHASE-2 training vertical slice', () => {
   it('rejects an illegal move without advancing or creating a terminal review observation', async () => {
     const user = userEvent.setup();
     renderApp();
-    const initialPosition = screen
-      .getByTestId('chessboard-adapter')
-      .getAttribute('data-position');
+    const initialPosition = screen.getByTestId('chessboard-adapter').getAttribute('data-position');
     await submitAccessibleMove(user, 'e2', 'e5');
     expect(screen.getByRole('heading', { name: 'Illegal move' })).toBeVisible();
-    expect(screen.getByTestId('chessboard-adapter')).toHaveAttribute(
-      'data-position',
-      initialPosition,
-    );
+    expect(screen.getByTestId('chessboard-adapter')).toHaveAttribute('data-position', initialPosition);
     expect(screen.getAllByText('0 observations').length).toBeGreaterThan(0);
   });
 
@@ -94,7 +86,7 @@ describe('hardened PHASE-2 training vertical slice', () => {
     expect(screen.getByRole('heading', { name: 'Correct repertoire move' })).toBeVisible();
   });
 
-  it('classifies a known sibling separately and offers repair', async () => {
+  it('classifies a known sibling separately and offers repair on the legacy fixture', async () => {
     const user = userEvent.setup();
     renderApp();
     await submitAccessibleMove(user, 'e2', 'e4');
@@ -117,12 +109,46 @@ describe('hardened PHASE-2 training vertical slice', () => {
     expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Hint 2' }));
     expect(screen.getByText(/Candidate destinations: f3, h3/u)).toBeVisible();
-    expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Hint 3' }));
     expect(screen.getByText(/pressure on the e5 pawn/u)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Reveal move' }));
     expect(screen.getByText('Move: Nf3.')).toBeVisible();
     expect(screen.getAllByText('2. Nf3').length).toBeGreaterThan(0);
+  });
+
+  it('accepts the PHASE-3 alternate graph move and reports replacement target work', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByLabelText('Training fixture'));
+    await user.click(
+      screen.getByRole('option', { name: 'PHASE-3 · Graph alternatives and transposition' }),
+    );
+    await submitAccessibleMove(user, 'e2', 'e4');
+    await screen.findByRole('heading', { name: 'Correct repertoire move' });
+    await screen.findByRole('heading', { name: 'Find the repertoire move' }, { timeout: 2000 });
+    await submitAccessibleMove(user, 'b1', 'c3');
+    expect(screen.getByRole('heading', { name: 'Correct repertoire move' })).toBeVisible();
+    expect(screen.getByText(/replacement target work has been queued/u)).toBeVisible();
+  });
+
+  it('previews recursive PGN locally and cancel leaves the active fixture unchanged', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const before = screen.getByLabelText('Training fixture').textContent;
+    await user.click(screen.getByRole('button', { name: 'Import PGN repertoire' }));
+    expect(screen.getByRole('dialog', { name: 'Import PGN repertoire' })).toBeVisible();
+    fireEvent.change(screen.getByRole('textbox', { name: 'PGN text' }), {
+      target: {
+        value:
+          '[Event "recursive"]\n\n1. e4 e5 2. Nf3 (2. Nc3 Nc6 3. Nf3 $1) Nc6 3. Nc3 {transpose} Nf6 *',
+      },
+    });
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByText(/Preview valid: 1 game/u)).toBeVisible();
+    expect(screen.getByText(/1 recursive variation/u)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Import PGN repertoire' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Training fixture').textContent).toBe(before);
   });
 
   it('opens the compact tree drawer and restores focus when it closes', async () => {

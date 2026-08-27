@@ -9,6 +9,7 @@ import type {
 
 export interface TrainingExerciseStep {
   id: string;
+  ply: number;
   actor: FixtureActor;
   from: string;
   to: string;
@@ -23,6 +24,10 @@ export interface TrainingExerciseStep {
   hint?: TrainingHint;
   nextStepId?: string;
   nextStepByAcceptedUci: Readonly<Record<string, string | undefined>>;
+  treeItemIdByAcceptedUci?: Readonly<Record<string, string>>;
+  targetDispositionByAcceptedUci?: Readonly<
+    Record<string, 'preserved' | 'displaced'>
+  >;
 }
 
 export interface TrainingExercisePlan {
@@ -107,12 +112,19 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     const nextStepId = fixture.route[index + 1]?.id;
     compiled.push({
       ...step,
+      ply: index,
       acceptedMoveSetKey: normalizedAcceptedMoveSet(step.acceptedUci),
       trainingItemId: `${fixture.id}:decision:${positionKey}:${normalizedAcceptedMoveSet(step.acceptedUci)}`,
       positionKey,
       ...(nextStepId ? { nextStepId } : {}),
       nextStepByAcceptedUci: Object.fromEntries(
         step.acceptedUci.map((uci) => [uci, nextStepId]),
+      ),
+      treeItemIdByAcceptedUci: Object.fromEntries(
+        step.acceptedUci.map((uci) => [uci, step.treeItemId]),
+      ),
+      targetDispositionByAcceptedUci: Object.fromEntries(
+        step.acceptedUci.map((uci) => [uci, 'preserved' as const]),
       ),
     });
     fen = routeResult.move.fen;
