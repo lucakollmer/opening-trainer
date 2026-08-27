@@ -7,27 +7,38 @@ import {
   createTrainingSession,
   currentFixtureStep,
   hintDisclosure,
+  readyRetestCount,
   reduceTrainingSession,
+  type TrainingSessionState,
 } from './session';
 
-function playCorrectly(fixture: TrainingFixture) {
-  let state = createTrainingSession(fixture, 0, { sessionId: `${fixture.id}-test` });
-  let nowMs = 10;
-  for (let guard = 0; guard < 100 && state.status !== 'line-complete'; guard += 1) {
+function expectedMove(state: TrainingSessionState, fixture: TrainingFixture) {
+  const step = currentFixtureStep(state, fixture);
+  if (!step) throw new Error('Expected a route step.');
+  return {
+    from: step.from,
+    to: step.to,
+    ...(step.promotion ? { promotion: step.promotion } : {}),
+  };
+}
+
+function driveCorrectly(
+  state: TrainingSessionState,
+  fixture: TrainingFixture,
+  startedAtMs = 10,
+): TrainingSessionState {
+  let nowMs = startedAtMs;
+  let guard = 0;
+  while (guard < 100 && state.status !== 'line-complete') {
+    guard += 1;
     if (state.status === 'opponent-moving') {
       state = reduceTrainingSession(state, fixture, { type: 'opponent-tick', nowMs });
     } else if (state.status === 'correct-feedback') {
       state = reduceTrainingSession(state, fixture, { type: 'continue', nowMs });
     } else if (state.status === 'awaiting-user-move') {
-      const step = currentFixtureStep(state, fixture);
-      if (!step) throw new Error('Expected a route step.');
       state = reduceTrainingSession(state, fixture, {
         type: 'user-move',
-        move: {
-          from: step.from,
-          to: step.to,
-          ...(step.promotion ? { promotion: step.promotion } : {}),
-        },
+        move: expectedMove(state, fixture),
         nowMs,
       });
     } else {
@@ -35,12 +46,43 @@ function playCorrectly(fixture: TrainingFixture) {
     }
     nowMs += 10;
   }
+  if (guard >= 100) throw new Error('Fixture line did not complete deterministically.');
+  return state;
+}
+
+function playCorrectly(fixture: TrainingFixture) {
+  return driveCorrectly(
+    createTrainingSession(fixture, 0, { sessionId: `${fixture.id}-test` }),
+    fixture,
+  );
+}
+
+function reachWhiteTarget(startedAtMs = 0): TrainingSessionState {
+  let state = createTrainingSession(fix01White, startedAtMs, {
+    sessionId: `target-${startedAtMs}`,
+  });
+  state = reduceTrainingSession(state, fix01White, {
+    type: 'user-move',
+    move: { from: 'e2', to: 'e4' },
+    nowMs: startedAtMs + 10,
+  });
+  state = reduceTrainingSession(state, fix01White, {
+    type: 'continue',
+    nowMs: startedAtMs + 20,
+  });
+  state = reduceTrainingSession(state, fix01White, {
+    type: 'opponent-tick',
+    nowMs: startedAtMs + 30,
+  });
   return state;
 }
 
 describe('hardened training session reducer', () => {
-  it('preserves deterministic complete-line replay for both colours', () => {
-    expect(playCorrectly(fix01White).status).toBe('line-complete');
+  it('preserves deterministic complete-line replay for both colours and targeted evidence semantics', () => {
+    const white = playCorrectly(fix01White);
+    expect(white.status).toBe('line-complete');
+    expect(white.evidence.filter((item) => item.outcome === 'correct')).toHaveLength(4);
+    expect(white.evidence.filter((item) => item.evidenceRole === 'targeted')).toHaveLength(1);
     expect(playCorrectly(fix02Black).status).toBe('line-complete');
   });
 
@@ -69,15 +111,7 @@ describe('hardened training session reducer', () => {
   });
 
   it('keeps sibling variation distinct from legal outside-repertoire play', () => {
-    let state = createTrainingSession(fix01White, 2000, { sessionId: 'variation' });
-    state = reduceTrainingSession(state, fix01White, {
-      type: 'user-move',
-      move: { from: 'e2', to: 'e4' },
-      nowMs: 2010,
-    });
-    state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 2020 });
-    state = reduceTrainingSession(state, fix01White, { type: 'opponent-tick', nowMs: 2030 });
-
+    const state = reachWhiteTarget(2000);
     const sibling = reduceTrainingSession(state, fix01White, {
       type: 'user-move',
       move: { from: 'b1', to: 'c3' },
@@ -95,14 +129,7 @@ describe('hardened training session reducer', () => {
   });
 
   it('preserves progressive hints and full reveal only at level four', () => {
-    let state = createTrainingSession(fix01White, 3000, { sessionId: 'hint' });
-    state = reduceTrainingSession(state, fix01White, {
-      type: 'user-move',
-      move: { from: 'e2', to: 'e4' },
-      nowMs: 3010,
-    });
-    state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 3020 });
-    state = reduceTrainingSession(state, fix01White, { type: 'opponent-tick', nowMs: 3030 });
+    let state = reachWhiteTarget(3000);
     state = reduceTrainingSession(state, fix01White, { type: 'request-hint' });
     expect(hintDisclosure(state, fix01White)).not.toContain('Nf3');
     state = reduceTrainingSession(state, fix01White, { type: 'request-hint' });
@@ -111,6 +138,111 @@ describe('hardened training session reducer', () => {
     state = reduceTrainingSession(state, fix01White, { type: 'reveal', nowMs: 3100 });
     expect(hintDisclosure(state, fix01White)).toContain('Nf3');
     expect(state.evidence.at(-1)?.outcome).toBe('revealed');
+  });
+
+  it('keeps the original failure, records repair separately, and ages delayed retest only after a later user decision', () => {
+    let state = reachWhiteTarget(4000);
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'user-move',
+      move: { from: 'b1', to: 'c3' },
+      nowMs: 4040,
+    });
+    expect(state.retestQueue[0]?.separationRemaining).toBe(1);
+    state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 4050 });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'user-move',
+      move: { from: 'g1', to: 'f3' },
+      nowMs: 4060,
+    });
+    expect(state.evidence.map((item) => item.outcome)).toEqual([
+      'correct',
+      'wrong-variation',
+      'repair-correct',
+    ]);
+    expect(state.retestQueue[0]?.separationRemaining).toBe(1);
+
+    state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 4070 });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'opponent-tick',
+      nowMs: 4080,
+    });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'user-move',
+      move: { from: 'f1', to: 'b5' },
+      nowMs: 4090,
+    });
+    expect(readyRetestCount(state)).toBe(1);
+  });
+
+  it('restarts a ready retest from move one and retargets the failed decision', () => {
+    let state = reachWhiteTarget(5000);
+    state = reduceTrainingSession(state, fix01White, { type: 'reveal', nowMs: 5040 });
+    state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 5050 });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'user-move',
+      move: { from: 'g1', to: 'f3' },
+      nowMs: 5060,
+    });
+    state = reduceTrainingSession(state, fix01White, { type: 'continue', nowMs: 5070 });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'opponent-tick',
+      nowMs: 5080,
+    });
+    state = reduceTrainingSession(state, fix01White, {
+      type: 'user-move',
+      move: { from: 'f1', to: 'b5' },
+      nowMs: 5090,
+    });
+    state = driveCorrectly(state, fix01White, 5100);
+    expect(readyRetestCount(state)).toBe(1);
+
+    const retest = reduceTrainingSession(state, fix01White, {
+      type: 'start-retest',
+      nowMs: 6000,
+    });
+    expect(retest.runKind).toBe('retest');
+    expect(retest.plyIndex).toBe(0);
+    expect(retest.fen).toBe(fix01White.initialFen);
+    expect(retest.targetPly).toBe(fix01White.targetPly);
+    expect(retest.retestQueue).toHaveLength(0);
+  });
+
+  it('supports abandonment and deterministic restart without mutating the prior state', () => {
+    const start = createTrainingSession(fix01White, 7000, { sessionId: 'restart' });
+    const snapshot = JSON.stringify(start);
+    const abandoned = reduceTrainingSession(start, fix01White, { type: 'abandon' });
+
+    expect(start.status).toBe('awaiting-user-move');
+    expect(JSON.stringify(start)).toBe(snapshot);
+    expect(abandoned.status).toBe('abandoned');
+
+    const restarted = reduceTrainingSession(abandoned, fix01White, {
+      type: 'restart',
+      nowMs: 8000,
+    });
+    expect(restarted.status).toBe('awaiting-user-move');
+    expect(restarted.fen).toBe(fix01White.initialFen);
+    expect(restarted.evidence).toHaveLength(0);
+    expect(restarted.sessionId).toBe(start.sessionId);
+  });
+
+  it('produces the same deterministic opponent result for the same fixture state', () => {
+    const first = createTrainingSession(fix02Black, 9000, { sessionId: 'first' });
+    const second = createTrainingSession(fix02Black, 9000, { sessionId: 'second' });
+
+    const firstAfter = reduceTrainingSession(first, fix02Black, {
+      type: 'opponent-tick',
+      nowMs: 9010,
+    });
+    const secondAfter = reduceTrainingSession(second, fix02Black, {
+      type: 'opponent-tick',
+      nowMs: 9010,
+    });
+
+    expect(firstAfter.fen).toBe(secondAfter.fen);
+    expect(firstAfter.lastMove?.uci).toBe('e2e4');
+    expect(firstAfter.currentStepId).toBe(secondAfter.currentStepId);
+    expect(firstAfter.status).toBe(secondAfter.status);
   });
 
   it('subtracts a blocking promotion-dialog pause from response duration', () => {
