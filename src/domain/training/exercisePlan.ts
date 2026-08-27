@@ -9,6 +9,7 @@ import type {
 
 export interface TrainingExerciseStep {
   id: string;
+  ply: number;
   actor: FixtureActor;
   from: string;
   to: string;
@@ -16,6 +17,7 @@ export interface TrainingExerciseStep {
   san: string;
   treeItemId: string;
   acceptedUci: readonly string[];
+  acceptedSan: readonly string[];
   acceptedMoveSetKey: string;
   trainingItemId: string;
   positionKey: string;
@@ -23,6 +25,8 @@ export interface TrainingExerciseStep {
   hint?: TrainingHint;
   nextStepId?: string;
   nextStepByAcceptedUci: Readonly<Record<string, string | undefined>>;
+  treeItemIdByAcceptedUci?: Readonly<Record<string, string>>;
+  targetDispositionByAcceptedUci?: Readonly<Record<string, 'preserved' | 'displaced'>>;
 }
 
 export interface TrainingExercisePlan {
@@ -35,7 +39,10 @@ export interface TrainingExercisePlan {
   startStepId: string;
   targetStepId: string;
   steps: readonly TrainingExerciseStep[];
+  /** Train-safe tree. Unrevealed answer SAN is structurally absent. */
   tree: readonly TrainingTreeItem[];
+  /** Full-label tree used only by Browse mode or explicit post-response disclosure. */
+  browseTree: readonly TrainingTreeItem[];
 }
 
 function treeIds(items: readonly TrainingTreeItem[]): Set<string> {
@@ -51,13 +58,24 @@ function treeIds(items: readonly TrainingTreeItem[]): Set<string> {
   return result;
 }
 
+function maskTrainingTree(
+  items: readonly TrainingTreeItem[],
+): readonly TrainingTreeItem[] {
+  return items.map((item) => ({
+    ...item,
+    visibleLabel: item.maskedLabel,
+    ...(item.children ? { children: maskTrainingTree(item.children) } : {}),
+  }));
+}
+
 export function normalizedAcceptedMoveSet(moves: readonly string[]): string {
   return [...new Set(moves.map((move) => move.toLowerCase()))].sort().join('|');
 }
 
 export function compileTrainingFixture(fixture: TrainingFixture): TrainingExercisePlan {
-  if (fixture.route.length === 0)
+  if (fixture.route.length === 0) {
     throw new Error('A training fixture requires route moves.');
+  }
   if (fixture.targetPly < 0 || fixture.targetPly >= fixture.route.length) {
     throw new Error(`Fixture target ply is outside the route: ${fixture.targetPly}`);
   }
@@ -84,6 +102,7 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
       );
     }
 
+    const acceptedSan: string[] = [];
     for (const acceptedUci of step.acceptedUci) {
       const input = moveFromUci(acceptedUci);
       if (!input) throw new Error(`Invalid accepted UCI ${acceptedUci} at ${step.id}`);
@@ -91,6 +110,7 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
       if (accepted.kind !== 'applied') {
         throw new Error(`Accepted move ${acceptedUci} is not legal at ${step.id}`);
       }
+      if (!acceptedSan.includes(accepted.move.san)) acceptedSan.push(accepted.move.san);
     }
 
     const routeResult = tryApplyMove(fen, {
@@ -110,12 +130,20 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     const nextStepId = fixture.route[index + 1]?.id;
     compiled.push({
       ...step,
+      ply: index,
+      acceptedSan,
       acceptedMoveSetKey: normalizedAcceptedMoveSet(step.acceptedUci),
       trainingItemId: `${fixture.id}:decision:${positionKey}:${normalizedAcceptedMoveSet(step.acceptedUci)}`,
       positionKey,
       ...(nextStepId ? { nextStepId } : {}),
       nextStepByAcceptedUci: Object.fromEntries(
         step.acceptedUci.map((uci) => [uci, nextStepId]),
+      ),
+      treeItemIdByAcceptedUci: Object.fromEntries(
+        step.acceptedUci.map((uci) => [uci, step.treeItemId]),
+      ),
+      targetDispositionByAcceptedUci: Object.fromEntries(
+        step.acceptedUci.map((uci) => [uci, 'preserved' as const]),
       ),
     });
     fen = routeResult.move.fen;
@@ -136,7 +164,8 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     startStepId: compiled[0]!.id,
     targetStepId: target.id,
     steps: compiled,
-    tree: fixture.tree,
+    tree: maskTrainingTree(fixture.tree),
+    browseTree: fixture.tree,
   };
 }
 

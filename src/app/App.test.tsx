@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { App } from './App';
@@ -8,7 +8,11 @@ vi.mock('react-chessboard', () => ({
   Chessboard: ({
     options,
   }: {
-    options: { position?: string; boardOrientation?: string; allowDragging?: boolean };
+    options: {
+      position?: string;
+      boardOrientation?: string;
+      allowDragging?: boolean;
+    };
   }) => (
     <div
       data-testid="chessboard-adapter"
@@ -43,8 +47,17 @@ async function submitAccessibleMove(
   await user.click(screen.getByRole('button', { name: 'Submit move' }));
 }
 
-describe('hardened PHASE-2 training vertical slice', () => {
-  it('renders the responsive shell with the real in-memory training fixture', () => {
+async function selectPhase3Demo(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByLabelText('Training fixture'));
+  await user.click(
+    screen.getByRole('option', {
+      name: 'PHASE-3 · Graph alternatives and transposition',
+    }),
+  );
+}
+
+describe('training shell with PHASE-3 graph integration', () => {
+  it('renders the responsive shell with the accepted PHASE-2 fixture by default', () => {
     renderApp();
     expect(screen.getByRole('heading', { name: 'Opening Trainer' })).toBeVisible();
     expect(screen.getByLabelText('Training fixture')).toBeVisible();
@@ -98,7 +111,7 @@ describe('hardened PHASE-2 training vertical slice', () => {
     ).toBeVisible();
   });
 
-  it('classifies a known sibling separately and offers repair', async () => {
+  it('classifies a known sibling separately and offers repair on the legacy fixture', async () => {
     const user = userEvent.setup();
     renderApp();
     await submitAccessibleMove(user, 'e2', 'e4');
@@ -131,12 +144,117 @@ describe('hardened PHASE-2 training vertical slice', () => {
     expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Hint 2' }));
     expect(screen.getByText(/Candidate destinations: f3, h3/u)).toBeVisible();
-    expect(screen.queryByText('2. Nf3')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Hint 3' }));
     expect(screen.getByText(/pressure on the e5 pawn/u)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Reveal move' }));
     expect(screen.getByText('Move: Nf3.')).toBeVisible();
     expect(screen.getAllByText('2. Nf3').length).toBeGreaterThan(0);
+  });
+
+  it('keeps PHASE-3 graph answers out of the Train-mode DOM before response', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await selectPhase3Demo(user);
+    expect(screen.queryByText('Nf3')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nc3')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bb5')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Browse' }));
+    expect(screen.getAllByText('Nf3').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Nc3').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Bb5').length).toBeGreaterThan(0);
+  });
+
+  it('accepts the PHASE-3 alternate graph move and reports replacement target work', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await selectPhase3Demo(user);
+    await submitAccessibleMove(user, 'e2', 'e4');
+    await screen.findByRole('heading', { name: 'Correct repertoire move' });
+    await screen.findByRole(
+      'heading',
+      { name: 'Find the repertoire move' },
+      { timeout: 2000 },
+    );
+    await submitAccessibleMove(user, 'b1', 'c3');
+    expect(
+      screen.getByRole('heading', { name: 'Correct repertoire move' }),
+    ).toBeVisible();
+    expect(screen.getByText(/replacement target work has been queued/u)).toBeVisible();
+  });
+
+  it('edits playlist inclusion in memory and stops accepting the excluded branch', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await selectPhase3Demo(user);
+    const inclusion = screen.getByRole('switch', {
+      name: 'Include alternative branch',
+    });
+    expect(inclusion).toBeChecked();
+    await user.click(inclusion);
+    expect(inclusion).not.toBeChecked();
+
+    await submitAccessibleMove(user, 'e2', 'e4');
+    await screen.findByRole(
+      'heading',
+      { name: 'Find the repertoire move' },
+      { timeout: 2000 },
+    );
+    await submitAccessibleMove(user, 'b1', 'c3');
+    expect(
+      screen.getByRole('heading', { name: 'Known sibling variation' }),
+    ).toBeVisible();
+    expect(screen.getByText(/This prompt expects Nf3/u)).toBeVisible();
+  });
+
+  it('previews recursive PGN locally and cancel leaves the active fixture unchanged', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const before = screen.getByLabelText('Training fixture').textContent;
+    await user.click(screen.getByRole('button', { name: 'Import PGN repertoire' }));
+    expect(screen.getByRole('dialog', { name: 'Import PGN repertoire' })).toBeVisible();
+    fireEvent.change(screen.getByRole('textbox', { name: 'PGN text' }), {
+      target: {
+        value:
+          '[Event "recursive"]\n\n1. e4 e5 2. Nf3 (2. Nc3 Nc6 3. Nf3 $1) Nc6 3. Nc3 {transpose} Nf6 *',
+      },
+    });
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByText(/Preview valid: 1 game/u)).toBeVisible();
+    expect(screen.getByText(/1 recursive variation/u)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText('Training fixture').textContent).toBe(before);
+  });
+
+  it('commits a validated PGN candidate once and activates its in-memory repertoire', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole('button', { name: 'Import PGN repertoire' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Repertoire name' }), {
+      target: { value: 'Imported Queen Pawn' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'PGN text' }), {
+      target: { value: '[Event "import"]\n\n1. d4 d5 2. c4 *' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByText(/Preview valid: 1 game/u)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Create repertoire' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText('Training fixture')).toHaveTextContent(
+      'Imported Queen Pawn',
+    );
+    await user.click(screen.getByRole('button', { name: 'Browse' }));
+    expect(screen.getAllByText('d4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('d5').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('c4').length).toBeGreaterThan(0);
   });
 
   it('opens the compact tree drawer and restores focus when it closes', async () => {

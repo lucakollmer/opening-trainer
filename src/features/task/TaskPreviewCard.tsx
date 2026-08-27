@@ -15,11 +15,11 @@ import {
   readyRetestCount,
   type TrainingSessionState,
 } from '../../domain/training/session';
-import type { TrainingFixture } from '../../fixtures/trainingFixtures';
+import type { TrainingExercisePlan } from '../../domain/training/exercisePlan';
 
 interface TaskPreviewCardProps {
   session: TrainingSessionState;
-  fixture: TrainingFixture;
+  plan: TrainingExercisePlan;
   onHint: () => void;
   onReveal: () => void;
   onContinue: () => void;
@@ -41,7 +41,8 @@ function defaultContent(session: TrainingSessionState) {
       return {
         severity: 'info' as const,
         title: 'Opponent reply',
-        message: 'The deterministic fixture opponent is following the selected route.',
+        message:
+          'The deterministic repertoire opponent is following the selected route.',
       };
     case 'hint-offered':
       return {
@@ -61,14 +62,15 @@ function defaultContent(session: TrainingSessionState) {
       return {
         severity: 'success' as const,
         title: 'Line complete',
-        message: 'The full fixture route has been replayed from the initial position.',
+        message:
+          'The selected repertoire route has been replayed from the initial position.',
       };
     case 'session-complete':
       return {
         severity: 'success' as const,
         title: 'Session complete',
         message:
-          'This run kept all observations in memory only; no scheduler state was updated.',
+          'This run kept observations in memory only; no scheduler state was updated.',
       };
     case 'abandoned':
       return {
@@ -79,9 +81,10 @@ function defaultContent(session: TrainingSessionState) {
     case 'error':
       return {
         severity: 'error' as const,
-        title: 'Training fixture error',
+        title: 'Training data error',
         message:
-          'The deterministic route could not continue from the current position.',
+          session.feedback?.message ??
+          'The exercise could not continue from the current position.',
       };
     default:
       return {
@@ -100,7 +103,7 @@ function defaultContent(session: TrainingSessionState) {
 
 export function TaskPreviewCard({
   session,
-  fixture,
+  plan,
   onHint,
   onReveal,
   onContinue,
@@ -110,14 +113,15 @@ export function TaskPreviewCard({
   onAbandon,
 }: TaskPreviewCardProps) {
   const content = defaultContent(session);
-  const hint = hintDisclosure(session, fixture);
-  const step = currentFixtureStep(session, fixture);
+  const hint = hintDisclosure(session, plan);
+  const step = currentFixtureStep(session, plan);
   const hintAllowed =
     canSubmitUserMove(session) &&
     session.status !== 'repair-replay' &&
     step?.actor === 'user' &&
     Boolean(step.hint);
   const readyRetests = readyRetestCount(session);
+  const totalPlies = Math.max(1, ...plan.steps.map((item) => item.ply + 1));
 
   return (
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
@@ -156,17 +160,15 @@ export function TaskPreviewCard({
           <Alert severity={content.severity} aria-live="polite">
             {content.message}
           </Alert>
-
           {hint ? (
             <Alert severity={session.hintLevel === 4 ? 'warning' : 'info'}>
               {hint}
             </Alert>
           ) : null}
-
           <Typography variant="body2" color="text.secondary">
-            Move {Math.min(session.plyIndex + 1, fixture.route.length)} of{' '}
-            {fixture.route.length}. Review observations and retest tickets are
-            intentionally in-memory only in PHASE-2.
+            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Review
+            observations and retest tickets remain in-memory until the persistence
+            phase.
           </Typography>
         </Stack>
       </CardContent>
