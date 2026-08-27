@@ -111,13 +111,19 @@ export function playlistAllowsContext(
   graph: RepertoireGraph,
   playlist: Playlist,
   context: RepertoireContext,
-  ply = contextPly(context, contextsById(graph)),
+  ply?: number,
 ): boolean {
   const byId = contextsById(graph);
-  if (!playlistBaseAllowsContext(graph, playlist, context, byId, ply)) return false;
-  if (!insideIncludedSubtree(context, playlist, byId)) return false;
+  const graphContext = byId.get(context.id);
+  if (!graphContext) return false;
+  const effectivePly = ply ?? contextPly(graphContext, byId);
+  if (!playlistBaseAllowsContext(graph, playlist, graphContext, byId, effectivePly)) {
+    return false;
+  }
+  if (!insideIncludedSubtree(graphContext, playlist, byId)) return false;
   return (
-    playlist.tags.length === 0 || playlist.tags.some((tag) => context.tags.includes(tag))
+    playlist.tags.length === 0 ||
+    playlist.tags.some((tag) => graphContext.tags.includes(tag))
   );
 }
 
@@ -127,23 +133,25 @@ export function playlistAllowsRouteContext(
   context: RepertoireContext,
 ): boolean {
   const byId = contextsById(graph);
-  const ply = contextPly(context, byId);
-  if (!playlistBaseAllowsContext(graph, playlist, context, byId, ply)) return false;
+  const graphContext = byId.get(context.id);
+  if (!graphContext) return false;
+  const ply = contextPly(graphContext, byId);
+  if (!playlistBaseAllowsContext(graph, playlist, graphContext, byId, ply)) return false;
 
   const isOnIncludedRoute =
     playlist.includedContextIds.length === 0 ||
     playlist.includedContextIds.some(
       (included) =>
-        isDescendantOrSelf(context.id, included, byId) ||
-        isDescendantOrSelf(included, context.id, byId),
+        isDescendantOrSelf(graphContext.id, included, byId) ||
+        isDescendantOrSelf(included, graphContext.id, byId),
     );
   if (!isOnIncludedRoute) return false;
   if (playlist.tags.length === 0) return true;
-  if (playlist.tags.some((tag) => context.tags.includes(tag))) return true;
+  if (playlist.tags.some((tag) => graphContext.tags.includes(tag))) return true;
 
   return graph.contexts.some((candidate) => {
-    if (candidate.repertoireId !== context.repertoireId) return false;
-    if (!isDescendantOrSelf(candidate.id, context.id, byId)) return false;
+    if (candidate.repertoireId !== graphContext.repertoireId) return false;
+    if (!isDescendantOrSelf(candidate.id, graphContext.id, byId)) return false;
     const candidatePly = contextPly(candidate, byId);
     if (!playlistBaseAllowsContext(graph, playlist, candidate, byId, candidatePly)) {
       return false;
