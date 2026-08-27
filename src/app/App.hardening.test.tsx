@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { App } from './App';
@@ -67,7 +67,11 @@ describe('PHASE-3 application hardening', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     expect(screen.getByText(/Preview valid: 2 game/u)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Create repertoire' }));
-    expect(screen.queryByRole('dialog', { name: 'Import PGN repertoire' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
+      ).not.toBeInTheDocument(),
+    );
     expect(screen.getByLabelText('Training fixture')).toHaveTextContent(
       'Imported multi · Game 1',
     );
