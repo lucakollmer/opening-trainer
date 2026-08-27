@@ -14,6 +14,7 @@ import {
 import { useState, type ChangeEvent } from 'react';
 import type { OpeningTrainerRepository } from '../../infrastructure/db/openingTrainerRepository';
 import {
+  MAX_BACKUP_BYTES,
   commitBackupRestore,
   exportCompleteBackup,
   previewBackupJson,
@@ -82,6 +83,10 @@ export function DataManagementDialog({
     if (!file) return;
     setError(null);
     setRestorePreview(null);
+    if (file.size > MAX_BACKUP_BYTES) {
+      setError(`Backup exceeds ${MAX_BACKUP_BYTES} bytes.`);
+      return;
+    }
     try {
       setRestorePreview(previewBackupJson(await file.text()));
     } catch (cause) {

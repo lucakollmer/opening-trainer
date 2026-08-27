@@ -24,7 +24,7 @@ import {
 import { storedRowsToGraph } from '../db/graphStorage';
 
 export const OPENING_TRAINER_BACKUP_FORMAT = 'opening-trainer-backup';
-export const MAX_BACKUP_BYTES = 20_000_000;
+export const MAX_BACKUP_BYTES = 5_000_000;
 
 export interface OpeningTrainerBackupData {
   repertoires: RepertoireRecord[];

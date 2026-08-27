@@ -1,4 +1,8 @@
-import type { ImportCandidate, RepertoireGraph } from '../../domain/repertoire/types';
+import type {
+  ImportCandidate,
+  Playlist,
+  RepertoireGraph,
+} from '../../domain/repertoire/types';
 import type { TrainingSessionState } from '../../domain/training/session';
 import {
   DATABASE_META_ID,
@@ -6,6 +10,9 @@ import {
   USER_DATA_TABLE_NAMES,
   createDatabaseMeta,
   type ConfusionRelationRecord,
+  type PlaylistEntryKind,
+  type PlaylistEntryRecord,
+  type PlaylistRecord,
   type SessionRecord,
   type SettingRecord,
   type TrainingItemRecord,
@@ -29,6 +36,31 @@ function nowIso(): string {
 
 function sameJson(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function playlistEntries(playlist: Playlist): PlaylistEntryRecord[] {
+  const entries: Array<{ kind: PlaylistEntryKind; value: string }> = [
+    ...playlist.repertoireIds.map((value) => ({
+      kind: 'repertoire' as const,
+      value,
+    })),
+    ...playlist.includedContextIds.map((value) => ({
+      kind: 'include-context' as const,
+      value,
+    })),
+    ...playlist.excludedContextIds.map((value) => ({
+      kind: 'exclude-context' as const,
+      value,
+    })),
+    ...playlist.tags.map((value) => ({ kind: 'tag' as const, value })),
+  ];
+  return entries.map((entry, order) => ({
+    id: `playlist-entry:${playlist.id}:${entry.kind}:${String(order).padStart(4, '0')}`,
+    playlistId: playlist.id,
+    kind: entry.kind,
+    value: entry.value,
+    order,
+  }));
 }
 
 export class OpeningTrainerRepository {
@@ -229,6 +261,76 @@ export class OpeningTrainerRepository {
         }
         if (derived.trainingItems.length > 0) {
           await this.database.trainingItems.bulkPut(derived.trainingItems);
+        }
+        const meta = await this.database.meta.get(DATABASE_META_ID);
+        if (meta) await this.database.meta.put({ ...meta, updatedAt: now });
+      },
+    );
+  }
+
+  public async savePlaylist(playlist: Playlist, now = nowIso()): Promise<void> {
+    await this.database.transaction(
+      'rw',
+      [
+        this.database.repertoires,
+        this.database.repertoireContexts,
+        this.database.playlists,
+        this.database.playlistEntries,
+        this.database.meta,
+      ],
+      async () => {
+        if (
+          playlist.maxPly !== undefined &&
+          (!Number.isInteger(playlist.maxPly) || playlist.maxPly < 0)
+        ) {
+          throw new Error(`Invalid playlist maxPly: ${playlist.id}`);
+        }
+        if (new Set(playlist.repertoireIds).size !== playlist.repertoireIds.length) {
+          throw new Error(`Duplicate playlist repertoire: ${playlist.id}`);
+        }
+        const repertoireIds = new Set(playlist.repertoireIds);
+        for (const repertoireId of repertoireIds) {
+          const repertoire = await this.database.repertoires.get(repertoireId);
+          if (!repertoire) {
+            throw new Error(`Playlist references missing repertoire: ${playlist.id}`);
+          }
+          if (repertoire.archivedAt) {
+            throw new Error(`Playlist references archived repertoire: ${playlist.id}`);
+          }
+        }
+        for (const contextId of [
+          ...playlist.includedContextIds,
+          ...playlist.excludedContextIds,
+        ]) {
+          const context = await this.database.repertoireContexts.get(contextId);
+          if (!context) {
+            throw new Error(`Playlist references missing context: ${playlist.id}`);
+          }
+          if (!repertoireIds.has(context.repertoireId)) {
+            throw new Error(
+              `Playlist context is outside its repertoire set: ${playlist.id}`,
+            );
+          }
+        }
+
+        const existing = await this.database.playlists.get(playlist.id);
+        const record: PlaylistRecord = {
+          id: playlist.id,
+          name: playlist.name,
+          ...(playlist.colour ? { colour: playlist.colour } : {}),
+          ...(playlist.maxPly !== undefined ? { maxPly: playlist.maxPly } : {}),
+          weighting: structuredClone(playlist.weighting),
+          createdAt: existing?.createdAt ?? (playlist.createdAt || now),
+          updatedAt: now,
+        };
+        const entries = playlistEntries(playlist);
+        await this.database.playlists.put(record);
+        await this.database.playlistEntries
+          .where('playlistId')
+          .equals(playlist.id)
+          .delete();
+        if (entries.length > 0) {
+          await this.database.playlistEntries.bulkPut(entries);
         }
         const meta = await this.database.meta.get(DATABASE_META_ID);
         if (meta) await this.database.meta.put({ ...meta, updatedAt: now });
