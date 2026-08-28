@@ -15,13 +15,19 @@ import {
 } from '@mui/material';
 import { useState, type ChangeEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import { previewPgnImport } from '../../domain/repertoire/pgnImport';
+import {
+  MAX_PGN_BYTES,
+  MAX_PGN_GAMES,
+  MAX_PGN_MOVES,
+  MAX_PGN_VARIATION_DEPTH,
+  previewPgnImport,
+} from '../../domain/repertoire/pgnImport';
 import type { Colour, ImportCandidate } from '../../domain/repertoire/types';
 
 interface PgnImportDialogProps {
   open: boolean;
   onClose: () => void;
-  onCommit: (candidate: ImportCandidate) => void;
+  onCommit: (candidate: ImportCandidate) => Promise<void> | void;
 }
 
 export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProps) {
@@ -30,6 +36,7 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
   const [colour, setColour] = useState<Colour>('white');
   const [candidate, setCandidate] = useState<ImportCandidate | null>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [committing, setCommitting] = useState(false);
 
   const preview = () => {
     setCommitError(null);
@@ -47,27 +54,46 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
 
   const loadFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
-    setPgn(await file.text());
     setCandidate(null);
     setCommitError(null);
-    event.target.value = '';
+    if (file.size > MAX_PGN_BYTES) {
+      setPgn('');
+      setCommitError(`PGN exceeds the ${MAX_PGN_BYTES.toLocaleString()}-byte limit.`);
+      return;
+    }
+    try {
+      setPgn(await file.text());
+    } catch (error) {
+      setCommitError(
+        error instanceof Error ? error.message : 'Could not read PGN file.',
+      );
+    }
   };
 
-  const commit = () => {
-    if (!candidate || candidate.errors.length > 0) return;
+  const commit = async () => {
+    if (!candidate || candidate.errors.length > 0 || committing) return;
+    setCommitting(true);
     try {
-      onCommit(candidate);
+      await onCommit(candidate);
       setCandidate(null);
       setCommitError(null);
       onClose();
     } catch (error) {
       setCommitError(error instanceof Error ? error.message : 'Import commit failed.');
+    } finally {
+      setCommitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog
+      open={open}
+      onClose={committing ? undefined : onClose}
+      fullWidth
+      maxWidth="md"
+    >
       <DialogTitle>Import PGN repertoire</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
@@ -76,9 +102,15 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
             variations, comments and NAGs are preserved before an explicit
             create-repertoire commit.
           </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Import limits: {MAX_PGN_BYTES.toLocaleString()} bytes,{' '}
+            {MAX_PGN_GAMES.toLocaleString()} games, {MAX_PGN_MOVES.toLocaleString()}{' '}
+            move tokens and {MAX_PGN_VARIATION_DEPTH} nested variation levels.
+          </Typography>
           <TextField
             label="Repertoire name"
             value={name}
+            disabled={committing}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               setName(event.target.value);
               setCandidate(null);
@@ -90,6 +122,7 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
               labelId="import-colour-label"
               label="Your colour"
               value={colour}
+              disabled={committing}
               onChange={(event: SelectChangeEvent<Colour>) => {
                 setColour(event.target.value);
                 setCandidate(null);
@@ -99,7 +132,7 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
               <MenuItem value="black">Black</MenuItem>
             </Select>
           </FormControl>
-          <Button component="label" variant="outlined">
+          <Button component="label" variant="outlined" disabled={committing}>
             Choose local PGN file
             <input
               hidden
@@ -115,6 +148,7 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
             multiline
             minRows={10}
             value={pgn}
+            disabled={committing}
             onChange={(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
               setPgn(event.target.value);
               setCandidate(null);
@@ -156,16 +190,18 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={preview} disabled={!pgn.trim()}>
+        <Button onClick={onClose} disabled={committing}>
+          Cancel
+        </Button>
+        <Button onClick={preview} disabled={!pgn.trim() || committing}>
           Preview
         </Button>
         <Button
           variant="contained"
-          onClick={commit}
-          disabled={!candidate || candidate.errors.length > 0}
+          onClick={() => void commit()}
+          disabled={!candidate || candidate.errors.length > 0 || committing}
         >
-          Create repertoire
+          {committing ? 'Saving…' : 'Create repertoire'}
         </Button>
       </DialogActions>
     </Dialog>

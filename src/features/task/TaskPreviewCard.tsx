@@ -70,13 +70,13 @@ function defaultContent(session: TrainingSessionState) {
         severity: 'success' as const,
         title: 'Session complete',
         message:
-          'This run kept observations in memory only; no scheduler state was updated.',
+          'This run recorded raw review observations without updating scheduler state.',
       };
     case 'abandoned':
       return {
         severity: 'warning' as const,
         title: 'Session abandoned',
-        message: 'The in-memory run ended without committing persistent review state.',
+        message: 'The run ended without updating scheduler state.',
       };
     case 'error':
       return {
@@ -166,9 +166,9 @@ export function TaskPreviewCard({
             </Alert>
           ) : null}
           <Typography variant="body2" color="text.secondary">
-            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Review
-            observations and retest tickets remain in-memory until the persistence
-            phase.
+            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Raw
+            review observations and retest tickets are tracked separately from scheduler
+            state.
           </Typography>
         </Stack>
       </CardContent>

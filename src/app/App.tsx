@@ -2,8 +2,10 @@ import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import {
+  Alert,
   AppBar,
   Box,
+  Button,
   Chip,
   Container,
   Drawer,
@@ -27,7 +29,9 @@ import {
   ChessboardPreview,
   type BoardMoveCommand,
 } from '../features/board/ChessboardPreview';
+import { DataManagementDialog } from '../features/data/DataManagementDialog';
 import { PgnImportDialog } from '../features/import/PgnImportDialog';
+import { SessionRecoveryDialog } from '../features/session/SessionRecoveryDialog';
 import { RepertoireTreePreview } from '../features/repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../features/task/TaskPreviewCard';
 import { canSubmitUserMove, currentFixtureStep } from '../domain/training/session';
@@ -37,7 +41,6 @@ import {
 } from '../domain/training/exercisePlan';
 import { createGraphExercisePlan } from '../domain/repertoire/exercisePlan';
 import { contextPly } from '../domain/repertoire/graph';
-import { InMemoryImportRepository } from '../domain/repertoire/importRepository';
 import {
   createGraphTrainingSession,
   reduceGraphTrainingSession,
@@ -53,10 +56,22 @@ import {
   type TrainingTreeItem,
 } from '../fixtures/trainingFixtures';
 import { phase3DemoFilteredPlan, phase3DemoPlan } from '../fixtures/phase3Demo';
+import {
+  OPENING_TRAINER_DATABASE_NAME,
+  OpeningTrainerDatabase,
+  type SessionRecord,
+} from '../infrastructure/db/openingTrainerDatabase';
+import { OpeningTrainerRepository } from '../infrastructure/db/openingTrainerRepository';
 
 const phase2Plans = phase2TrainingFixtures.map(compileTrainingFixture);
 const defaultPlan = phase2Plans[0]!;
 const basePlans: readonly TrainingExercisePlan[] = [...phase2Plans, phase3DemoPlan];
+
+interface StoredRepertoireSummary {
+  id: string;
+  name: string;
+  trainable: boolean;
+}
 
 function nowMs() {
   return Date.now();
@@ -64,6 +79,12 @@ function nowMs() {
 
 function sessionId(plan: TrainingExercisePlan) {
   return globalThis.crypto?.randomUUID?.() ?? `${plan.id}-${nowMs()}`;
+}
+
+function applicationDatabaseName(): string {
+  return import.meta.env.MODE === 'test'
+    ? `opening-trainer-test-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`
+    : OPENING_TRAINER_DATABASE_NAME;
 }
 
 function isDescendantOf(
@@ -94,7 +115,7 @@ function importedExercisePlans(graph: RepertoireGraph): TrainingExercisePlan[] {
       .map((move) => move.contextId),
   );
 
-  const plans = repertoire.rootContextIds.flatMap((rootContextId, rootIndex) => {
+  return repertoire.rootContextIds.flatMap((rootContextId, rootIndex) => {
     const root = contexts.get(rootContextId);
     if (!root) return [];
     const targets = graph.contexts
@@ -127,11 +148,29 @@ function importedExercisePlans(graph: RepertoireGraph): TrainingExercisePlan[] {
       },
     ];
   });
+}
 
-  if (plans.length === 0) {
-    throw new Error('Imported repertoire contains no trainable user decision.');
+function persistedPlans(graphs: readonly RepertoireGraph[]): {
+  plans: TrainingExercisePlan[];
+  repertoireByPlanId: Map<string, string>;
+  repertoires: StoredRepertoireSummary[];
+} {
+  const plans: TrainingExercisePlan[] = [];
+  const repertoireByPlanId = new Map<string, string>();
+  const repertoires: StoredRepertoireSummary[] = [];
+  for (const graph of graphs) {
+    const repertoire = graph.repertoires[0];
+    if (!repertoire) continue;
+    const graphPlans = importedExercisePlans(graph);
+    graphPlans.forEach((plan) => repertoireByPlanId.set(plan.id, repertoire.id));
+    plans.push(...graphPlans);
+    repertoires.push({
+      id: repertoire.id,
+      name: repertoire.name,
+      trainable: graphPlans.length > 0,
+    });
   }
-  return plans;
+  return { plans, repertoireByPlanId, repertoires };
 }
 
 function fullTreeLabels(items: readonly TrainingTreeItem[]): Map<string, string> {
@@ -164,13 +203,49 @@ function revealTrainTreeLabels(
   return visit(items);
 }
 
-export function App() {
+function hasDurableSessionProgress(session: SessionRecord['state']): boolean {
+  return (
+    session.plyIndex > 0 ||
+    session.evidence.length > 0 ||
+    session.hintLevel > 0 ||
+    session.retestQueue.length > 0 ||
+    session.status === 'session-complete' ||
+    session.status === 'abandoned'
+  );
+}
+
+export interface AppProps {
+  initialDemoFixtures?: boolean;
+  repository?: OpeningTrainerRepository;
+}
+
+export function App({
+  initialDemoFixtures = import.meta.env.MODE === 'test',
+  repository: suppliedRepository,
+}: AppProps = {}) {
+  const ownsRepository = suppliedRepository === undefined;
   const [mode, setMode] = useState<TrainingMode>('train');
   const [treeOpen, setTreeOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(basePlans);
-  const [selectionId, setSelectionId] = useState(defaultPlan.id);
+  const [dataOpen, setDataOpen] = useState(false);
+  const [bootReady, setBootReady] = useState(initialDemoFixtures);
+  const [plans, setPlans] = useState<readonly TrainingExercisePlan[]>(() =>
+    initialDemoFixtures ? basePlans : [],
+  );
+  const [selectionId, setSelectionId] = useState(
+    initialDemoFixtures ? defaultPlan.id : '',
+  );
+  const [storedRepertoires, setStoredRepertoires] = useState<
+    readonly StoredRepertoireSummary[]
+  >([]);
   const [includeDemoAlternative, setIncludeDemoAlternative] = useState(true);
+  const [repertoireByPlanId, setRepertoireByPlanId] = useState<
+    ReadonlyMap<string, string>
+  >(new Map());
+  const [recoverySession, setRecoverySession] = useState<SessionRecord | null>(null);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
+  const hasWorkspace = plans.length > 0;
+  const hasSavedRepertoires = storedRepertoires.length > 0;
   const selectedPlan =
     plans.find((candidate) => candidate.id === selectionId) ?? defaultPlan;
   const plan =
@@ -182,12 +257,118 @@ export function App() {
       sessionId: sessionId(defaultPlan),
     }),
   );
+  const [repository] = useState(
+    () =>
+      suppliedRepository ??
+      new OpeningTrainerRepository(
+        new OpeningTrainerDatabase(applicationDatabaseName()),
+      ),
+  );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
-  const importRepositoryRef = useRef(new InMemoryImportRepository());
+  const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
 
   const currentStep = currentFixtureStep(session, plan);
   const totalPlies = Math.max(1, ...plan.steps.map((step) => step.ply + 1));
+  const selectedRepertoireId =
+    repertoireByPlanId.get(plan.id) ?? storedRepertoires[0]?.id;
+
+  const refreshPersistedPlans = async (activateFirst = false) => {
+    const stored = persistedPlans(await repository.listRepertoireGraphs());
+    const storedIds = new Set(stored.plans.map((item) => item.id));
+    const bundledPlans = initialDemoFixtures ? basePlans : [];
+    const nextPlans = [
+      ...bundledPlans.filter((item) => !storedIds.has(item.id)),
+      ...stored.plans,
+    ];
+    setPlans(nextPlans);
+    setStoredRepertoires(stored.repertoires);
+    setRepertoireByPlanId(stored.repertoireByPlanId);
+    if (activateFirst && stored.plans[0]) {
+      const first = stored.plans[0];
+      setSelectionId(first.id);
+      setIncludeDemoAlternative(true);
+      setMode('train');
+      setSession(
+        createGraphTrainingSession(first, nowMs(), {
+          sessionId: sessionId(first),
+        }),
+      );
+    } else if (activateFirst && stored.plans.length === 0) {
+      setSelectionId('');
+    }
+    return { ...stored, allPlans: nextPlans };
+  };
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        await repository.initialize();
+        const refreshed = await refreshPersistedPlans();
+        if (!active) return;
+        const requestedPlanId = await repository.getSetting<string>('active-plan-id');
+        const requestedPlan = requestedPlanId
+          ? refreshed.allPlans.find((candidate) => candidate.id === requestedPlanId)
+          : undefined;
+        const initialPlan = requestedPlan ?? refreshed.plans[0];
+        if (initialPlan) {
+          setSelectionId(initialPlan.id);
+          setSession(
+            createGraphTrainingSession(initialPlan, nowMs(), {
+              sessionId: sessionId(initialPlan),
+            }),
+          );
+        }
+        const interrupted = await repository.latestInterruptedSession();
+        if (
+          active &&
+          interrupted &&
+          refreshed.allPlans.some((candidate) => candidate.id === interrupted.planId)
+        ) {
+          setRecoverySession(interrupted);
+        }
+      } catch (error) {
+        if (active) {
+          setPersistenceError(
+            error instanceof Error
+              ? error.message
+              : 'Local data initialization failed.',
+          );
+        }
+      } finally {
+        if (active) setBootReady(true);
+      }
+    })();
+
+    return () => {
+      active = false;
+      if (import.meta.env.MODE === 'test' && ownsRepository) {
+        void repository.deleteDatabase();
+      } else {
+        repository.close();
+      }
+    };
+    // Repository is intentionally constructed once for the application lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repository]);
+
+  useEffect(() => {
+    if (
+      !repertoireByPlanId.has(session.planId) ||
+      !hasDurableSessionProgress(session)
+    ) {
+      return;
+    }
+    const snapshot = structuredClone(session);
+    persistenceQueueRef.current = persistenceQueueRef.current
+      .then(() => repository.saveSession(snapshot))
+      .catch((error: unknown) => {
+        setPersistenceError(
+          error instanceof Error ? error.message : 'Session persistence failed.',
+        );
+      });
+  }, [repository, repertoireByPlanId, session]);
 
   useEffect(() => {
     if (mode !== 'train') return undefined;
@@ -228,6 +409,14 @@ export function App() {
     );
   };
 
+  const loadBundledDemo = () => {
+    setPlans(basePlans);
+    setSelectionId(defaultPlan.id);
+    setIncludeDemoAlternative(true);
+    setMode('train');
+    beginPlan(defaultPlan);
+  };
+
   const handlePlanChange = (nextPlanId: string) => {
     const nextPlan = plans.find((candidate) => candidate.id === nextPlanId);
     if (!nextPlan) return;
@@ -235,6 +424,9 @@ export function App() {
     setIncludeDemoAlternative(true);
     setMode('train');
     beginPlan(nextPlan);
+    if (repertoireByPlanId.has(nextPlan.id)) {
+      void repository.putSetting('active-plan-id', nextPlan.id);
+    }
   };
 
   const handleDemoAlternativeChange = (checked: boolean) => {
@@ -243,19 +435,26 @@ export function App() {
     beginPlan(checked ? phase3DemoPlan : phase3DemoFilteredPlan);
   };
 
-  const handleImportedCandidate = (candidate: ImportCandidate) => {
-    const importedPlans = importedExercisePlans(candidate.proposedGraph);
-    importRepositoryRef.current.createRepertoire(candidate);
-    const importedIds = new Set(importedPlans.map((item) => item.id));
-    setPlans((current) => [
-      ...current.filter((item) => !importedIds.has(item.id)),
-      ...importedPlans,
-    ]);
-    const firstPlan = importedPlans[0]!;
-    setSelectionId(firstPlan.id);
+  const handleImportedCandidate = async (candidate: ImportCandidate) => {
+    const storedGraph = await repository.createRepertoire(candidate);
+    const importedPlans = importedExercisePlans(storedGraph);
+    const refreshed = await refreshPersistedPlans();
+    const firstPlan = importedPlans[0];
+    if (!firstPlan) {
+      setSelectionId('');
+      setPersistenceError(
+        'Repertoire saved locally, but it contains no trainable user decision. It remains available for backup/PGN export; import another PGN to add trainable lines.',
+      );
+      return;
+    }
+    const refreshedPlan =
+      refreshed.allPlans.find((candidatePlan) => candidatePlan.id === firstPlan.id) ??
+      firstPlan;
+    setSelectionId(refreshedPlan.id);
     setIncludeDemoAlternative(true);
     setMode('train');
-    beginPlan(firstPlan);
+    beginPlan(refreshedPlan);
+    await repository.putSetting('active-plan-id', refreshedPlan.id);
   };
 
   const handleModeChange = (nextMode: TrainingMode) => {
@@ -295,6 +494,49 @@ export function App() {
     );
   };
 
+  const resumeInterruptedSession = async () => {
+    if (!recoverySession) return;
+    const recoveredPlan = plans.find(
+      (candidate) => candidate.id === recoverySession.planId,
+    );
+    if (!recoveredPlan) {
+      setPersistenceError('The saved session repertoire is not available.');
+      setRecoverySession(null);
+      return;
+    }
+    try {
+      await repository.putSetting('active-plan-id', recoveredPlan.id);
+      setSelectionId(recoveredPlan.id);
+      setIncludeDemoAlternative(true);
+      setMode('train');
+      setSession({
+        ...structuredClone(recoverySession.state),
+        attemptStartedAtMs: nowMs(),
+        pausedDurationMs: 0,
+        pauseStartedAtMs: undefined,
+      });
+      setRecoverySession(null);
+    } catch (error) {
+      setPersistenceError(
+        error instanceof Error ? error.message : 'Could not resume saved session.',
+      );
+      throw error;
+    }
+  };
+
+  const abandonInterruptedSession = async () => {
+    if (!recoverySession) return;
+    try {
+      await repository.markSessionAbandoned(recoverySession.id);
+      setRecoverySession(null);
+    } catch (error) {
+      setPersistenceError(
+        error instanceof Error ? error.message : 'Could not abandon saved session.',
+      );
+      throw error;
+    }
+  };
+
   const hintSquares =
     session.hintLevel >= 2 && session.hintLevel < 4 && currentStep?.actor === 'user'
       ? (currentStep.hint?.candidateDestinations ?? [])
@@ -322,56 +564,72 @@ export function App() {
           <Typography component="h1" variant="h6" sx={{ fontWeight: 700, mr: 'auto' }}>
             Opening Trainer
           </Typography>
-          <FormControl size="small" sx={{ minWidth: 240 }}>
-            <InputLabel id="repertoire-label">Training fixture</InputLabel>
-            <Select
-              labelId="repertoire-label"
-              label="Training fixture"
-              value={selectionId}
-              onChange={(event: SelectChangeEvent<string>) =>
-                handlePlanChange(String(event.target.value))
-              }
-            >
-              {plans.map((candidate) => (
-                <MenuItem key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          {selectionId === phase3DemoPlan.id ? (
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={includeDemoAlternative}
-                  onChange={(_: ChangeEvent<HTMLInputElement>, checked: boolean) =>
-                    handleDemoAlternativeChange(checked)
+          {hasWorkspace ? (
+            <>
+              <FormControl size="small" sx={{ minWidth: 240 }}>
+                <InputLabel id="repertoire-label">Training fixture</InputLabel>
+                <Select
+                  labelId="repertoire-label"
+                  label="Training fixture"
+                  value={selectionId}
+                  onChange={(event: SelectChangeEvent<string>) =>
+                    handlePlanChange(String(event.target.value))
                   }
-                  slotProps={{ input: { 'aria-label': 'Include alternative branch' } }}
+                >
+                  {plans.map((candidate) => (
+                    <MenuItem key={candidate.id} value={candidate.id}>
+                      {candidate.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <Chip
+                size="small"
+                variant="outlined"
+                label={
+                  repertoireByPlanId.has(plan.id) ? 'Saved locally' : 'Demo fixture'
+                }
+              />
+              {selectionId === phase3DemoPlan.id ? (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={includeDemoAlternative}
+                      onChange={(_: ChangeEvent<HTMLInputElement>, checked: boolean) =>
+                        handleDemoAlternativeChange(checked)
+                      }
+                      slotProps={{
+                        input: { 'aria-label': 'Include alternative branch' },
+                      }}
+                    />
+                  }
+                  label="Include alternative branch"
+                  sx={{ mx: 0 }}
                 />
-              }
-              label="Include alternative branch"
-              sx={{ mx: 0 }}
-            />
+              ) : null}
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={mode}
+                aria-label="Training mode"
+                onChange={(
+                  _: MouseEvent<HTMLElement>,
+                  nextMode: TrainingMode | null,
+                ) => {
+                  if (nextMode) handleModeChange(nextMode);
+                }}
+              >
+                <ToggleButton value="train">Train</ToggleButton>
+                <ToggleButton value="browse">Browse</ToggleButton>
+              </ToggleButtonGroup>
+              <Chip size="small" label={`${session.evidence.length} observations`} />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${session.plyIndex}/${totalPlies} plies`}
+              />
+            </>
           ) : null}
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={mode}
-            aria-label="Training mode"
-            onChange={(_: MouseEvent<HTMLElement>, nextMode: TrainingMode | null) => {
-              if (nextMode) handleModeChange(nextMode);
-            }}
-          >
-            <ToggleButton value="train">Train</ToggleButton>
-            <ToggleButton value="browse">Browse</ToggleButton>
-          </ToggleButtonGroup>
-          <Chip size="small" label={`${session.evidence.length} observations`} />
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${session.plyIndex}/${totalPlies} plies`}
-          />
           <Tooltip title="Import PGN repertoire">
             <IconButton
               color="inherit"
@@ -381,19 +639,25 @@ export function App() {
               <UploadFileOutlinedIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Open repertoire tree">
+          {hasWorkspace ? (
+            <Tooltip title="Open repertoire tree">
+              <IconButton
+                ref={treeButtonRef}
+                color="inherit"
+                aria-label="Open repertoire tree"
+                onClick={() => setTreeOpen(true)}
+                sx={{ display: { xs: 'inline-flex', md: 'none' } }}
+              >
+                <AccountTreeOutlinedIcon />
+              </IconButton>
+            </Tooltip>
+          ) : null}
+          <Tooltip title="Local data and recovery">
             <IconButton
-              ref={treeButtonRef}
               color="inherit"
-              aria-label="Open repertoire tree"
-              onClick={() => setTreeOpen(true)}
-              sx={{ display: { xs: 'inline-flex', md: 'none' } }}
+              aria-label="Local data and recovery"
+              onClick={() => setDataOpen(true)}
             >
-              <AccountTreeOutlinedIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Settings placeholder">
-            <IconButton color="inherit" aria-label="Settings placeholder">
               <SettingsOutlinedIcon />
             </IconButton>
           </Tooltip>
@@ -401,104 +665,166 @@ export function App() {
       </AppBar>
 
       <Container component="main" maxWidth="xl" sx={{ py: { xs: 1.5, md: 3 } }}>
-        <Box
-          className="training-workspace"
-          sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateAreas: {
-              xs: '"board" "task"',
-              md: '"tree board" "tree task"',
-              lg: '"tree board task"',
-            },
-            gridTemplateColumns: {
-              xs: 'minmax(0, 1fr)',
-              md: 'minmax(240px, 300px) minmax(0, 1fr)',
-              lg: 'minmax(250px, 300px) minmax(420px, 1fr) minmax(300px, 360px)',
-            },
-            alignItems: 'start',
-          }}
-        >
+        {persistenceError ? (
+          <Alert
+            severity="error"
+            onClose={() => setPersistenceError(null)}
+            sx={{ mb: 2 }}
+          >
+            {persistenceError}
+          </Alert>
+        ) : null}
+        {!bootReady ? (
+          <Typography color="text.secondary">Opening local data…</Typography>
+        ) : !hasWorkspace ? (
           <Box
             sx={{
-              gridArea: 'tree',
-              display: { xs: 'none', md: 'block' },
-              minWidth: 0,
+              maxWidth: 640,
+              mx: 'auto',
+              py: { xs: 6, md: 10 },
+              textAlign: 'center',
             }}
           >
-            {tree}
+            <Typography component="h2" variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
+              {hasSavedRepertoires
+                ? 'Saved repertoire has no trainable lines'
+                : 'No repertoire yet'}
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+              {hasSavedRepertoires
+                ? 'The repertoire is safely stored and will be included in backup/export, but it currently contains no user decision that can generate a training exercise.'
+                : 'No repertoire is stored on this device. Import a PGN to create one, or load the bundled demo without saving it.'}
+            </Typography>
+            {hasSavedRepertoires ? (
+              <Typography variant="body2" sx={{ mb: 3 }}>
+                Saved: {storedRepertoires.map((item) => item.name).join(', ')}
+              </Typography>
+            ) : null}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 1,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Button
+                variant="contained"
+                startIcon={<UploadFileOutlinedIcon />}
+                onClick={() => setImportOpen(true)}
+              >
+                {hasSavedRepertoires ? 'Import another PGN' : 'Import PGN'}
+              </Button>
+              <Button variant="outlined" onClick={loadBundledDemo}>
+                Load demo repertoire
+              </Button>
+              {hasSavedRepertoires ? (
+                <Button variant="outlined" onClick={() => setDataOpen(true)}>
+                  Local data and recovery
+                </Button>
+              ) : null}
+            </Box>
           </Box>
-          <Box sx={{ gridArea: 'board', minWidth: 0 }}>
-            <ChessboardPreview
-              position={session.fen}
-              orientation={plan.orientation}
-              userTurn={mode === 'train' && canSubmitUserMove(session)}
-              disabled={mode === 'browse'}
-              lastMove={lastMove}
-              hintSquares={hintSquares}
-              reducedMotion={reducedMotion}
-              onMove={handleMove}
-              onInteractionBlockChange={handleInteractionBlockChange}
-            />
+        ) : (
+          <Box
+            className="training-workspace"
+            sx={{
+              display: 'grid',
+              gap: 2,
+              gridTemplateAreas: {
+                xs: '"board" "task"',
+                md: '"tree board" "tree task"',
+                lg: '"tree board task"',
+              },
+              gridTemplateColumns: {
+                xs: 'minmax(0, 1fr)',
+                md: 'minmax(240px, 300px) minmax(0, 1fr)',
+                lg: 'minmax(250px, 300px) minmax(420px, 1fr) minmax(300px, 360px)',
+              },
+              alignItems: 'start',
+            }}
+          >
+            <Box
+              sx={{
+                gridArea: 'tree',
+                display: { xs: 'none', md: 'block' },
+                minWidth: 0,
+              }}
+            >
+              {tree}
+            </Box>
+            <Box sx={{ gridArea: 'board', minWidth: 0 }}>
+              <ChessboardPreview
+                position={session.fen}
+                orientation={plan.orientation}
+                userTurn={mode === 'train' && canSubmitUserMove(session)}
+                disabled={mode === 'browse'}
+                lastMove={lastMove}
+                hintSquares={hintSquares}
+                reducedMotion={reducedMotion}
+                onMove={handleMove}
+                onInteractionBlockChange={handleInteractionBlockChange}
+              />
+            </Box>
+            <Box sx={{ gridArea: 'task', minWidth: 0 }}>
+              <TaskPreviewCard
+                session={session}
+                plan={plan}
+                onHint={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'request-hint',
+                    }),
+                  )
+                }
+                onReveal={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'reveal',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onContinue={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'continue',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onRetest={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'start-retest',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onCompleteSession={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'complete-session',
+                    }),
+                  )
+                }
+                onRestart={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, {
+                      type: 'restart',
+                      nowMs: nowMs(),
+                    }),
+                  )
+                }
+                onAbandon={() =>
+                  setSession((current) =>
+                    reduceGraphTrainingSession(current, plan, { type: 'abandon' }),
+                  )
+                }
+              />
+            </Box>
           </Box>
-          <Box sx={{ gridArea: 'task', minWidth: 0 }}>
-            <TaskPreviewCard
-              session={session}
-              plan={plan}
-              onHint={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'request-hint',
-                  }),
-                )
-              }
-              onReveal={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'reveal',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onContinue={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'continue',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onRetest={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'start-retest',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onCompleteSession={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'complete-session',
-                  }),
-                )
-              }
-              onRestart={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, {
-                    type: 'restart',
-                    nowMs: nowMs(),
-                  }),
-                )
-              }
-              onAbandon={() =>
-                setSession((current) =>
-                  reduceGraphTrainingSession(current, plan, { type: 'abandon' }),
-                )
-              }
-            />
-          </Box>
-        </Box>
+        )}
       </Container>
 
       <Drawer
@@ -516,6 +842,22 @@ export function App() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onCommit={handleImportedCandidate}
+      />
+      <DataManagementDialog
+        open={dataOpen}
+        onClose={() => setDataOpen(false)}
+        repository={repository}
+        selectedRepertoireId={selectedRepertoireId}
+        onDataChanged={async () => {
+          await refreshPersistedPlans(true);
+          const interrupted = await repository.latestInterruptedSession();
+          setRecoverySession(interrupted ?? null);
+        }}
+      />
+      <SessionRecoveryDialog
+        session={recoverySession}
+        onResume={resumeInterruptedSession}
+        onAbandon={abandonInterruptedSession}
       />
     </Box>
   );

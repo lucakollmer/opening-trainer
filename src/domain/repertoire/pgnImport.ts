@@ -20,7 +20,10 @@ import type {
 import { validateRepertoireGraph } from './graph';
 
 const PARSER_VERSION = 'opening-trainer-pgn-rav-v1';
-const MAX_PGN_BYTES = 1_000_000;
+export const MAX_PGN_BYTES = 1_000_000;
+export const MAX_PGN_GAMES = 250;
+export const MAX_PGN_MOVES = 50_000;
+export const MAX_PGN_VARIATION_DEPTH = 32;
 const RESULTS = new Set(['1-0', '0-1', '1/2-1/2', '*']);
 
 interface Token {
@@ -46,6 +49,10 @@ interface ParsedGame {
   headers: Record<string, string>;
   rootComment?: string;
   line: ParsedLine;
+}
+
+interface ParseBudget {
+  moves: number;
 }
 
 function sourceLocator(game: number, line: number, column: number): SourceLocator {
@@ -190,6 +197,14 @@ function assertBalancedVariations(tokens: readonly Token[]): void {
   for (const token of tokens) {
     if (token.kind === 'lparen') {
       openings.push(token.locator);
+      if (openings.length > MAX_PGN_VARIATION_DEPTH) {
+        throw Object.assign(
+          new Error(
+            `PGN variation nesting exceeds the ${MAX_PGN_VARIATION_DEPTH}-level limit.`,
+          ),
+          { locator: token.locator },
+        );
+      }
     } else if (token.kind === 'rparen') {
       if (openings.length === 0) {
         throw Object.assign(new Error('Unmatched PGN variation terminator.'), {
@@ -217,7 +232,17 @@ function splitSymbolicNag(symbol: string): { san: string; nag?: string } {
 function parseLine(
   tokens: readonly Token[],
   start: number,
+  depth: number,
+  budget: ParseBudget,
 ): { line: ParsedLine; next: number } {
+  if (depth > MAX_PGN_VARIATION_DEPTH) {
+    throw Object.assign(
+      new Error(
+        `PGN variation nesting exceeds the ${MAX_PGN_VARIATION_DEPTH}-level limit.`,
+      ),
+      { locator: tokens[start]?.locator },
+    );
+  }
   const moves: ParsedMove[] = [];
   let comment: string | undefined;
   let index = start;
@@ -236,7 +261,7 @@ function parseLine(
           locator: token.locator,
         });
       }
-      const parsed = parseLine(tokens, index + 1);
+      const parsed = parseLine(tokens, index + 1, depth + 1, budget);
       previous.variations.push(parsed.line);
       index = parsed.next;
       continue;
@@ -278,6 +303,13 @@ function parseLine(
         locator: token.locator,
       });
     }
+    budget.moves += 1;
+    if (budget.moves > MAX_PGN_MOVES) {
+      throw Object.assign(
+        new Error(`PGN exceeds the ${MAX_PGN_MOVES}-move import limit.`),
+        { locator: token.locator },
+      );
+    }
     moves.push({
       san: split.san,
       nags: split.nag ? [split.nag] : [],
@@ -290,10 +322,17 @@ function parseLine(
 }
 
 function parseGames(text: string): ParsedGame[] {
-  return splitGames(text).map((source, gameIndex) => {
+  const sources = splitGames(text);
+  if (sources.length > MAX_PGN_GAMES) {
+    throw new Error(
+      `PGN contains ${sources.length} games; the limit is ${MAX_PGN_GAMES}.`,
+    );
+  }
+  const budget: ParseBudget = { moves: 0 };
+  return sources.map((source, gameIndex) => {
     const tokens = tokenize(source.movetext, gameIndex + 1);
     assertBalancedVariations(tokens);
-    const parsed = parseLine(tokens, 0);
+    const parsed = parseLine(tokens, 0, 0, budget);
     return {
       headers: source.headers,
       ...(parsed.line.comment ? { rootComment: parsed.line.comment } : {}),
@@ -342,6 +381,7 @@ function graphFromParsed(
   const childByParentEdge = new Map<string, RepertoireContext>();
   const moveByContextEdge = new Map<string, RepertoireMove>();
   const rootByPosition = new Map<string, RepertoireContext>();
+  const moveOrderByContext = new Map<string, number>();
   let variationCount = 0;
   let commentCount = 0;
   let nagCount = 0;
@@ -464,6 +504,7 @@ function graphFromParsed(
       const moveKey = `${beforeContext.id}:${edge.id}`;
       let repertoireMove = moveByContextEdge.get(moveKey);
       if (!repertoireMove) {
+        const order = moveOrderByContext.get(beforeContext.id) ?? 0;
         repertoireMove = {
           id: `move-${String(moves.length + 1).padStart(4, '0')}`,
           contextId: beforeContext.id,
@@ -471,12 +512,13 @@ function graphFromParsed(
           destinationContextId: child.id,
           actor: actorForFen(beforeFen, options.userColour),
           included: true,
-          order: moves.filter((item) => item.contextId === beforeContext.id).length,
+          order,
           ...(parsedMove.comment ? { note: parsedMove.comment } : {}),
           ...(parsedMove.nags.length ? { nags: [...parsedMove.nags] } : {}),
           sourceLocator: parsedMove.locator,
         };
         moves.push(repertoireMove);
+        moveOrderByContext.set(beforeContext.id, order + 1);
         moveByContextEdge.set(moveKey, repertoireMove);
       } else {
         repertoireMove = {
