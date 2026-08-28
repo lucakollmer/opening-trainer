@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Dialog,
   DialogActions,
@@ -6,12 +7,13 @@ import {
   DialogTitle,
   Typography,
 } from '@mui/material';
+import { useState } from 'react';
 import type { SessionRecord } from '../../infrastructure/db/openingTrainerDatabase';
 
 interface SessionRecoveryDialogProps {
   session: SessionRecord | null;
-  onResume: () => void;
-  onAbandon: () => void;
+  onResume: () => Promise<void> | void;
+  onAbandon: () => Promise<void> | void;
 }
 
 export function SessionRecoveryDialog({
@@ -19,6 +21,25 @@ export function SessionRecoveryDialog({
   onResume,
   onAbandon,
 }: SessionRecoveryDialogProps) {
+  const [busyAction, setBusyAction] = useState<'resume' | 'abandon' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (
+    action: 'resume' | 'abandon',
+    callback: () => Promise<void> | void,
+  ) => {
+    if (busyAction) return;
+    setBusyAction(action);
+    setError(null);
+    try {
+      await callback();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Session recovery action failed.');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   return (
     <Dialog open={Boolean(session)} maxWidth="xs" fullWidth>
       <DialogTitle>Resume interrupted session?</DialogTitle>
@@ -28,11 +49,21 @@ export function SessionRecoveryDialog({
           its exact position, target, hints, repair queue and already committed review
           evidence without committing those observations again.
         </Typography>
+        {error ? <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert> : null}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onAbandon}>End session</Button>
-        <Button variant="contained" onClick={onResume}>
-          Resume session
+        <Button
+          disabled={Boolean(busyAction)}
+          onClick={() => void run('abandon', onAbandon)}
+        >
+          {busyAction === 'abandon' ? 'Ending…' : 'End session'}
+        </Button>
+        <Button
+          variant="contained"
+          disabled={Boolean(busyAction)}
+          onClick={() => void run('resume', onResume)}
+        >
+          {busyAction === 'resume' ? 'Resuming…' : 'Resume session'}
         </Button>
       </DialogActions>
     </Dialog>
