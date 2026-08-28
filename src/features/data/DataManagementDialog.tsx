@@ -65,7 +65,6 @@ export function DataManagementDialog({
   useEffect(() => {
     if (!open) return;
     let active = true;
-    setSavedRepertoireCount(null);
     void repository
       .countSavedRepertoires()
       .then((count) => {
