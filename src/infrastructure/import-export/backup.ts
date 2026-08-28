@@ -1186,7 +1186,7 @@ export function previewBackupJson(text: string): BackupPreview {
   const backup =
     version === 1
       ? normalizeLegacyV1Backup(sourceForIntegrity)
-      : (structuredClone(sourceForIntegrity) as OpeningTrainerBackup);
+      : structuredClone(sourceForIntegrity);
   validateBackupData(backup.data);
   const warnings: string[] = [];
   if (version === 1) {
