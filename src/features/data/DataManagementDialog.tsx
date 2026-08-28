@@ -11,13 +11,12 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import type { OpeningTrainerRepository } from '../../infrastructure/db/openingTrainerRepository';
 import {
   MAX_BACKUP_BYTES,
-  commitBackupRestore,
-  exportCompleteBackup,
   previewBackupJson,
+  verifyBackupIntegrity,
   type BackupPreview,
 } from '../../infrastructure/import-export/backup';
 import { exportRepertoirePgn } from '../../infrastructure/import-export/pgnExport';
@@ -61,12 +60,34 @@ export function DataManagementDialog({
   const [restorePreview, setRestorePreview] = useState<BackupPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [savedRepertoireCount, setSavedRepertoireCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setSavedRepertoireCount(null);
+    void repository
+      .countSavedRepertoires()
+      .then((count) => {
+        if (active) setSavedRepertoireCount(count);
+      })
+      .catch((cause: unknown) => {
+        if (active) {
+          setError(
+            cause instanceof Error ? cause.message : 'Could not inspect local data.',
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, repository]);
 
   const exportBackup = async () => {
     setBusy(true);
     setError(null);
     try {
-      const { backup, json } = await exportCompleteBackup(repository.database);
+      const { backup, json } = await repository.exportCompleteBackup();
       downloadText(
         `opening-trainer-backup-${backup.exportedAt.slice(0, 10)}.json`,
         json,
@@ -90,7 +111,9 @@ export function DataManagementDialog({
       return;
     }
     try {
-      setRestorePreview(previewBackupJson(await file.text()));
+      const preview = previewBackupJson(await file.text());
+      await verifyBackupIntegrity(preview);
+      setRestorePreview(preview);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Backup preview failed.');
     }
@@ -102,7 +125,7 @@ export function DataManagementDialog({
     setError(null);
     try {
       const expectedRepertoireCount = restorePreview.summary.repertoires;
-      await commitBackupRestore(repository.database, restorePreview);
+      await repository.restoreCompleteBackup(restorePreview);
       const restoredGraph = await repository.loadCompleteGraph();
       if (restoredGraph.repertoires.length !== expectedRepertoireCount) {
         throw new Error(
@@ -125,6 +148,7 @@ export function DataManagementDialog({
     setBusy(true);
     setError(null);
     try {
+      await repository.awaitPendingOperations();
       const graph = await repository.loadRepertoireGraph(selectedRepertoireId);
       const repertoire = graph.repertoires[0]!;
       downloadText(
@@ -148,16 +172,37 @@ export function DataManagementDialog({
             <Typography variant="subtitle1">Complete backup</Typography>
             <Typography variant="body2" color="text.secondary">
               Export a versioned JSON backup of repertoires, playlists, training
-              identities, raw review evidence, sessions and settings.
+              identities, raw review evidence, sessions and settings. Pending local
+              writes are completed before the backup snapshot is taken.
             </Typography>
+            {savedRepertoireCount === 0 ? (
+              <Alert severity="info">
+                There are 0 saved repertoires. Bundled demo fixtures are intentionally
+                in-memory only and are not included in complete backups. Import a PGN
+                before testing backup and restore.
+              </Alert>
+            ) : savedRepertoireCount !== null ? (
+              <Typography variant="caption" color="text.secondary">
+                {savedRepertoireCount} saved repertoire(s) will be included. New backups
+                include an embedded SHA-256 integrity check.
+              </Typography>
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                Inspecting saved local data…
+              </Typography>
+            )}
             <Button
               variant="outlined"
               startIcon={<DownloadOutlinedIcon />}
               onClick={() => void exportBackup()}
-              disabled={busy}
+              disabled={busy || savedRepertoireCount === null || savedRepertoireCount === 0}
             >
               Export complete JSON
             </Button>
+            <Typography variant="caption" color="text.secondary">
+              Portable backup limit: {MAX_BACKUP_BYTES.toLocaleString()} bytes. Export is
+              refused if the generated file would exceed the same limit used by restore.
+            </Typography>
           </Stack>
 
           <Divider />
@@ -165,8 +210,9 @@ export function DataManagementDialog({
           <Stack spacing={1}>
             <Typography variant="subtitle1">Restore complete backup</Typography>
             <Typography variant="body2" color="text.secondary">
-              The file is validated in staging first. Existing local data is not changed
-              until you explicitly confirm replacement.
+              The file is size-checked, schema-validated and SHA-256 verified when the
+              digest is present. Existing local data is not changed until you explicitly
+              confirm replacement.
             </Typography>
             <Button component="label" variant="outlined" disabled={busy}>
               Choose JSON backup
