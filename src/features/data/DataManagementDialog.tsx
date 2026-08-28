@@ -194,13 +194,16 @@ export function DataManagementDialog({
               variant="outlined"
               startIcon={<DownloadOutlinedIcon />}
               onClick={() => void exportBackup()}
-              disabled={busy || savedRepertoireCount === null || savedRepertoireCount === 0}
+              disabled={
+                busy || savedRepertoireCount === null || savedRepertoireCount === 0
+              }
             >
               Export complete JSON
             </Button>
             <Typography variant="caption" color="text.secondary">
-              Portable backup limit: {MAX_BACKUP_BYTES.toLocaleString()} bytes. Export is
-              refused if the generated file would exceed the same limit used by restore.
+              Portable backup limit: {MAX_BACKUP_BYTES.toLocaleString()} bytes. Export
+              is refused if the generated file would exceed the same limit used by
+              restore.
             </Typography>
           </Stack>
 
