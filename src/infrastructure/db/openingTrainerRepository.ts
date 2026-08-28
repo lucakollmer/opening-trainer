@@ -312,7 +312,6 @@ export class OpeningTrainerRepository {
     if (playlistId && !playlist) {
       throw new Error(`Missing playlist ${playlistId}.`);
     }
-    const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
     const positions = new Map(graph.positions.map((position) => [position.id, position]));
     const existingRows = await this.database.trainingItems
       .where('repertoireId')
