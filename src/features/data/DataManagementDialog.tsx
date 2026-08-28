@@ -28,6 +28,7 @@ interface DataManagementDialogProps {
   repository: OpeningTrainerRepository;
   selectedRepertoireId?: string;
   onDataChanged: () => Promise<void> | void;
+  reloadAfterRestore?: () => void;
 }
 
 function downloadText(filename: string, content: string, type: string): void {
@@ -55,6 +56,7 @@ export function DataManagementDialog({
   repository,
   selectedRepertoireId,
   onDataChanged,
+  reloadAfterRestore = () => window.location.reload(),
 }: DataManagementDialogProps) {
   const [restorePreview, setRestorePreview] = useState<BackupPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,9 +101,18 @@ export function DataManagementDialog({
     setBusy(true);
     setError(null);
     try {
+      const expectedRepertoireCount = restorePreview.summary.repertoires;
       await commitBackupRestore(repository.database, restorePreview);
+      const restoredGraph = await repository.loadCompleteGraph();
+      if (restoredGraph.repertoires.length !== expectedRepertoireCount) {
+        throw new Error(
+          `Backup restore readback expected ${expectedRepertoireCount} repertoire(s) but reconstructed ${restoredGraph.repertoires.length}.`,
+        );
+      }
       setRestorePreview(null);
       await onDataChanged();
+      onClose();
+      reloadAfterRestore();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Backup restore failed.');
     } finally {
