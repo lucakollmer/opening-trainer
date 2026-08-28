@@ -66,7 +66,9 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
     try {
       setPgn(await file.text());
     } catch (error) {
-      setCommitError(error instanceof Error ? error.message : 'Could not read PGN file.');
+      setCommitError(
+        error instanceof Error ? error.message : 'Could not read PGN file.',
+      );
     }
   };
 
@@ -102,8 +104,8 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
           </Typography>
           <Typography variant="caption" color="text.secondary">
             Import limits: {MAX_PGN_BYTES.toLocaleString()} bytes,{' '}
-            {MAX_PGN_GAMES.toLocaleString()} games, {MAX_PGN_MOVES.toLocaleString()} move
-            tokens and {MAX_PGN_VARIATION_DEPTH} nested variation levels.
+            {MAX_PGN_GAMES.toLocaleString()} games, {MAX_PGN_MOVES.toLocaleString()}{' '}
+            move tokens and {MAX_PGN_VARIATION_DEPTH} nested variation levels.
           </Typography>
           <TextField
             label="Repertoire name"
