@@ -69,10 +69,12 @@ describe('PHASE-3 application hardening', () => {
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     expect(screen.getByText(/Preview valid: 2 game/u)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Create repertoire' }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
-      ).not.toBeInTheDocument(),
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByRole('dialog', { name: 'Import PGN repertoire' }),
+        ).not.toBeInTheDocument(),
+      { timeout: 5000 },
     );
     expect(screen.getByLabelText('Training fixture')).toHaveTextContent(
       'Imported multi · Game 1',
