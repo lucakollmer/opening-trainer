@@ -106,7 +106,9 @@ describe('PHASE-4 final persistence hardening', () => {
         (await source.exportCompleteBackup('2026-08-28T09:13:00.000Z')).json,
       );
 
-      const oldGraph = await target.createRepertoire(candidate('restore-old', 'Old data'));
+      const oldGraph = await target.createRepertoire(
+        candidate('restore-old', 'Old data'),
+      );
       const staleSession = progressedSession(oldGraph, 'stale-after-restore');
       const restore = target.restoreCompleteBackup(
         sourceBackup,
@@ -133,7 +135,9 @@ describe('PHASE-4 final persistence hardening', () => {
       const exported = await result.exportCompleteBackup('2026-08-28T09:15:00.000Z');
       expect(exported.backup.integrity).toMatchObject({ algorithm: 'SHA-256' });
       expect(exported.backup.integrity?.digest).toMatch(/^[a-f0-9]{64}$/u);
-      await expect(verifyBackupIntegrity(previewBackupJson(exported.json))).resolves.toBeUndefined();
+      await expect(
+        verifyBackupIntegrity(previewBackupJson(exported.json)),
+      ).resolves.toBeUndefined();
 
       const tampered = JSON.parse(exported.json) as {
         exportedAt: string;
