@@ -34,7 +34,9 @@ export function SessionRecoveryDialog({
     try {
       await callback();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Session recovery action failed.');
+      setError(
+        cause instanceof Error ? cause.message : 'Session recovery action failed.',
+      );
     } finally {
       setBusyAction(null);
     }
@@ -49,7 +51,11 @@ export function SessionRecoveryDialog({
           its exact position, target, hints, repair queue and already committed review
           evidence without committing those observations again.
         </Typography>
-        {error ? <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert> : null}
+        {error ? (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        ) : null}
       </DialogContent>
       <DialogActions>
         <Button
