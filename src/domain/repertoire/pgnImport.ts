@@ -237,7 +237,9 @@ function parseLine(
 ): { line: ParsedLine; next: number } {
   if (depth > MAX_PGN_VARIATION_DEPTH) {
     throw Object.assign(
-      new Error(`PGN variation nesting exceeds the ${MAX_PGN_VARIATION_DEPTH}-level limit.`),
+      new Error(
+        `PGN variation nesting exceeds the ${MAX_PGN_VARIATION_DEPTH}-level limit.`,
+      ),
       { locator: tokens[start]?.locator },
     );
   }
@@ -322,7 +324,9 @@ function parseLine(
 function parseGames(text: string): ParsedGame[] {
   const sources = splitGames(text);
   if (sources.length > MAX_PGN_GAMES) {
-    throw new Error(`PGN contains ${sources.length} games; the limit is ${MAX_PGN_GAMES}.`);
+    throw new Error(
+      `PGN contains ${sources.length} games; the limit is ${MAX_PGN_GAMES}.`,
+    );
   }
   const budget: ParseBudget = { moves: 0 };
   return sources.map((source, gameIndex) => {
