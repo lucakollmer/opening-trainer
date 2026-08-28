@@ -67,6 +67,12 @@ const phase2Plans = phase2TrainingFixtures.map(compileTrainingFixture);
 const defaultPlan = phase2Plans[0]!;
 const basePlans: readonly TrainingExercisePlan[] = [...phase2Plans, phase3DemoPlan];
 
+interface StoredRepertoireSummary {
+  id: string;
+  name: string;
+  trainable: boolean;
+}
+
 function nowMs() {
   return Date.now();
 }
@@ -109,7 +115,7 @@ function importedExercisePlans(graph: RepertoireGraph): TrainingExercisePlan[] {
       .map((move) => move.contextId),
   );
 
-  const plans = repertoire.rootContextIds.flatMap((rootContextId, rootIndex) => {
+  return repertoire.rootContextIds.flatMap((rootContextId, rootIndex) => {
     const root = contexts.get(rootContextId);
     if (!root) return [];
     const targets = graph.contexts
@@ -142,31 +148,29 @@ function importedExercisePlans(graph: RepertoireGraph): TrainingExercisePlan[] {
       },
     ];
   });
-
-  if (plans.length === 0) {
-    throw new Error('Imported repertoire contains no trainable user decision.');
-  }
-  return plans;
 }
 
 function persistedPlans(graphs: readonly RepertoireGraph[]): {
   plans: TrainingExercisePlan[];
   repertoireByPlanId: Map<string, string>;
+  repertoires: StoredRepertoireSummary[];
 } {
   const plans: TrainingExercisePlan[] = [];
   const repertoireByPlanId = new Map<string, string>();
+  const repertoires: StoredRepertoireSummary[] = [];
   for (const graph of graphs) {
     const repertoire = graph.repertoires[0];
     if (!repertoire) continue;
-    try {
-      const graphPlans = importedExercisePlans(graph);
-      graphPlans.forEach((plan) => repertoireByPlanId.set(plan.id, repertoire.id));
-      plans.push(...graphPlans);
-    } catch {
-      // A valid stored repertoire may contain no trainable user decision yet.
-    }
+    const graphPlans = importedExercisePlans(graph);
+    graphPlans.forEach((plan) => repertoireByPlanId.set(plan.id, repertoire.id));
+    plans.push(...graphPlans);
+    repertoires.push({
+      id: repertoire.id,
+      name: repertoire.name,
+      trainable: graphPlans.length > 0,
+    });
   }
-  return { plans, repertoireByPlanId };
+  return { plans, repertoireByPlanId, repertoires };
 }
 
 function fullTreeLabels(items: readonly TrainingTreeItem[]): Map<string, string> {
@@ -212,11 +216,14 @@ function hasDurableSessionProgress(session: SessionRecord['state']): boolean {
 
 export interface AppProps {
   initialDemoFixtures?: boolean;
+  repository?: OpeningTrainerRepository;
 }
 
 export function App({
   initialDemoFixtures = import.meta.env.MODE === 'test',
+  repository: suppliedRepository,
 }: AppProps = {}) {
+  const ownsRepository = suppliedRepository === undefined;
   const [mode, setMode] = useState<TrainingMode>('train');
   const [treeOpen, setTreeOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -228,6 +235,9 @@ export function App({
   const [selectionId, setSelectionId] = useState(
     initialDemoFixtures ? defaultPlan.id : '',
   );
+  const [storedRepertoires, setStoredRepertoires] = useState<
+    readonly StoredRepertoireSummary[]
+  >([]);
   const [includeDemoAlternative, setIncludeDemoAlternative] = useState(true);
   const [repertoireByPlanId, setRepertoireByPlanId] = useState<
     ReadonlyMap<string, string>
@@ -235,6 +245,7 @@ export function App({
   const [recoverySession, setRecoverySession] = useState<SessionRecord | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const hasWorkspace = plans.length > 0;
+  const hasSavedRepertoires = storedRepertoires.length > 0;
   const selectedPlan =
     plans.find((candidate) => candidate.id === selectionId) ?? defaultPlan;
   const plan =
@@ -248,9 +259,8 @@ export function App({
   );
   const [repository] = useState(
     () =>
-      new OpeningTrainerRepository(
-        new OpeningTrainerDatabase(applicationDatabaseName()),
-      ),
+      suppliedRepository ??
+      new OpeningTrainerRepository(new OpeningTrainerDatabase(applicationDatabaseName())),
   );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
   const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -258,7 +268,8 @@ export function App({
 
   const currentStep = currentFixtureStep(session, plan);
   const totalPlies = Math.max(1, ...plan.steps.map((step) => step.ply + 1));
-  const selectedRepertoireId = repertoireByPlanId.get(plan.id);
+  const selectedRepertoireId =
+    repertoireByPlanId.get(plan.id) ?? storedRepertoires[0]?.id;
 
   const refreshPersistedPlans = async (activateFirst = false) => {
     const stored = persistedPlans(await repository.listRepertoireGraphs());
@@ -269,6 +280,7 @@ export function App({
       ...stored.plans,
     ];
     setPlans(nextPlans);
+    setStoredRepertoires(stored.repertoires);
     setRepertoireByPlanId(stored.repertoireByPlanId);
     if (activateFirst && stored.plans[0]) {
       const first = stored.plans[0];
@@ -280,6 +292,8 @@ export function App({
           sessionId: sessionId(first),
         }),
       );
+    } else if (activateFirst && stored.plans.length === 0) {
+      setSelectionId('');
     }
     return { ...stored, allPlans: nextPlans };
   };
@@ -327,9 +341,10 @@ export function App({
 
     return () => {
       active = false;
-      repository.close();
-      if (import.meta.env.MODE === 'test') {
+      if (import.meta.env.MODE === 'test' && ownsRepository) {
         void repository.deleteDatabase();
+      } else {
+        repository.close();
       }
     };
     // Repository is intentionally constructed once for the application lifetime.
@@ -421,23 +436,23 @@ export function App({
   const handleImportedCandidate = async (candidate: ImportCandidate) => {
     const storedGraph = await repository.createRepertoire(candidate);
     const importedPlans = importedExercisePlans(storedGraph);
-    const importedIds = new Set(importedPlans.map((item) => item.id));
-    setPlans((current) => [
-      ...current.filter((item) => !importedIds.has(item.id)),
-      ...importedPlans,
-    ]);
-    const repertoireId = storedGraph.repertoires[0]!.id;
-    setRepertoireByPlanId((current) => {
-      const next = new Map(current);
-      importedPlans.forEach((item) => next.set(item.id, repertoireId));
-      return next;
-    });
-    const firstPlan = importedPlans[0]!;
-    setSelectionId(firstPlan.id);
+    const refreshed = await refreshPersistedPlans();
+    const firstPlan = importedPlans[0];
+    if (!firstPlan) {
+      setSelectionId('');
+      setPersistenceError(
+        'Repertoire saved locally, but it contains no trainable user decision. It remains available for backup/PGN export; import another PGN to add trainable lines.',
+      );
+      return;
+    }
+    const refreshedPlan =
+      refreshed.allPlans.find((candidatePlan) => candidatePlan.id === firstPlan.id) ??
+      firstPlan;
+    setSelectionId(refreshedPlan.id);
     setIncludeDemoAlternative(true);
     setMode('train');
-    beginPlan(firstPlan);
-    await repository.putSetting('active-plan-id', firstPlan.id);
+    beginPlan(refreshedPlan);
+    await repository.putSetting('active-plan-id', refreshedPlan.id);
   };
 
   const handleModeChange = (nextMode: TrainingMode) => {
@@ -477,7 +492,7 @@ export function App({
     );
   };
 
-  const resumeInterruptedSession = () => {
+  const resumeInterruptedSession = async () => {
     if (!recoverySession) return;
     const recoveredPlan = plans.find(
       (candidate) => candidate.id === recoverySession.planId,
@@ -487,29 +502,37 @@ export function App({
       setRecoverySession(null);
       return;
     }
-    setSelectionId(recoveredPlan.id);
-    setIncludeDemoAlternative(true);
-    setMode('train');
-    setSession({
-      ...structuredClone(recoverySession.state),
-      attemptStartedAtMs: nowMs(),
-      pausedDurationMs: 0,
-      pauseStartedAtMs: undefined,
-    });
-    setRecoverySession(null);
+    try {
+      await repository.putSetting('active-plan-id', recoveredPlan.id);
+      setSelectionId(recoveredPlan.id);
+      setIncludeDemoAlternative(true);
+      setMode('train');
+      setSession({
+        ...structuredClone(recoverySession.state),
+        attemptStartedAtMs: nowMs(),
+        pausedDurationMs: 0,
+        pauseStartedAtMs: undefined,
+      });
+      setRecoverySession(null);
+    } catch (error) {
+      setPersistenceError(
+        error instanceof Error ? error.message : 'Could not resume saved session.',
+      );
+      throw error;
+    }
   };
 
-  const abandonInterruptedSession = () => {
+  const abandonInterruptedSession = async () => {
     if (!recoverySession) return;
-    const id = recoverySession.id;
-    setRecoverySession(null);
-    void repository
-      .markSessionAbandoned(id)
-      .catch((error: unknown) =>
-        setPersistenceError(
-          error instanceof Error ? error.message : 'Could not abandon saved session.',
-        ),
+    try {
+      await repository.markSessionAbandoned(recoverySession.id);
+      setRecoverySession(null);
+    } catch (error) {
+      setPersistenceError(
+        error instanceof Error ? error.message : 'Could not abandon saved session.',
       );
+      throw error;
+    }
   };
 
   const hintSquares =
@@ -561,7 +584,7 @@ export function App({
               <Chip
                 size="small"
                 variant="outlined"
-                label={selectedRepertoireId ? 'Saved locally' : 'Demo fixture'}
+                label={repertoireByPlanId.has(plan.id) ? 'Saved locally' : 'Demo fixture'}
               />
               {selectionId === phase3DemoPlan.id ? (
                 <FormControlLabel
@@ -659,12 +682,20 @@ export function App({
             }}
           >
             <Typography component="h2" variant="h5" sx={{ fontWeight: 700, mb: 1 }}>
-              No repertoire yet
+              {hasSavedRepertoires
+                ? 'Saved repertoire has no trainable lines'
+                : 'No repertoire yet'}
             </Typography>
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
-              No repertoire is stored on this device. Import a PGN to create one, or
-              load the bundled demo without saving it.
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+              {hasSavedRepertoires
+                ? 'The repertoire is safely stored and will be included in backup/export, but it currently contains no user decision that can generate a training exercise.'
+                : 'No repertoire is stored on this device. Import a PGN to create one, or load the bundled demo without saving it.'}
             </Typography>
+            {hasSavedRepertoires ? (
+              <Typography variant="body2" sx={{ mb: 3 }}>
+                Saved: {storedRepertoires.map((item) => item.name).join(', ')}
+              </Typography>
+            ) : null}
             <Box
               sx={{
                 display: 'flex',
@@ -678,11 +709,16 @@ export function App({
                 startIcon={<UploadFileOutlinedIcon />}
                 onClick={() => setImportOpen(true)}
               >
-                Import PGN
+                {hasSavedRepertoires ? 'Import another PGN' : 'Import PGN'}
               </Button>
               <Button variant="outlined" onClick={loadBundledDemo}>
                 Load demo repertoire
               </Button>
+              {hasSavedRepertoires ? (
+                <Button variant="outlined" onClick={() => setDataOpen(true)}>
+                  Local data and recovery
+                </Button>
+              ) : null}
             </Box>
           </Box>
         ) : (
