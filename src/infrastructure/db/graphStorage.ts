@@ -69,6 +69,7 @@ export function canonicalizeGraphForPersistence(
 ): RepertoireGraph {
   validateRepertoireGraph(source);
 
+  const sourceEdgeById = new Map(source.edges.map((edge) => [edge.id, edge]));
   const positionIdByOld = new Map(
     source.positions.map((position) => [
       position.id,
@@ -78,8 +79,9 @@ export function canonicalizeGraphForPersistence(
   const edgeIdByOld = new Map(
     source.edges.map((edge) => {
       const fromPositionId = positionIdByOld.get(edge.fromPositionId);
-      if (!fromPositionId)
+      if (!fromPositionId) {
         throw new Error(`Missing source position ${edge.fromPositionId}.`);
+      }
       return [edge.id, persistentEdgeId(fromPositionId, edge.uci)] as const;
     }),
   );
@@ -111,7 +113,7 @@ export function canonicalizeGraphForPersistence(
   }));
   const moves = source.moves.map((move) => {
     const contextId = contextIdByOld.get(move.contextId)!;
-    const edge = source.edges.find((candidate) => candidate.id === move.edgeId);
+    const edge = sourceEdgeById.get(move.edgeId);
     if (!edge) throw new Error(`Missing edge ${move.edgeId}.`);
     return {
       ...move,
@@ -304,8 +306,9 @@ export function deriveTrainingRows(
     });
     if (accepted.moves.length === 0) continue;
     const position = positions.get(context.entryPositionId);
-    if (!position)
+    if (!position) {
       throw new Error(`Missing decision position ${context.entryPositionId}.`);
+    }
     const contextScopeKey = position.key;
     const trainingItemId = trainingItemIdentityKey({
       repertoireId: context.repertoireId,
