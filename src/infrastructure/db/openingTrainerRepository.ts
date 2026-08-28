@@ -346,7 +346,9 @@ export class OpeningTrainerRepository {
               throw new Error(`Playlist references missing repertoire: ${playlist.id}`);
             }
             if (repertoire.archivedAt) {
-              throw new Error(`Playlist references archived repertoire: ${playlist.id}`);
+              throw new Error(
+                `Playlist references archived repertoire: ${playlist.id}`,
+              );
             }
           }
           for (const contextId of [
@@ -454,7 +456,9 @@ export class OpeningTrainerRepository {
             seed: state.sessionId,
             policyVersion: SESSION_POLICY_VERSION,
             pendingRepairIds: state.retestQueue.map((ticket) => ticket.id),
-            committedObservationIds: state.evidence.map((observation) => observation.id),
+            committedObservationIds: state.evidence.map(
+              (observation) => observation.id,
+            ),
             createdAt: existingSession?.createdAt ?? now,
             updatedAt: now,
             ...(terminal ? { completedAt: now } : {}),
