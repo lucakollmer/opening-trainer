@@ -260,7 +260,9 @@ export function App({
   const [repository] = useState(
     () =>
       suppliedRepository ??
-      new OpeningTrainerRepository(new OpeningTrainerDatabase(applicationDatabaseName())),
+      new OpeningTrainerRepository(
+        new OpeningTrainerDatabase(applicationDatabaseName()),
+      ),
   );
   const treeButtonRef = useRef<HTMLButtonElement>(null);
   const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -584,7 +586,9 @@ export function App({
               <Chip
                 size="small"
                 variant="outlined"
-                label={repertoireByPlanId.has(plan.id) ? 'Saved locally' : 'Demo fixture'}
+                label={
+                  repertoireByPlanId.has(plan.id) ? 'Saved locally' : 'Demo fixture'
+                }
               />
               {selectionId === phase3DemoPlan.id ? (
                 <FormControlLabel
