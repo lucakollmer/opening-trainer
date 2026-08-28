@@ -15,7 +15,13 @@ import {
 } from '@mui/material';
 import { useState, type ChangeEvent } from 'react';
 import type { SelectChangeEvent } from '@mui/material/Select';
-import { previewPgnImport } from '../../domain/repertoire/pgnImport';
+import {
+  MAX_PGN_BYTES,
+  MAX_PGN_GAMES,
+  MAX_PGN_MOVES,
+  MAX_PGN_VARIATION_DEPTH,
+  previewPgnImport,
+} from '../../domain/repertoire/pgnImport';
 import type { Colour, ImportCandidate } from '../../domain/repertoire/types';
 
 interface PgnImportDialogProps {
@@ -48,11 +54,20 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
 
   const loadFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
-    setPgn(await file.text());
     setCandidate(null);
     setCommitError(null);
-    event.target.value = '';
+    if (file.size > MAX_PGN_BYTES) {
+      setPgn('');
+      setCommitError(`PGN exceeds the ${MAX_PGN_BYTES.toLocaleString()}-byte limit.`);
+      return;
+    }
+    try {
+      setPgn(await file.text());
+    } catch (error) {
+      setCommitError(error instanceof Error ? error.message : 'Could not read PGN file.');
+    }
   };
 
   const commit = async () => {
@@ -84,6 +99,11 @@ export function PgnImportDialog({ open, onClose, onCommit }: PgnImportDialogProp
             Preview is isolated and does not mutate repertoire state. Recursive
             variations, comments and NAGs are preserved before an explicit
             create-repertoire commit.
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Import limits: {MAX_PGN_BYTES.toLocaleString()} bytes,{' '}
+            {MAX_PGN_GAMES.toLocaleString()} games, {MAX_PGN_MOVES.toLocaleString()} move
+            tokens and {MAX_PGN_VARIATION_DEPTH} nested variation levels.
           </Typography>
           <TextField
             label="Repertoire name"
