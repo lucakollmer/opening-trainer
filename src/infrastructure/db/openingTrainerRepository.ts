@@ -868,11 +868,11 @@ export class OpeningTrainerRepository {
     };
   }
 
-  private async adaptiveExercise(
+  private adaptiveExercise(
     graph: RepertoireGraph,
     descriptor: AdaptiveExerciseDescriptor,
     targetTrainingItemIds: readonly string[],
-  ): Promise<AdaptiveExercisePlan> {
+  ): AdaptiveExercisePlan {
     return {
       descriptor,
       targetTrainingItemIds,
