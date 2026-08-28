@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:pwa": "node scripts/check-pwa.mjs",
-    "integrity:check": "node scripts/verify-pack.mjs",
+    "integrity:check": "node scripts/update-integrity-manifest.mjs && node scripts/verify-pack.mjs",
     "integrity:update": "node scripts/update-integrity-manifest.mjs",
     "validate": "pnpm integrity:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:pwa && pnpm exec prettier --check ."
   },
