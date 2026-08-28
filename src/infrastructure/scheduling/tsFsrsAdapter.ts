@@ -32,12 +32,12 @@ const FSRS_TO_STAGE: Readonly<Record<State, SchedulerStage>> = {
   [State.Relearning]: 'relearning',
 };
 
-const GRADE_TO_FSRS: Readonly<Record<SchedulerGrade, Rating>> = {
+const GRADE_TO_FSRS = {
   Again: Rating.Again,
   Hard: Rating.Hard,
   Good: Rating.Good,
   Easy: Rating.Easy,
-};
+} as const;
 
 function fromCard(card: Card): SchedulerState {
   return {
