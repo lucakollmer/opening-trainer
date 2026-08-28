@@ -175,7 +175,7 @@ function requireStringArray(record: Record<string, unknown>, key: string): strin
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     throw new Error(`Backup field ${key} must be an array of strings.`);
   }
-  return value;
+  return value.map((item) => String(item));
 }
 
 function requireEnum(
@@ -300,7 +300,12 @@ function validateSessionState(value: unknown, label: string): void {
     throw new Error(`${label} retestAttemptsByStep must be an object.`);
   }
   for (const [stepId, attempt] of Object.entries(value.retestAttemptsByStep)) {
-    if (!stepId || !Number.isInteger(attempt) || Number(attempt) < 0) {
+    if (
+      !stepId ||
+      typeof attempt !== 'number' ||
+      !Number.isInteger(attempt) ||
+      attempt < 0
+    ) {
       throw new Error(`${label} retestAttemptsByStep contains invalid data.`);
     }
   }
@@ -694,7 +699,13 @@ function stableJsonValue(value: unknown): unknown {
 }
 
 function canonicalBackupText(backup: OpeningTrainerBackup): string {
-  const { integrity: _integrity, ...unsigned } = backup;
+  const unsigned: OpeningTrainerBackup = {
+    format: backup.format,
+    version: backup.version,
+    exportedAt: backup.exportedAt,
+    databaseMeta: backup.databaseMeta,
+    data: backup.data,
+  };
   return `${JSON.stringify(stableJsonValue(unsigned), null, 2)}\n`;
 }
 
