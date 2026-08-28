@@ -40,19 +40,28 @@ export function exportRepertoirePgn(
   const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
   const positions = new Map(graph.positions.map((position) => [position.id, position]));
   const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
+  const movesByContext = new Map<string, RepertoireMove[]>();
+  for (const move of graph.moves) {
+    if (!move.included) continue;
+    const group = movesByContext.get(move.contextId) ?? [];
+    group.push(move);
+    movesByContext.set(move.contextId, group);
+  }
+  for (const group of movesByContext.values()) {
+    group.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  }
 
-  const outgoing = (contextId: string): RepertoireMove[] =>
-    graph.moves
-      .filter((move) => move.contextId === contextId && move.included)
-      .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const outgoing = (contextId: string): readonly RepertoireMove[] =>
+    movesByContext.get(contextId) ?? [];
 
   const renderMove = (move: RepertoireMove): string => {
     const context = contexts.get(move.contextId);
     const edge = edges.get(move.edgeId);
     if (!context || !edge) throw new Error(`Cannot export dangling move ${move.id}.`);
     const position = positions.get(context.entryPositionId);
-    if (!position)
+    if (!position) {
       throw new Error(`Cannot export missing position ${context.entryPositionId}.`);
+    }
     const nags = move.nags?.length ? ` ${move.nags.join(' ')}` : '';
     const note = move.note ?? move.purpose;
     return `${movePrefix(position.fen)} ${edge.san}${nags}${commentText(note)}`;
@@ -63,8 +72,9 @@ export function exportRepertoirePgn(
     visited: ReadonlySet<string>,
   ): string => {
     const destination = contexts.get(move.destinationContextId);
-    if (!destination)
+    if (!destination) {
       throw new Error(`Missing destination ${move.destinationContextId}.`);
+    }
     const nextVisited = new Set(visited);
     nextVisited.add(move.contextId);
     const continuation = renderContext(destination, nextVisited);
@@ -88,8 +98,9 @@ export function exportRepertoirePgn(
       .slice(1)
       .map((variation) => `(${renderMoveAndContinuation(variation, nextVisited)})`);
     const destination = contexts.get(main.destinationContextId);
-    if (!destination)
+    if (!destination) {
       throw new Error(`Missing destination ${main.destinationContextId}.`);
+    }
     const continuation = renderContext(destination, nextVisited);
     return [mainText, ...variations, continuation].filter(Boolean).join(' ');
   };
