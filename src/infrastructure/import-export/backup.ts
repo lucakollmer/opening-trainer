@@ -154,7 +154,10 @@ function requireNumber(record: Record<string, unknown>, key: string): number {
   return value;
 }
 
-function requireNonNegativeInteger(record: Record<string, unknown>, key: string): number {
+function requireNonNegativeInteger(
+  record: Record<string, unknown>,
+  key: string,
+): number {
   const value = requireNumber(record, key);
   if (!Number.isInteger(value) || value < 0) {
     throw new Error(`Backup field ${key} must be a non-negative integer.`);
@@ -190,7 +193,10 @@ function requireEnum(
   return value;
 }
 
-function requireObject(record: Record<string, unknown>, key: string): Record<string, unknown> {
+function requireObject(
+  record: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> {
   const value = record[key];
   if (!isObject(value)) throw new Error(`Backup field ${key} must be an object.`);
   return value;
@@ -201,7 +207,8 @@ function validateLocator(value: unknown, label: string): void {
   if (!isObject(value)) throw new Error(`${label} sourceLocator must be an object.`);
   for (const key of ['game', 'line', 'column']) {
     const number = requireNonNegativeInteger(value, key);
-    if (number < 1) throw new Error(`${label} sourceLocator.${key} must be at least 1.`);
+    if (number < 1)
+      throw new Error(`${label} sourceLocator.${key} must be at least 1.`);
   }
 }
 
@@ -247,7 +254,8 @@ function validateReviewRecord(value: unknown, label: string): void {
   requireEnum(value, 'evidenceRole', EVIDENCE_ROLES);
   requireEnum(value, 'outcome', TRAINING_OUTCOMES);
   const responseTime = requireNumber(value, 'responseTimeMs');
-  if (responseTime < 0) throw new Error(`${label} responseTimeMs must be non-negative.`);
+  if (responseTime < 0)
+    throw new Error(`${label} responseTimeMs must be non-negative.`);
   const hintLevel = requireNonNegativeInteger(value, 'hintLevel');
   if (hintLevel > 4) throw new Error(`${label} hintLevel must be between 0 and 4.`);
   requireNonNegativeInteger(value, 'illegalAttemptCount');
@@ -281,7 +289,8 @@ function validateSessionState(value: unknown, label: string): void {
     const pause = requireNumber(value, 'pauseStartedAtMs');
     if (pause < 0) throw new Error(`${label} pauseStartedAtMs must be non-negative.`);
   }
-  if (!Array.isArray(value.evidence)) throw new Error(`${label} evidence must be an array.`);
+  if (!Array.isArray(value.evidence))
+    throw new Error(`${label} evidence must be an array.`);
   value.evidence.forEach((review, index) =>
     validateReviewRecord(review, `${label} evidence ${index}`),
   );
@@ -289,7 +298,8 @@ function validateSessionState(value: unknown, label: string): void {
     throw new Error(`${label} retestQueue must be an array.`);
   }
   value.retestQueue.forEach((ticket, index) => {
-    if (!isObject(ticket)) throw new Error(`${label} retest ticket ${index} is invalid.`);
+    if (!isObject(ticket))
+      throw new Error(`${label} retest ticket ${index} is invalid.`);
     requireString(ticket, 'id');
     requireString(ticket, 'targetStepId');
     requireNonNegativeInteger(ticket, 'separationRemaining');
@@ -313,11 +323,20 @@ function validateSessionState(value: unknown, label: string): void {
     throw new Error(`${label} lastMove must be an object when present.`);
   }
   if (value.feedback !== undefined) {
-    if (!isObject(value.feedback)) throw new Error(`${label} feedback must be an object.`);
+    if (!isObject(value.feedback))
+      throw new Error(`${label} feedback must be an object.`);
     requireEnum(
       value.feedback,
       'kind',
-      new Set(['info', 'correct', 'illegal', 'outside', 'variation', 'reveal', 'repair']),
+      new Set([
+        'info',
+        'correct',
+        'illegal',
+        'outside',
+        'variation',
+        'reveal',
+        'repair',
+      ]),
     );
     requireString(value.feedback, 'title');
     requireString(value.feedback, 'message');
@@ -333,7 +352,8 @@ function assertRecordArray(
   value.forEach((item, index) => {
     if (!isObject(item)) throw new Error(`Backup table ${name}[${index}] is invalid.`);
     const id = requireString(item, 'id');
-    if (seen.has(id)) throw new Error(`Backup table ${name} contains duplicate ID ${id}.`);
+    if (seen.has(id))
+      throw new Error(`Backup table ${name} contains duplicate ID ${id}.`);
     seen.add(id);
   });
 }
@@ -479,7 +499,8 @@ function validateRecordSchemas(data: OpeningTrainerBackupData): void {
     const record = row as unknown as Record<string, unknown>;
     requireString(record, 'id');
     requireString(record, 'updatedAt');
-    if (!Object.hasOwn(record, 'value')) throw new Error('Backup setting is missing value.');
+    if (!Object.hasOwn(record, 'value'))
+      throw new Error('Backup setting is missing value.');
   });
   data.imports.forEach((row, index) => {
     const record = row as unknown as Record<string, unknown>;
@@ -553,7 +574,10 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
     if (session.state.sessionId !== session.id) {
       throw new Error(`Session ${session.id} state has a mismatched session ID.`);
     }
-    if (session.state.planId !== session.planId || session.state.fixtureId !== session.fixtureId) {
+    if (
+      session.state.planId !== session.planId ||
+      session.state.fixtureId !== session.fixtureId
+    ) {
       throw new Error(`Session ${session.id} state identity is inconsistent.`);
     }
     if (
@@ -561,7 +585,9 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
         (observationId) => !reviewIds.has(observationId),
       )
     ) {
-      throw new Error(`Session ${session.id} references missing committed observation.`);
+      throw new Error(
+        `Session ${session.id} references missing committed observation.`,
+      );
     }
   }
   for (const item of data.imports) {
@@ -809,7 +835,8 @@ export function previewBackupJson(text: string): BackupPreview {
     assertRecordArray(parsed.data[key], key);
   }
   if (parsed.integrity !== undefined) {
-    if (!isObject(parsed.integrity)) throw new Error('Backup integrity field is invalid.');
+    if (!isObject(parsed.integrity))
+      throw new Error('Backup integrity field is invalid.');
     if (parsed.integrity.algorithm !== 'SHA-256') {
       throw new Error('Backup integrity algorithm is not supported.');
     }
@@ -851,7 +878,9 @@ export async function verifyBackupIntegrity(preview: BackupPreview): Promise<voi
   if (!integrity) return;
   const actual = await sha256Hex(canonicalBackupText(preview.backup));
   if (actual !== integrity.digest) {
-    throw new Error('Backup SHA-256 verification failed. The file may be corrupted or modified.');
+    throw new Error(
+      'Backup SHA-256 verification failed. The file may be corrupted or modified.',
+    );
   }
 }
 
@@ -868,7 +897,8 @@ async function putBackupData(
   if (data.repertoireMoves.length) {
     await database.repertoireMoves.bulkPut(data.repertoireMoves);
   }
-  if (data.decisionRules.length) await database.decisionRules.bulkPut(data.decisionRules);
+  if (data.decisionRules.length)
+    await database.decisionRules.bulkPut(data.decisionRules);
   if (data.playlists.length) await database.playlists.bulkPut(data.playlists);
   if (data.playlistEntries.length) {
     await database.playlistEntries.bulkPut(data.playlistEntries);
