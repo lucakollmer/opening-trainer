@@ -1009,7 +1009,7 @@ export class OpeningTrainerRepository {
         ...(options.playlistId ? { playlistId: options.playlistId } : {}),
       };
       exercises.push(
-        await this.adaptiveExercise(
+        this.adaptiveExercise(
           graph,
           descriptor,
           batched.map((row) => row.candidate.trainingItemId),
