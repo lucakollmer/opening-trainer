@@ -5,7 +5,10 @@ import { App } from '../../app/App';
 import { AppProviders } from '../../app/AppProviders';
 import { previewPgnImport } from '../../domain/repertoire/pgnImport';
 import { phase3DemoPgn } from '../../fixtures/phase3Demo';
-import { exportCompleteBackup, previewBackupJson } from '../../infrastructure/import-export/backup';
+import {
+  exportCompleteBackup,
+  previewBackupJson,
+} from '../../infrastructure/import-export/backup';
 import { OpeningTrainerDatabase } from '../../infrastructure/db/openingTrainerDatabase';
 import { OpeningTrainerRepository } from '../../infrastructure/db/openingTrainerRepository';
 import { DataManagementDialog } from './DataManagementDialog';
