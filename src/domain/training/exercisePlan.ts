@@ -22,11 +22,15 @@ export interface TrainingExerciseStep {
   trainingItemId: string;
   positionKey: string;
   wrongSiblingUci?: readonly string[];
+  confusionContextIdByWrongUci?: Readonly<Record<string, string>>;
   hint?: TrainingHint;
   nextStepId?: string;
   nextStepByAcceptedUci: Readonly<Record<string, string | undefined>>;
   treeItemIdByAcceptedUci?: Readonly<Record<string, string>>;
-  targetDispositionByAcceptedUci?: Readonly<Record<string, 'preserved' | 'displaced'>>;
+  targetDispositionByAcceptedUci?: Readonly<
+    Record<string, 'preserved' | 'displaced'>
+  >;
+  displacedTargetStepIdsByAcceptedUci?: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface TrainingExercisePlan {
@@ -38,6 +42,7 @@ export interface TrainingExercisePlan {
   initialFen: string;
   startStepId: string;
   targetStepId: string;
+  targetStepIds: readonly string[];
   steps: readonly TrainingExerciseStep[];
   /** Train-safe tree. Unrevealed answer SAN is structurally absent. */
   tree: readonly TrainingTreeItem[];
@@ -145,6 +150,9 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
       targetDispositionByAcceptedUci: Object.fromEntries(
         step.acceptedUci.map((uci) => [uci, 'preserved' as const]),
       ),
+      displacedTargetStepIdsByAcceptedUci: Object.fromEntries(
+        step.acceptedUci.map((uci) => [uci, []]),
+      ),
     });
     fen = routeResult.move.fen;
   });
@@ -163,6 +171,7 @@ export function compileTrainingFixture(fixture: TrainingFixture): TrainingExerci
     initialFen: fixture.initialFen,
     startStepId: compiled[0]!.id,
     targetStepId: target.id,
+    targetStepIds: [target.id],
     steps: compiled,
     tree: maskTrainingTree(fixture.tree),
     browseTree: fixture.tree,

@@ -1,15 +1,11 @@
-import { FsrsSchedulingFoundationAdapter } from './schedulerPort';
+import { createEmptySchedulerState } from './schedulerPort';
 
-describe('FSRS scheduling foundation adapter', () => {
-  it('constructs behind the project port and serializes its configuration', () => {
-    const adapter = new FsrsSchedulingFoundationAdapter();
-    const card = adapter.createCard();
-    const configuration = JSON.parse(adapter.serializeConfiguration()) as Record<
-      string,
-      unknown
-    >;
-
-    expect(card).toBeDefined();
-    expect(configuration.enable_fuzz).toBe(false);
+it('creates a portable scheduler-neutral new state', () => {
+  const state = createEmptySchedulerState(new Date('2026-08-28T10:00:00.000Z'));
+  expect(state).toMatchObject({
+    dueAt: '2026-08-28T10:00:00.000Z',
+    stage: 'new',
+    reps: 0,
+    lapses: 0,
   });
 });

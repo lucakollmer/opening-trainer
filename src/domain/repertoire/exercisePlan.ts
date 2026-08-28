@@ -26,6 +26,7 @@ export interface GraphExercisePlanOptions {
   repertoireId: string;
   rootContextId: string;
   targetContextId: string;
+  targetContextIds?: readonly string[];
   promptMode?: PromptMode;
   playlistId?: string;
 }
@@ -130,29 +131,44 @@ function buildTree(
   );
 }
 
-function knownSiblingUcis(
+function knownSiblingMoves(
   graph: RepertoireGraph,
   repertoireId: string,
   positionId: string,
   acceptedUci: ReadonlySet<string>,
-): readonly string[] {
+): readonly { uci: string; confusionContextId: string }[] {
   const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
   const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
-  return [
-    ...new Set(
-      graph.moves
-        .filter((move) => move.actor === 'user' && move.included)
-        .filter((move) => {
-          const context = contexts.get(move.contextId);
-          return (
-            context?.repertoireId === repertoireId &&
-            context.entryPositionId === positionId
-          );
-        })
-        .map((move) => edges.get(move.edgeId)?.uci)
-        .filter((uci): uci is string => Boolean(uci && !acceptedUci.has(uci))),
-    ),
-  ].sort();
+  const byUci = new Map<string, string>();
+  const candidates = graph.moves
+    .filter((move) => move.actor === 'user' && move.included)
+    .filter((move) => {
+      const context = contexts.get(move.contextId);
+      return (
+        context?.repertoireId === repertoireId &&
+        context.entryPositionId === positionId
+      );
+    })
+    .map((move) => ({
+      uci: edges.get(move.edgeId)?.uci,
+      confusionContextId: move.destinationContextId,
+    }))
+    .filter(
+      (item): item is { uci: string; confusionContextId: string } =>
+        Boolean(item.uci && !acceptedUci.has(item.uci)),
+    )
+    .sort(
+      (left, right) =>
+        left.uci.localeCompare(right.uci) ||
+        left.confusionContextId.localeCompare(right.confusionContextId),
+    );
+  for (const item of candidates) {
+    if (!byUci.has(item.uci)) byUci.set(item.uci, item.confusionContextId);
+  }
+  return [...byUci].map(([uci, confusionContextId]) => ({
+    uci,
+    confusionContextId,
+  }));
 }
 
 export function createGraphExercisePlan(
@@ -180,17 +196,28 @@ export function createGraphExercisePlan(
     contexts.get(options.targetContextId),
     `Missing target context ${options.targetContextId}`,
   );
-  if (root.repertoireId !== repertoire.id || target.repertoireId !== repertoire.id) {
-    throw new Error('Exercise root and target must belong to the selected repertoire.');
+  const targetIds = [
+    ...new Set([...(options.targetContextIds ?? []), target.id]),
+  ];
+  const targets = targetIds.map((id) =>
+    required(contexts.get(id), `Missing target context ${id}`),
+  );
+  if (
+    root.repertoireId !== repertoire.id ||
+    targets.some((item) => item.repertoireId !== repertoire.id)
+  ) {
+    throw new Error('Exercise root and targets must belong to the selected repertoire.');
   }
   if (!routeContextAllowed(graph, root, contexts, playlist)) {
     throw new Error('Exercise root is outside the selected playlist route.');
   }
-  if (!routeContextAllowed(graph, target, contexts, playlist)) {
-    throw new Error('Exercise target is outside the selected playlist route.');
-  }
-  if (!canReachContext(graph, root.id, target.id, contexts, playlist)) {
-    throw new Error('Exercise target is not reachable from its root context.');
+  for (const item of targets) {
+    if (!routeContextAllowed(graph, item, contexts, playlist)) {
+      throw new Error('Exercise target is outside the selected playlist route.');
+    }
+    if (!canReachContext(graph, root.id, item.id, contexts, playlist)) {
+      throw new Error('Exercise target is not reachable from its root context.');
+    }
   }
 
   const promptMode = options.promptMode ?? 'normal';
@@ -288,6 +315,7 @@ export function createGraphExercisePlan(
     const treeItemIdByAcceptedUci: Record<string, string> = {};
     const targetDispositionByAcceptedUci: Record<string, 'preserved' | 'displaced'> =
       {};
+    const displacedTargetStepIdsByAcceptedUci: Record<string, readonly string[]> = {};
     for (const acceptedMove of accepted.moves) {
       const matching = candidateMoves.find(
         (move) => move.edgeId === acceptedMove.edgeId,
@@ -306,6 +334,11 @@ export function createGraphExercisePlan(
         canReachContext(graph, destination, target.id, contexts, playlist)
           ? 'preserved'
           : 'displaced';
+      displacedTargetStepIdsByAcceptedUci[acceptedMove.uci] = targetIds.filter(
+        (targetId) =>
+          targetId !== context.id &&
+          !canReachContext(graph, destination, targetId, contexts, playlist),
+      );
     }
 
     const position = required(
@@ -314,7 +347,7 @@ export function createGraphExercisePlan(
     );
     const trainingItemId = trainingItemIdentityKey({
       repertoireId: repertoire.id,
-      contextScopeKey: promptMode === 'normal' ? position.key : context.id,
+      contextScopeKey: promptMode === 'strict' ? context.id : position.key,
       positionKey: position.key,
       acceptedMoveSetKey: accepted.normalizedKey,
       promptMode,
@@ -322,6 +355,15 @@ export function createGraphExercisePlan(
         ? { strictPathFingerprint: context.pathFingerprint }
         : {}),
     });
+    const siblingMoves =
+      actor === 'user'
+        ? knownSiblingMoves(
+            graph,
+            repertoire.id,
+            context.entryPositionId,
+            acceptedUcis,
+          )
+        : [];
     compiled.push({
       id: context.id,
       ply: contextPly(context, contexts),
@@ -336,26 +378,24 @@ export function createGraphExercisePlan(
       acceptedMoveSetKey: accepted.normalizedKey,
       trainingItemId,
       positionKey: position.key,
-      wrongSiblingUci:
-        actor === 'user'
-          ? knownSiblingUcis(
-              graph,
-              repertoire.id,
-              context.entryPositionId,
-              acceptedUcis,
-            )
-          : [],
+      wrongSiblingUci: siblingMoves.map((move) => move.uci),
+      confusionContextIdByWrongUci: Object.fromEntries(
+        siblingMoves.map((move) => [move.uci, move.confusionContextId]),
+      ),
       nextStepId: nextStepByAcceptedUci[selectedEdge.uci],
       nextStepByAcceptedUci,
       treeItemIdByAcceptedUci,
       targetDispositionByAcceptedUci,
+      displacedTargetStepIdsByAcceptedUci,
     });
   }
 
-  if (!compiled.some((step) => step.id === target.id && step.actor === 'user')) {
-    throw new Error(
-      'Target context must resolve to a user decision with accepted moves.',
-    );
+  for (const targetContext of targets) {
+    if (!compiled.some((step) => step.id === targetContext.id && step.actor === 'user')) {
+      throw new Error(
+        'Every target context must resolve to a user decision with accepted moves.',
+      );
+    }
   }
 
   return {
@@ -364,13 +404,14 @@ export function createGraphExercisePlan(
       repertoire.id,
       root.id,
       target.id,
+      targetIds.join(','),
       promptMode,
       options.playlistId ?? 'all',
     ].join(':'),
     label: repertoire.name,
     description: playlist
       ? `Contextual repertoire exercise using playlist ${playlist.name}.`
-      : `Contextual repertoire exercise targeting ${target.label ?? target.id}.`,
+      : `Contextual repertoire exercise targeting ${targets.length} scheduled decision${targets.length === 1 ? '' : 's'}.`,
     orientation: repertoire.userColour,
     userColour: repertoire.userColour,
     initialFen: required(
@@ -379,6 +420,7 @@ export function createGraphExercisePlan(
     ).fen,
     startStepId: root.id,
     targetStepId: target.id,
+    targetStepIds: targetIds,
     steps: compiled,
     tree: buildTree(graph, repertoire.id, options.playlistId, 'train'),
     browseTree: buildTree(graph, repertoire.id, options.playlistId, 'browse'),

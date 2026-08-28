@@ -1,4 +1,9 @@
 import {
+  SCHEDULER_MAPPING_POLICY_VERSION,
+  RESPONSE_TIME_POLICY_VERSION,
+} from '../../domain/scheduling/observationPolicy';
+import { createEmptySchedulerState } from '../../domain/scheduling/schedulerPort';
+import {
   DATABASE_META_ID,
   OPENING_TRAINER_DATABASE_SCHEMA_VERSION,
   OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
@@ -17,11 +22,17 @@ import {
   type RepertoireMoveRecord,
   type RepertoireRecord,
   type ReviewLogRecord,
+  type SchedulerDecisionRecord,
+  type SchedulerStateRecord,
   type SessionRecord,
   type SettingRecord,
   type TrainingItemRecord,
 } from '../db/openingTrainerDatabase';
 import { storedRowsToGraph } from '../db/graphStorage';
+import {
+  TS_FSRS_ADAPTER_VERSION,
+  TS_FSRS_PARAMETERS_VERSION,
+} from '../scheduling/tsFsrsAdapter';
 
 export const OPENING_TRAINER_BACKUP_FORMAT = 'opening-trainer-backup';
 export const MAX_BACKUP_BYTES = 5_000_000;
@@ -63,6 +74,10 @@ const TRAINING_STATUSES = new Set([
   'abandoned',
   'error',
 ]);
+const SCHEDULER_STAGES = new Set(['new', 'learning', 'review', 'relearning']);
+const SCHEDULER_ACTIONS = new Set(['review', 'none', 'promote-target']);
+const SCHEDULER_GRADES = new Set(['Again', 'Hard', 'Good', 'Easy']);
+const RESPONSE_BANDS = new Set(['fast', 'ordinary', 'hesitant']);
 
 export interface BackupIntegrity {
   algorithm: 'SHA-256';
@@ -80,6 +95,8 @@ export interface OpeningTrainerBackupData {
   playlistEntries: PlaylistEntryRecord[];
   trainingItems: TrainingItemRecord[];
   reviewLogs: ReviewLogRecord[];
+  schedulerStates: SchedulerStateRecord[];
+  schedulerDecisions: SchedulerDecisionRecord[];
   sessions: SessionRecord[];
   settings: SettingRecord[];
   imports: ImportRecord[];
@@ -103,13 +120,16 @@ export interface BackupPreview {
     playlists: number;
     trainingItems: number;
     reviewLogs: number;
+    schedulerStates: number;
+    schedulerDecisions: number;
     sessions: number;
     settings: number;
   };
   warnings: readonly string[];
+  sourceForIntegrity?: OpeningTrainerBackup;
 }
 
-const BACKUP_DATA_KEYS = [
+const BACKUP_DATA_KEYS_V1 = [
   'repertoires',
   'repertoireContexts',
   'positions',
@@ -125,6 +145,12 @@ const BACKUP_DATA_KEYS = [
   'imports',
   'openingNames',
   'confusionRelations',
+] as const;
+
+const BACKUP_DATA_KEYS_V2 = [
+  ...BACKUP_DATA_KEYS_V1,
+  'schedulerStates',
+  'schedulerDecisions',
 ] as const satisfies readonly (keyof OpeningTrainerBackupData)[];
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -178,7 +204,7 @@ function requireStringArray(record: Record<string, unknown>, key: string): strin
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     throw new Error(`Backup field ${key} must be an array of strings.`);
   }
-  return value.map((item) => String(item));
+  return value.map(String);
 }
 
 function requireEnum(
@@ -264,6 +290,59 @@ function validateReviewRecord(value: unknown, label: string): void {
   optionalString(value, 'confusionContextId');
 }
 
+function validateSchedulerState(value: unknown, label: string): void {
+  if (!isObject(value)) throw new Error(`${label} state must be an object.`);
+  const schemaVersion = requireNonNegativeInteger(value, 'schemaVersion');
+  if (schemaVersion !== 1) throw new Error(`${label} state schema is unsupported.`);
+  requireString(value, 'dueAt');
+  for (const key of ['stability', 'difficulty', 'elapsedDays', 'scheduledDays']) {
+    const number = requireNumber(value, key);
+    if (number < 0) throw new Error(`${label} ${key} must be non-negative.`);
+  }
+  for (const key of ['learningSteps', 'reps', 'lapses']) {
+    requireNonNegativeInteger(value, key);
+  }
+  requireEnum(value, 'stage', SCHEDULER_STAGES);
+  optionalString(value, 'lastReviewAt');
+}
+
+function validateAdaptiveState(value: unknown, label: string): void {
+  if (value === undefined) return;
+  if (!isObject(value)) throw new Error(`${label} adaptive metadata must be an object.`);
+  requireString(value, 'generatorVersion');
+  requireString(value, 'seed');
+  const exerciseIndex = requireNonNegativeInteger(value, 'exerciseIndex');
+  const requestedTargetCount = requireNonNegativeInteger(
+    value,
+    'requestedTargetCount',
+  );
+  if (requestedTargetCount < 1) {
+    throw new Error(`${label} requestedTargetCount must be at least 1.`);
+  }
+  requireNonNegativeInteger(value, 'newItemLimit');
+  requireStringArray(value, 'targetTrainingItemIds');
+  if (!Array.isArray(value.exercises) || value.exercises.length === 0) {
+    throw new Error(`${label} adaptive exercises must be a non-empty array.`);
+  }
+  if (exerciseIndex >= value.exercises.length) {
+    throw new Error(`${label} adaptive exerciseIndex is outside the exercise list.`);
+  }
+  value.exercises.forEach((exercise, index) => {
+    if (!isObject(exercise)) {
+      throw new Error(`${label} adaptive exercise ${index} is invalid.`);
+    }
+    for (const key of ['repertoireId', 'rootContextId', 'targetContextId']) {
+      requireString(exercise, key);
+    }
+    requireStringArray(exercise, 'targetContextIds');
+    requireEnum(exercise, 'promptMode', PROMPT_MODES);
+    if (exercise.kind !== undefined) {
+      requireEnum(exercise, 'kind', new Set(['scheduled', 'retest']));
+    }
+    optionalString(exercise, 'playlistId');
+  });
+}
+
 function validateSessionState(value: unknown, label: string): void {
   if (!isObject(value)) throw new Error(`${label} state must be an object.`);
   requireString(value, 'sessionId');
@@ -274,6 +353,8 @@ function validateSessionState(value: unknown, label: string): void {
   optionalString(value, 'currentStepId');
   requireNonNegativeInteger(value, 'plyIndex');
   requireString(value, 'targetStepId');
+  requireStringArray(value, 'targetStepIds');
+  requireStringArray(value, 'targetTrainingItemIds');
   requireNonNegativeInteger(value, 'targetPly');
   requireEnum(value, 'runKind', new Set(['primary', 'retest']));
   requireNonNegativeInteger(value, 'treeRevealedPlyCount');
@@ -341,6 +422,7 @@ function validateSessionState(value: unknown, label: string): void {
     requireString(value.feedback, 'title');
     requireString(value.feedback, 'message');
   }
+  validateAdaptiveState(value.adaptive, label);
 }
 
 function assertRecordArray(
@@ -435,6 +517,7 @@ function validateRecordSchemas(data: OpeningTrainerBackupData): void {
     }
     requireEnum(record, 'promptMode', PROMPT_MODES);
     requireStringArray(record, 'acceptedUci');
+    optionalString(record, 'playlistId');
   });
   data.playlists.forEach((row) => {
     const record = row as unknown as Record<string, unknown>;
@@ -470,11 +553,53 @@ function validateRecordSchemas(data: OpeningTrainerBackupData): void {
     }
     requireEnum(record, 'promptMode', PROMPT_MODES);
     requireStringArray(record, 'contextIds');
+    if (record.playlistIds !== undefined) {
+      requireStringArray(record, 'playlistIds');
+    }
     requireEnum(record, 'status', TRAINING_ITEM_STATUSES);
   });
   data.reviewLogs.forEach((row, index) =>
     validateReviewRecord(row, `reviewLogs[${index}]`),
   );
+  data.schedulerStates.forEach((row, index) => {
+    const record = row as unknown as Record<string, unknown>;
+    requireString(record, 'id');
+    requireString(record, 'trainingItemId');
+    validateSchedulerState(record.state, `schedulerStates[${index}]`);
+    requireString(record, 'adapterVersion');
+    requireString(record, 'parametersVersion');
+    requireString(record, 'mappingPolicyVersion');
+    requireString(record, 'createdAt');
+    requireString(record, 'updatedAt');
+  });
+  data.schedulerDecisions.forEach((row, index) => {
+    const record = row as unknown as Record<string, unknown>;
+    for (const key of [
+      'id',
+      'observationId',
+      'trainingItemId',
+      'policyVersion',
+      'responsePolicyVersion',
+      'adapterVersion',
+      'parametersVersion',
+      'reason',
+      'decidedAt',
+      'previousDueAt',
+      'resultingDueAt',
+    ]) {
+      requireString(record, key);
+    }
+    requireEnum(record, 'action', SCHEDULER_ACTIONS);
+    if (record.grade !== undefined) requireEnum(record, 'grade', SCHEDULER_GRADES);
+    requireEnum(record, 'responseBand', RESPONSE_BANDS);
+    validateSchedulerState(record.resultingState, `schedulerDecisions[${index}]`);
+    if (record.resultingRetrievability !== undefined) {
+      const value = requireNumber(record, 'resultingRetrievability');
+      if (value < 0 || value > 1) {
+        throw new Error('Scheduler retrievability must be between 0 and 1.');
+      }
+    }
+  });
   data.sessions.forEach((row, index) => {
     const record = row as unknown as Record<string, unknown>;
     for (const key of [
@@ -490,6 +615,9 @@ function validateRecordSchemas(data: OpeningTrainerBackupData): void {
     }
     requireEnum(record, 'status', TRAINING_STATUSES);
     requireStringArray(record, 'targetIds');
+    if (record.targetIdentityKind !== undefined) {
+      requireEnum(record, 'targetIdentityKind', new Set(['training-item', 'legacy-step']));
+    }
     requireStringArray(record, 'pendingRepairIds');
     requireStringArray(record, 'committedObservationIds');
     optionalString(record, 'completedAt');
@@ -537,6 +665,18 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
   const reviewIds = ids(data.reviewLogs);
   const sessionIds = ids(data.sessions);
   const playlistIds = ids(data.playlists);
+  const schedulerStateIds = new Set(
+    data.schedulerStates.map((row) => row.trainingItemId),
+  );
+  if (schedulerStateIds.size !== data.schedulerStates.length) {
+    throw new Error('Backup contains duplicate scheduler state training-item identities.');
+  }
+  const schedulerDecisionObservationIds = new Set(
+    data.schedulerDecisions.map((row) => row.observationId),
+  );
+  if (schedulerDecisionObservationIds.size !== data.schedulerDecisions.length) {
+    throw new Error('Backup contains duplicate scheduler decisions for one observation.');
+  }
 
   for (const rule of data.decisionRules) {
     if (!repertoireIds.has(rule.repertoireId)) {
@@ -547,6 +687,9 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
     }
     if (!trainingItemIds.has(rule.trainingItemId)) {
       throw new Error(`Decision rule ${rule.id} references missing training item.`);
+    }
+    if (rule.playlistId && !playlistIds.has(rule.playlistId)) {
+      throw new Error(`Decision rule ${rule.id} references missing playlist.`);
     }
   }
   for (const entry of data.playlistEntries) {
@@ -561,6 +704,12 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
     if (item.contextIds.some((contextId) => !contextIds.has(contextId))) {
       throw new Error(`Training item ${item.id} references missing context.`);
     }
+    if (item.playlistIds?.some((playlistId) => !playlistIds.has(playlistId))) {
+      throw new Error(`Training item ${item.id} references missing playlist.`);
+    }
+    if (item.status === 'active' && !schedulerStateIds.has(item.id)) {
+      throw new Error(`Active training item ${item.id} is missing scheduler state.`);
+    }
   }
   for (const review of data.reviewLogs) {
     if (!trainingItemIds.has(review.trainingItemId)) {
@@ -568,6 +717,48 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
     }
     if (!sessionIds.has(review.sessionId)) {
       throw new Error(`Review ${review.id} references missing session.`);
+    }
+    if (
+      review.confusionContextId &&
+      !contextIds.has(review.confusionContextId) &&
+      !review.confusionContextId.includes(':sibling:')
+    ) {
+      throw new Error(`Review ${review.id} references missing confusion context.`);
+    }
+  }
+  for (const scheduler of data.schedulerStates) {
+    if (scheduler.id !== scheduler.trainingItemId) {
+      throw new Error(`Scheduler state ${scheduler.id} has a mismatched identity.`);
+    }
+    if (!trainingItemIds.has(scheduler.trainingItemId)) {
+      throw new Error(`Scheduler state ${scheduler.id} references missing training item.`);
+    }
+  }
+  for (const decision of data.schedulerDecisions) {
+    if (decision.id !== decision.observationId) {
+      throw new Error(`Scheduler decision ${decision.id} has a mismatched observation ID.`);
+    }
+
+    if (!reviewIds.has(decision.observationId)) {
+      throw new Error(`Scheduler decision ${decision.id} references missing observation.`);
+    }
+    const review = data.reviewLogs.find((row) => row.id === decision.observationId);
+    if (!review || review.trainingItemId !== decision.trainingItemId) {
+      throw new Error(
+        `Scheduler decision ${decision.id} does not match its raw observation training item.`,
+      );
+    }
+    if (!trainingItemIds.has(decision.trainingItemId)) {
+      throw new Error(`Scheduler decision ${decision.id} references missing training item.`);
+    }
+    if (decision.action === 'review' && !decision.grade) {
+      throw new Error(`Scheduler decision ${decision.id} is missing its review grade.`);
+    }
+    if (
+      decision.resultingState &&
+      decision.resultingDueAt !== decision.resultingState.dueAt
+    ) {
+      throw new Error(`Scheduler decision ${decision.id} has inconsistent resulting due state.`);
     }
   }
   for (const session of data.sessions) {
@@ -589,6 +780,51 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
         `Session ${session.id} references missing committed observation.`,
       );
     }
+    if (
+      session.targetIdentityKind === 'training-item' &&
+      session.targetIds.some((trainingItemId) => !trainingItemIds.has(trainingItemId))
+    ) {
+      throw new Error(`Session ${session.id} references missing target training item.`);
+    }
+    if (
+      session.state.targetTrainingItemIds.some(
+        (trainingItemId) => !trainingItemIds.has(trainingItemId),
+      )
+    ) {
+      throw new Error(
+        `Session ${session.id} state references missing target training item.`,
+      );
+    }
+    if (
+      session.state.adaptive?.targetTrainingItemIds.some(
+        (trainingItemId) => !trainingItemIds.has(trainingItemId),
+      )
+    ) {
+      throw new Error(
+        `Session ${session.id} adaptive metadata references missing training item.`,
+      );
+    }
+    for (const exercise of session.state.adaptive?.exercises ?? []) {
+      if (!repertoireIds.has(exercise.repertoireId)) {
+        throw new Error(
+          `Session ${session.id} adaptive exercise references missing repertoire.`,
+        );
+      }
+      if (
+        !contextIds.has(exercise.rootContextId) ||
+        !contextIds.has(exercise.targetContextId) ||
+        exercise.targetContextIds.some((contextId) => !contextIds.has(contextId))
+      ) {
+        throw new Error(
+          `Session ${session.id} adaptive exercise references missing context.`,
+        );
+      }
+      if (exercise.playlistId && !playlistIds.has(exercise.playlistId)) {
+        throw new Error(
+          `Session ${session.id} adaptive exercise references missing playlist.`,
+        );
+      }
+    }
   }
   for (const item of data.imports) {
     if (!repertoireIds.has(item.repertoireId)) {
@@ -601,11 +837,18 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
     }
   }
   for (const confusion of data.confusionRelations) {
+    if (!trainingItemIds.has(confusion.expectedTrainingItemId)) {
+      throw new Error(
+        `Confusion relation ${confusion.id} references a missing training item.`,
+      );
+    }
     if (
-      !trainingItemIds.has(confusion.expectedTrainingItemId) ||
-      !contextIds.has(confusion.confusionContextId)
+      !contextIds.has(confusion.confusionContextId) &&
+      !confusion.confusionContextId.includes(':sibling:')
     ) {
-      throw new Error(`Confusion relation ${confusion.id} references missing data.`);
+      throw new Error(
+        `Confusion relation ${confusion.id} references a missing repertoire context.`,
+      );
     }
   }
 }
@@ -649,6 +892,8 @@ async function readBackupData(
     playlistEntries,
     trainingItems,
     reviewLogs,
+    schedulerStates,
+    schedulerDecisions,
     sessions,
     settings,
     imports,
@@ -665,6 +910,8 @@ async function readBackupData(
     database.playlistEntries.toArray(),
     database.trainingItems.toArray(),
     database.reviewLogs.toArray(),
+    database.schedulerStates.toArray(),
+    database.schedulerDecisions.toArray(),
     database.sessions.toArray(),
     database.settings.toArray(),
     database.imports.toArray(),
@@ -682,6 +929,8 @@ async function readBackupData(
     playlistEntries,
     trainingItems,
     reviewLogs,
+    schedulerStates,
+    schedulerDecisions,
     sessions,
     settings,
     imports,
@@ -706,6 +955,8 @@ function stableData(data: OpeningTrainerBackupData): OpeningTrainerBackupData {
     playlistEntries: sortRows(data.playlistEntries),
     trainingItems: sortRows(data.trainingItems),
     reviewLogs: sortRows(data.reviewLogs),
+    schedulerStates: sortRows(data.schedulerStates),
+    schedulerDecisions: sortRows(data.schedulerDecisions),
     sessions: sortRows(data.sessions),
     settings: sortRows(data.settings),
     imports: sortRows(data.imports),
@@ -741,6 +992,86 @@ async function sha256Hex(text: string): Promise<string> {
   return [...new Uint8Array(digest)]
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('');
+}
+
+function normalizeLegacySession(session: unknown): SessionRecord {
+  const cloned = structuredClone(session) as SessionRecord & {
+    state: SessionRecord['state'] & {
+      targetStepIds?: readonly string[];
+      targetTrainingItemIds?: readonly string[];
+    };
+  };
+  const targetStepIds = cloned.state.targetStepIds ?? [cloned.state.targetStepId];
+  return {
+    ...cloned,
+    targetIdentityKind: cloned.targetIdentityKind ?? 'legacy-step',
+    state: {
+      ...cloned.state,
+      targetStepIds,
+      targetTrainingItemIds: cloned.state.targetTrainingItemIds ?? [],
+    },
+  };
+}
+
+function normalizeLegacyV1Backup(source: OpeningTrainerBackup): OpeningTrainerBackup {
+  const cutoverAt = source.exportedAt;
+  const oldData = source.data as unknown as Record<string, unknown>;
+  const trainingItems = structuredClone(
+    oldData.trainingItems as TrainingItemRecord[],
+  );
+  const schedulerStates = trainingItems
+    .filter((item) => item.status === 'active')
+    .map(
+      (item): SchedulerStateRecord => ({
+        id: item.id,
+        trainingItemId: item.id,
+        state: createEmptySchedulerState(new Date(cutoverAt)),
+        adapterVersion: TS_FSRS_ADAPTER_VERSION,
+        parametersVersion: TS_FSRS_PARAMETERS_VERSION,
+        mappingPolicyVersion: SCHEDULER_MAPPING_POLICY_VERSION,
+        createdAt: cutoverAt,
+        updatedAt: cutoverAt,
+      }),
+    );
+  return {
+    format: OPENING_TRAINER_BACKUP_FORMAT,
+    version: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
+    exportedAt: source.exportedAt,
+    databaseMeta: {
+      ...structuredClone(source.databaseMeta),
+      databaseSchemaVersion: OPENING_TRAINER_DATABASE_SCHEMA_VERSION,
+      portableSchemaVersion: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
+      schedulerCutoverAt:
+        source.databaseMeta.schedulerCutoverAt ?? source.exportedAt,
+    },
+    data: {
+      repertoires: structuredClone(oldData.repertoires as RepertoireRecord[]),
+      repertoireContexts: structuredClone(
+        oldData.repertoireContexts as RepertoireContextRecord[],
+      ),
+      positions: structuredClone(oldData.positions as PositionRecord[]),
+      moveEdges: structuredClone(oldData.moveEdges as MoveEdgeRecord[]),
+      repertoireMoves: structuredClone(
+        oldData.repertoireMoves as RepertoireMoveRecord[],
+      ),
+      decisionRules: structuredClone(oldData.decisionRules as DecisionRuleRecord[]),
+      playlists: structuredClone(oldData.playlists as PlaylistRecord[]),
+      playlistEntries: structuredClone(
+        oldData.playlistEntries as PlaylistEntryRecord[],
+      ),
+      trainingItems,
+      reviewLogs: structuredClone(oldData.reviewLogs as ReviewLogRecord[]),
+      schedulerStates,
+      schedulerDecisions: [],
+      sessions: (oldData.sessions as unknown[]).map(normalizeLegacySession),
+      settings: structuredClone(oldData.settings as SettingRecord[]),
+      imports: structuredClone(oldData.imports as ImportRecord[]),
+      openingNames: structuredClone(oldData.openingNames as OpeningNameRecord[]),
+      confusionRelations: structuredClone(
+        oldData.confusionRelations as ConfusionRelationRecord[],
+      ),
+    },
+  };
 }
 
 export async function exportCompleteBackup(
@@ -801,7 +1132,7 @@ export function previewBackupJson(text: string): BackupPreview {
       `Backup version ${version} is newer than this app supports (${OPENING_TRAINER_PORTABLE_SCHEMA_VERSION}).`,
     );
   }
-  if (version !== OPENING_TRAINER_PORTABLE_SCHEMA_VERSION) {
+  if (version !== 1 && version !== OPENING_TRAINER_PORTABLE_SCHEMA_VERSION) {
     throw new Error(`Backup version ${version} is not supported.`);
   }
   requireString(parsed, 'exportedAt');
@@ -814,6 +1145,7 @@ export function previewBackupJson(text: string): BackupPreview {
   requireString(databaseMetaObject, 'updatedAt');
   optionalString(databaseMetaObject, 'appVersion');
   optionalString(databaseMetaObject, 'lastSuccessfulBackupAt');
+  optionalString(databaseMetaObject, 'schedulerCutoverAt');
   const databaseSchemaVersion = requireNumber(
     databaseMetaObject,
     'databaseSchemaVersion',
@@ -827,11 +1159,15 @@ export function previewBackupJson(text: string): BackupPreview {
       `Backup database schema ${databaseSchemaVersion} is newer than this app supports.`,
     );
   }
-  if (portableSchemaVersion !== OPENING_TRAINER_PORTABLE_SCHEMA_VERSION) {
+  if (version === 2 && portableSchemaVersion !== 2) {
     throw new Error('Backup portable schema metadata is inconsistent.');
   }
+  if (version === 1 && portableSchemaVersion !== 1) {
+    throw new Error('Legacy backup portable schema metadata is inconsistent.');
+  }
   if (!isObject(parsed.data)) throw new Error('Backup data envelope is invalid.');
-  for (const key of BACKUP_DATA_KEYS) {
+  const keys = version === 1 ? BACKUP_DATA_KEYS_V1 : BACKUP_DATA_KEYS_V2;
+  for (const key of keys) {
     assertRecordArray(parsed.data[key], key);
   }
   if (parsed.integrity !== undefined) {
@@ -846,12 +1182,21 @@ export function previewBackupJson(text: string): BackupPreview {
     }
   }
 
-  const backup = structuredClone(parsed) as unknown as OpeningTrainerBackup;
+  const sourceForIntegrity = structuredClone(parsed) as unknown as OpeningTrainerBackup;
+  const backup =
+    version === 1
+      ? normalizeLegacyV1Backup(sourceForIntegrity)
+      : (structuredClone(sourceForIntegrity) as OpeningTrainerBackup);
   validateBackupData(backup.data);
   const warnings: string[] = [];
-  if (!backup.integrity) {
+  if (version === 1) {
     warnings.push(
-      'This legacy v1 backup predates embedded SHA-256 verification. Its structure will still be validated before restore.',
+      'Legacy PHASE-4 backup will be migrated to scheduler schema v2. Historical review observations remain raw evidence and are not retroactively graded.',
+    );
+  }
+  if (!sourceForIntegrity.integrity) {
+    warnings.push(
+      'This backup has no embedded SHA-256 verification. Its structure will still be validated before restore.',
     );
   }
   if (backup.data.sessions.some((session) => session.status !== 'session-complete')) {
@@ -861,11 +1206,14 @@ export function previewBackupJson(text: string): BackupPreview {
   }
   return {
     backup,
+    sourceForIntegrity,
     summary: {
       repertoires: backup.data.repertoires.length,
       playlists: backup.data.playlists.length,
       trainingItems: backup.data.trainingItems.length,
       reviewLogs: backup.data.reviewLogs.length,
+      schedulerStates: backup.data.schedulerStates.length,
+      schedulerDecisions: backup.data.schedulerDecisions.length,
       sessions: backup.data.sessions.length,
       settings: backup.data.settings.length,
     },
@@ -874,9 +1222,10 @@ export function previewBackupJson(text: string): BackupPreview {
 }
 
 export async function verifyBackupIntegrity(preview: BackupPreview): Promise<void> {
-  const integrity = preview.backup.integrity;
+  const source = preview.sourceForIntegrity ?? preview.backup;
+  const integrity = source.integrity;
   if (!integrity) return;
-  const actual = await sha256Hex(canonicalBackupText(preview.backup));
+  const actual = await sha256Hex(canonicalBackupText(source));
   if (actual !== integrity.digest) {
     throw new Error(
       'Backup SHA-256 verification failed. The file may be corrupted or modified.',
@@ -907,6 +1256,12 @@ async function putBackupData(
     await database.trainingItems.bulkPut(data.trainingItems);
   }
   if (data.reviewLogs.length) await database.reviewLogs.bulkPut(data.reviewLogs);
+  if (data.schedulerStates.length) {
+    await database.schedulerStates.bulkPut(data.schedulerStates);
+  }
+  if (data.schedulerDecisions.length) {
+    await database.schedulerDecisions.bulkPut(data.schedulerDecisions);
+  }
   if (data.sessions.length) await database.sessions.bulkPut(data.sessions);
   if (data.settings.length) await database.settings.bulkPut(data.settings);
   if (data.imports.length) await database.imports.bulkPut(data.imports);
@@ -944,6 +1299,8 @@ export async function commitBackupRestore(
       id: DATABASE_META_ID,
       databaseSchemaVersion: OPENING_TRAINER_DATABASE_SCHEMA_VERSION,
       portableSchemaVersion: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
+      schedulerCutoverAt:
+        preview.backup.databaseMeta.schedulerCutoverAt ?? restoredAt,
       updatedAt: restoredAt,
     });
     const staged = await readBackupData(database);
@@ -952,3 +1309,10 @@ export async function commitBackupRestore(
   });
   await validateDatabaseIntegrity(database);
 }
+
+export const PHASE5_BACKUP_POLICY = {
+  mappingPolicyVersion: SCHEDULER_MAPPING_POLICY_VERSION,
+  responsePolicyVersion: RESPONSE_TIME_POLICY_VERSION,
+  adapterVersion: TS_FSRS_ADAPTER_VERSION,
+  parametersVersion: TS_FSRS_PARAMETERS_VERSION,
+} as const;

@@ -20,6 +20,17 @@ import type { TrainingExercisePlan } from '../../domain/training/exercisePlan';
 interface TaskPreviewCardProps {
   session: TrainingSessionState;
   plan: TrainingExercisePlan;
+  hasNextExercise?: boolean;
+  queueSummary?: { due: number; new: number; contrast: number };
+  sessionSummary?: {
+    targeted: number;
+    correctWithoutHint: number;
+    hinted: number;
+    failed: number;
+    confusions: number;
+    repaired: number;
+    unresolved: number;
+  };
   onHint: () => void;
   onReveal: () => void;
   onContinue: () => void;
@@ -29,7 +40,7 @@ interface TaskPreviewCardProps {
   onAbandon: () => void;
 }
 
-function defaultContent(session: TrainingSessionState) {
+function defaultContent(session: TrainingSessionState, hasNextExercise: boolean) {
   switch (session.status) {
     case 'awaiting-user-move':
       return {
@@ -62,21 +73,22 @@ function defaultContent(session: TrainingSessionState) {
       return {
         severity: 'success' as const,
         title: 'Line complete',
-        message:
-          'The selected repertoire route has been replayed from the initial position.',
+        message: hasNextExercise
+          ? 'This route is complete. Continue with the next scheduled route from move one.'
+          : 'The selected repertoire route has been replayed from the initial position.',
       };
     case 'session-complete':
       return {
         severity: 'success' as const,
         title: 'Session complete',
         message:
-          'This run recorded raw review observations without updating scheduler state.',
+          'Targeted results have been recorded and the next reviews were scheduled.',
       };
     case 'abandoned':
       return {
         severity: 'warning' as const,
         title: 'Session abandoned',
-        message: 'The run ended without updating scheduler state.',
+        message: 'Recorded observations remain saved; unfinished targets stay available.',
       };
     case 'error':
       return {
@@ -104,6 +116,9 @@ function defaultContent(session: TrainingSessionState) {
 export function TaskPreviewCard({
   session,
   plan,
+  hasNextExercise = false,
+  queueSummary,
+  sessionSummary,
   onHint,
   onReveal,
   onContinue,
@@ -112,7 +127,7 @@ export function TaskPreviewCard({
   onRestart,
   onAbandon,
 }: TaskPreviewCardProps) {
-  const content = defaultContent(session);
+  const content = defaultContent(session, hasNextExercise);
   const hint = hintDisclosure(session, plan);
   const step = currentFixtureStep(session, plan);
   const hintAllowed =
@@ -122,6 +137,10 @@ export function TaskPreviewCard({
     Boolean(step.hint);
   const readyRetests = readyRetestCount(session);
   const totalPlies = Math.max(1, ...plan.steps.map((item) => item.ply + 1));
+  const adaptiveProgress = session.adaptive
+    ? `${session.adaptive.exerciseIndex + 1}/${session.adaptive.exercises.length} routes`
+    : null;
+  const promptMode = session.adaptive?.exercises[session.adaptive.exerciseIndex]?.promptMode;
 
   return (
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
@@ -137,6 +156,20 @@ export function TaskPreviewCard({
               size="small"
               label={session.runKind === 'retest' ? 'Retest run' : 'Primary run'}
             />
+            {adaptiveProgress ? (
+              <Chip size="small" variant="outlined" label={adaptiveProgress} />
+            ) : null}
+            {promptMode && promptMode !== 'normal' ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={
+                  promptMode === 'contrast'
+                    ? 'Contrast drill'
+                    : `${promptMode[0]!.toUpperCase()}${promptMode.slice(1)} mode`
+                }
+              />
+            ) : null}
             <Chip
               size="small"
               variant="outlined"
@@ -166,10 +199,23 @@ export function TaskPreviewCard({
             </Alert>
           ) : null}
           <Typography variant="body2" color="text.secondary">
-            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Raw
-            review observations and retest tickets are tracked separately from scheduler
-            state.
+            Move {Math.min(session.plyIndex + 1, totalPlies)} of {totalPlies}. Only
+            explicitly targeted decisions change their review schedule; incidental route
+            moves remain evidence without interval inflation.
           </Typography>
+          {session.status === 'session-complete' && sessionSummary ? (
+            <Typography variant="body2">
+              {sessionSummary.targeted} targeted · {sessionSummary.correctWithoutHint}{' '}
+              unhinted · {sessionSummary.hinted} hinted · {sessionSummary.failed} failed ·{' '}
+              {sessionSummary.repaired} repaired · {sessionSummary.unresolved} unresolved
+            </Typography>
+          ) : null}
+          {session.status === 'session-complete' && queueSummary ? (
+            <Typography variant="body2" color="text.secondary">
+              Next queue: {queueSummary.due} due · {queueSummary.new} new
+              {queueSummary.contrast > 0 ? ` · ${queueSummary.contrast} contrast` : ''}.
+            </Typography>
+          ) : null}
         </Stack>
       </CardContent>
 
@@ -192,7 +238,9 @@ export function TaskPreviewCard({
           <Button onClick={onRetest}>Run queued retest</Button>
         ) : null}
         {session.status === 'line-complete' ? (
-          <Button onClick={onCompleteSession}>Complete session</Button>
+          <Button onClick={onCompleteSession}>
+            {hasNextExercise ? 'Continue scheduled session' : 'Complete session'}
+          </Button>
         ) : null}
         {session.status === 'session-complete' || session.status === 'abandoned' ? (
           <Button onClick={onRestart}>Restart session</Button>
