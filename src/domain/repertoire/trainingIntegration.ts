@@ -132,7 +132,5 @@ export function reduceGraphTrainingSession(
     (step.targetDispositionByAcceptedUci?.[applied.move.uci] === 'displaced'
       ? [state.targetStepId]
       : []);
-  return displaced.length > 0
-    ? queueDisplacedTargets(next, plan, displaced)
-    : next;
+  return displaced.length > 0 ? queueDisplacedTargets(next, plan, displaced) : next;
 }

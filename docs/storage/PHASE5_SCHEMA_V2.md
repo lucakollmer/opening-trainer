@@ -22,10 +22,10 @@ rating to those rows and does not reinterpret PHASE-4 history.
 
 Two new tables form the scheduler projection:
 
-| Table | Identity | Purpose |
-| --- | --- | --- |
-| `schedulerStates` | one row per canonical training-item ID | current portable scheduler state and adapter/policy metadata |
-| `schedulerDecisions` | one row per observation ID | versioned decision describing whether that new raw observation caused `Again`, `Hard`, `Good`, `Easy`, no update, or targeted promotion |
+| Table                | Identity                               | Purpose                                                                                                                                 |
+| -------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `schedulerStates`    | one row per canonical training-item ID | current portable scheduler state and adapter/policy metadata                                                                            |
+| `schedulerDecisions` | one row per observation ID             | versioned decision describing whether that new raw observation caused `Again`, `Hard`, `Good`, `Easy`, no update, or targeted promotion |
 
 The observation ID is the idempotency key for the scheduler decision. A transaction that
 commits a new PHASE-5 observation commits its scheduler decision and resulting scheduler
@@ -96,7 +96,6 @@ Legacy PHASE-4 sessions remain marked as legacy step-target sessions and are not
 converted into a different scheduling history. New graph-based wrong-sibling observations
 store the real sibling destination context ID; legacy synthetic `:sibling:` identifiers remain
 accepted during portability validation so historical PHASE-4 evidence is not discarded.
-
 
 ## Prompt-mode and playlist-derived items
 

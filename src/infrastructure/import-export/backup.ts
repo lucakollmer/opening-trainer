@@ -308,14 +308,12 @@ function validateSchedulerState(value: unknown, label: string): void {
 
 function validateAdaptiveState(value: unknown, label: string): void {
   if (value === undefined) return;
-  if (!isObject(value)) throw new Error(`${label} adaptive metadata must be an object.`);
+  if (!isObject(value))
+    throw new Error(`${label} adaptive metadata must be an object.`);
   requireString(value, 'generatorVersion');
   requireString(value, 'seed');
   const exerciseIndex = requireNonNegativeInteger(value, 'exerciseIndex');
-  const requestedTargetCount = requireNonNegativeInteger(
-    value,
-    'requestedTargetCount',
-  );
+  const requestedTargetCount = requireNonNegativeInteger(value, 'requestedTargetCount');
   if (requestedTargetCount < 1) {
     throw new Error(`${label} requestedTargetCount must be at least 1.`);
   }
@@ -616,7 +614,11 @@ function validateRecordSchemas(data: OpeningTrainerBackupData): void {
     requireEnum(record, 'status', TRAINING_STATUSES);
     requireStringArray(record, 'targetIds');
     if (record.targetIdentityKind !== undefined) {
-      requireEnum(record, 'targetIdentityKind', new Set(['training-item', 'legacy-step']));
+      requireEnum(
+        record,
+        'targetIdentityKind',
+        new Set(['training-item', 'legacy-step']),
+      );
     }
     requireStringArray(record, 'pendingRepairIds');
     requireStringArray(record, 'committedObservationIds');
@@ -669,13 +671,17 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
     data.schedulerStates.map((row) => row.trainingItemId),
   );
   if (schedulerStateIds.size !== data.schedulerStates.length) {
-    throw new Error('Backup contains duplicate scheduler state training-item identities.');
+    throw new Error(
+      'Backup contains duplicate scheduler state training-item identities.',
+    );
   }
   const schedulerDecisionObservationIds = new Set(
     data.schedulerDecisions.map((row) => row.observationId),
   );
   if (schedulerDecisionObservationIds.size !== data.schedulerDecisions.length) {
-    throw new Error('Backup contains duplicate scheduler decisions for one observation.');
+    throw new Error(
+      'Backup contains duplicate scheduler decisions for one observation.',
+    );
   }
 
   for (const rule of data.decisionRules) {
@@ -731,16 +737,22 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
       throw new Error(`Scheduler state ${scheduler.id} has a mismatched identity.`);
     }
     if (!trainingItemIds.has(scheduler.trainingItemId)) {
-      throw new Error(`Scheduler state ${scheduler.id} references missing training item.`);
+      throw new Error(
+        `Scheduler state ${scheduler.id} references missing training item.`,
+      );
     }
   }
   for (const decision of data.schedulerDecisions) {
     if (decision.id !== decision.observationId) {
-      throw new Error(`Scheduler decision ${decision.id} has a mismatched observation ID.`);
+      throw new Error(
+        `Scheduler decision ${decision.id} has a mismatched observation ID.`,
+      );
     }
 
     if (!reviewIds.has(decision.observationId)) {
-      throw new Error(`Scheduler decision ${decision.id} references missing observation.`);
+      throw new Error(
+        `Scheduler decision ${decision.id} references missing observation.`,
+      );
     }
     const review = data.reviewLogs.find((row) => row.id === decision.observationId);
     if (!review || review.trainingItemId !== decision.trainingItemId) {
@@ -749,7 +761,9 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
       );
     }
     if (!trainingItemIds.has(decision.trainingItemId)) {
-      throw new Error(`Scheduler decision ${decision.id} references missing training item.`);
+      throw new Error(
+        `Scheduler decision ${decision.id} references missing training item.`,
+      );
     }
     if (decision.action === 'review' && !decision.grade) {
       throw new Error(`Scheduler decision ${decision.id} is missing its review grade.`);
@@ -758,7 +772,9 @@ function validateSupplementalRows(data: OpeningTrainerBackupData): void {
       decision.resultingState &&
       decision.resultingDueAt !== decision.resultingState.dueAt
     ) {
-      throw new Error(`Scheduler decision ${decision.id} has inconsistent resulting due state.`);
+      throw new Error(
+        `Scheduler decision ${decision.id} has inconsistent resulting due state.`,
+      );
     }
   }
   for (const session of data.sessions) {
@@ -1016,23 +1032,19 @@ function normalizeLegacySession(session: unknown): SessionRecord {
 function normalizeLegacyV1Backup(source: OpeningTrainerBackup): OpeningTrainerBackup {
   const cutoverAt = source.exportedAt;
   const oldData = source.data as unknown as Record<string, unknown>;
-  const trainingItems = structuredClone(
-    oldData.trainingItems as TrainingItemRecord[],
-  );
+  const trainingItems = structuredClone(oldData.trainingItems as TrainingItemRecord[]);
   const schedulerStates = trainingItems
     .filter((item) => item.status === 'active')
-    .map(
-      (item): SchedulerStateRecord => ({
-        id: item.id,
-        trainingItemId: item.id,
-        state: createEmptySchedulerState(new Date(cutoverAt)),
-        adapterVersion: TS_FSRS_ADAPTER_VERSION,
-        parametersVersion: TS_FSRS_PARAMETERS_VERSION,
-        mappingPolicyVersion: SCHEDULER_MAPPING_POLICY_VERSION,
-        createdAt: cutoverAt,
-        updatedAt: cutoverAt,
-      }),
-    );
+    .map((item): SchedulerStateRecord => ({
+      id: item.id,
+      trainingItemId: item.id,
+      state: createEmptySchedulerState(new Date(cutoverAt)),
+      adapterVersion: TS_FSRS_ADAPTER_VERSION,
+      parametersVersion: TS_FSRS_PARAMETERS_VERSION,
+      mappingPolicyVersion: SCHEDULER_MAPPING_POLICY_VERSION,
+      createdAt: cutoverAt,
+      updatedAt: cutoverAt,
+    }));
   return {
     format: OPENING_TRAINER_BACKUP_FORMAT,
     version: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
@@ -1041,8 +1053,7 @@ function normalizeLegacyV1Backup(source: OpeningTrainerBackup): OpeningTrainerBa
       ...structuredClone(source.databaseMeta),
       databaseSchemaVersion: OPENING_TRAINER_DATABASE_SCHEMA_VERSION,
       portableSchemaVersion: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
-      schedulerCutoverAt:
-        source.databaseMeta.schedulerCutoverAt ?? source.exportedAt,
+      schedulerCutoverAt: source.databaseMeta.schedulerCutoverAt ?? source.exportedAt,
     },
     data: {
       repertoires: structuredClone(oldData.repertoires as RepertoireRecord[]),
@@ -1186,7 +1197,7 @@ export function previewBackupJson(text: string): BackupPreview {
   const backup =
     version === 1
       ? normalizeLegacyV1Backup(sourceForIntegrity)
-      : (structuredClone(sourceForIntegrity) as OpeningTrainerBackup);
+      : structuredClone(sourceForIntegrity);
   validateBackupData(backup.data);
   const warnings: string[] = [];
   if (version === 1) {
@@ -1299,8 +1310,7 @@ export async function commitBackupRestore(
       id: DATABASE_META_ID,
       databaseSchemaVersion: OPENING_TRAINER_DATABASE_SCHEMA_VERSION,
       portableSchemaVersion: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
-      schedulerCutoverAt:
-        preview.backup.databaseMeta.schedulerCutoverAt ?? restoredAt,
+      schedulerCutoverAt: preview.backup.databaseMeta.schedulerCutoverAt ?? restoredAt,
       updatedAt: restoredAt,
     });
     const staged = await readBackupData(database);

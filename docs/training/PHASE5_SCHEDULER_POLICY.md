@@ -22,10 +22,10 @@ scheduler-decision row records the mapping result.
 Response duration is measured with the browser monotonic clock and the review timestamp
 is recorded separately from the wall clock.
 
-| Item stage | fast | ordinary | hesitant |
-| --- | ---: | ---: | ---: |
-| new / learning / relearning | <= 5 s | <= 15 s | > 15 s |
-| review | <= 3.5 s | <= 12 s | > 12 s |
+| Item stage                  |     fast | ordinary | hesitant |
+| --------------------------- | -------: | -------: | -------: |
+| new / learning / relearning |   <= 5 s |  <= 15 s |   > 15 s |
+| review                      | <= 3.5 s |  <= 12 s |   > 12 s |
 
 A mature item is a review-stage item with at least three repetitions and stability of at
 least three days. Only mature, fast, unhinted recall can receive `Easy` from an ordinary
@@ -33,15 +33,15 @@ least three days. Only mature, fast, unhinted recall can receive `Easy` from an 
 
 ## Targeted mapping
 
-| Evidence | FSRS result |
-| --- | --- |
-| reveal / hint level 4 | Again |
-| wrong sibling variation | Again |
-| legal outside repertoire | Again |
-| hesitant recall | Hard |
-| ordinary correct | Good |
-| mature fast unhinted correct | Easy |
-| repair-correct | no scheduler update |
+| Evidence                     | FSRS result         |
+| ---------------------------- | ------------------- |
+| reveal / hint level 4        | Again               |
+| wrong sibling variation      | Again               |
+| legal outside repertoire     | Again               |
+| hesitant recall              | Hard                |
+| ordinary correct             | Good                |
+| mature fast unhinted correct | Easy                |
+| repair-correct               | no scheduler update |
 
 Hint and illegal-attempt caps can only reduce a positive grade:
 
@@ -112,7 +112,6 @@ selection against already-mutated scheduler state.
 A raw observation, its scheduler decision and any resulting scheduler-state update commit
 in one Dexie transaction using the observation ID as the idempotency key. Re-saving a
 session snapshot cannot advance the same review twice.
-
 
 ## Same-session retest orchestration
 

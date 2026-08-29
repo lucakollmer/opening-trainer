@@ -96,11 +96,7 @@ export class TsFsrsSchedulerAdapter implements SchedulerPort {
     };
   }
 
-  public review(
-    state: SchedulerState,
-    grade: SchedulerGrade,
-    now: Date,
-  ) {
+  public review(state: SchedulerState, grade: SchedulerGrade, now: Date) {
     const result = this.#scheduler.next(toCard(state), now, GRADE_TO_FSRS[grade]);
     const nextState = fromCard(result.card);
     return {

@@ -88,7 +88,8 @@ function defaultContent(session: TrainingSessionState, hasNextExercise: boolean)
       return {
         severity: 'warning' as const,
         title: 'Session abandoned',
-        message: 'Recorded observations remain saved; unfinished targets stay available.',
+        message:
+          'Recorded observations remain saved; unfinished targets stay available.',
       };
     case 'error':
       return {
@@ -140,7 +141,8 @@ export function TaskPreviewCard({
   const adaptiveProgress = session.adaptive
     ? `${session.adaptive.exerciseIndex + 1}/${session.adaptive.exercises.length} routes`
     : null;
-  const promptMode = session.adaptive?.exercises[session.adaptive.exerciseIndex]?.promptMode;
+  const promptMode =
+    session.adaptive?.exercises[session.adaptive.exerciseIndex]?.promptMode;
 
   return (
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
@@ -206,8 +208,9 @@ export function TaskPreviewCard({
           {session.status === 'session-complete' && sessionSummary ? (
             <Typography variant="body2">
               {sessionSummary.targeted} targeted · {sessionSummary.correctWithoutHint}{' '}
-              unhinted · {sessionSummary.hinted} hinted · {sessionSummary.failed} failed ·{' '}
-              {sessionSummary.repaired} repaired · {sessionSummary.unresolved} unresolved
+              unhinted · {sessionSummary.hinted} hinted · {sessionSummary.failed} failed
+              · {sessionSummary.repaired} repaired · {sessionSummary.unresolved}{' '}
+              unresolved
             </Typography>
           ) : null}
           {session.status === 'session-complete' && queueSummary ? (

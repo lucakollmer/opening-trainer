@@ -76,7 +76,8 @@ function outgoingSans(graph: RepertoireGraph, contextId: string): string[] {
 function contextByOutgoing(graph: RepertoireGraph, sans: readonly string[]) {
   const expected = [...sans].sort().join('|');
   const context = graph.contexts.find(
-    (candidateContext) => outgoingSans(graph, candidateContext.id).join('|') === expected,
+    (candidateContext) =>
+      outgoingSans(graph, candidateContext.id).join('|') === expected,
   );
   if (!context) throw new Error(`Missing context with outgoing ${expected}`);
   return context;
@@ -105,7 +106,9 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
       const graph = await result.createRepertoire(candidate('phase5-idempotent'));
       const plan = rootTargetPlan(graph);
       const state = reduceGraphTrainingSession(
-        createGraphTrainingSession(plan, 1_000, { sessionId: 'phase5-idempotent-session' }),
+        createGraphTrainingSession(plan, 1_000, {
+          sessionId: 'phase5-idempotent-session',
+        }),
         plan,
         {
           type: 'user-move',
@@ -132,7 +135,9 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
   it('records twenty incidental positive prefix traversals without FSRS interval inflation', async () => {
     const result = await repository();
     try {
-      const graph = await result.createRepertoire(candidate('phase5-incidental-positive'));
+      const graph = await result.createRepertoire(
+        candidate('phase5-incidental-positive'),
+      );
       const repertoire = graph.repertoires[0]!;
       const plan = createGraphExercisePlan(graph, {
         repertoireId: repertoire.id,
@@ -190,7 +195,9 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
   it('promotes an incidental failure to targeted work without applying a scheduler review', async () => {
     const result = await repository();
     try {
-      const graph = await result.createRepertoire(candidate('phase5-incidental-negative'));
+      const graph = await result.createRepertoire(
+        candidate('phase5-incidental-negative'),
+      );
       const repertoire = graph.repertoires[0]!;
       const plan = createGraphExercisePlan(graph, {
         repertoireId: repertoire.id,
@@ -261,11 +268,12 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
     }
   });
 
-
   it('does not requeue an already-answered batched ancestor when an accepted branch displaces only the deeper target', async () => {
     const result = await repository();
     try {
-      const graph = await result.createRepertoire(candidate('phase5-batched-alternative'));
+      const graph = await result.createRepertoire(
+        candidate('phase5-batched-alternative'),
+      );
       const repertoire = graph.repertoires[0]!;
       const branch = contextByOutgoing(graph, ['Nc3', 'Nf3']);
       const deeperTarget = contextByOutgoing(graph, ['Nc3']);
@@ -275,7 +283,9 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
         targetContextId: deeperTarget.id,
         targetContextIds: [branch.id, deeperTarget.id],
       });
-      expect(plan.targetStepIds).toEqual(expect.arrayContaining([branch.id, deeperTarget.id]));
+      expect(plan.targetStepIds).toEqual(
+        expect.arrayContaining([branch.id, deeperTarget.id]),
+      );
 
       let state = createGraphTrainingSession(plan, 1_000, {
         sessionId: 'phase5-batched-alternative-session',
@@ -341,7 +351,10 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
         seed: 'deterministic-seed',
       };
       const first = await result.createAdaptiveSessionPlan('phase5-generator', options);
-      const second = await result.createAdaptiveSessionPlan('phase5-generator', options);
+      const second = await result.createAdaptiveSessionPlan(
+        'phase5-generator',
+        options,
+      );
       expect(first.exercises.map((exercise) => exercise.plan.id)).toEqual(
         second.exercises.map((exercise) => exercise.plan.id),
       );
@@ -353,7 +366,6 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
       await result.deleteDatabase();
     }
   });
-
 
   it('creates strict-mode scheduler items on demand without mixing them into normal recall', async () => {
     const result = await repository();
@@ -374,10 +386,10 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
       ).toBe(true);
       expect(
         strict.exercises.every((exercise) =>
-          exercise.plan.targetStepIds.every(
-            (stepId) =>
-              exercise.plan.steps.find((step) => step.id === stepId)?.trainingItemId
-                .includes('::strict::'),
+          exercise.plan.targetStepIds.every((stepId) =>
+            exercise.plan.steps
+              .find((step) => step.id === stepId)
+              ?.trainingItemId.includes('::strict::'),
           ),
         ),
       ).toBe(true);
@@ -503,8 +515,8 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
           .toArray()
       ).find((item) => item.promptMode === 'normal')!;
       const confusionContextId =
-        graph.contexts.find((context) => !normalItem.contextIds.includes(context.id))?.id ??
-        graph.contexts[0]!.id;
+        graph.contexts.find((context) => !normalItem.contextIds.includes(context.id))
+          ?.id ?? graph.contexts[0]!.id;
       await result.database.confusionRelations.put({
         id: `${normalItem.id}::${confusionContextId}`,
         expectedTrainingItemId: normalItem.id,
@@ -549,9 +561,7 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
         (context) =>
           graph.moves.filter(
             (move) =>
-              move.contextId === context.id &&
-              move.actor === 'user' &&
-              move.included,
+              move.contextId === context.id && move.actor === 'user' && move.included,
           ).length > 1,
       );
       expect(branch).toBeDefined();
@@ -645,9 +655,10 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
       const interrupted = await result.latestInterruptedSession();
       expect(interrupted?.id).toBe('phase5-recovery-session');
       expect(interrupted?.state.adaptive?.seed).toBe('phase5-recovery-seed');
-      const descriptor = interrupted!.state.adaptive!.exercises[
-        interrupted!.state.adaptive!.exerciseIndex
-      ]!;
+      const descriptor =
+        interrupted!.state.adaptive!.exercises[
+          interrupted!.state.adaptive!.exerciseIndex
+        ]!;
       const rebuilt = await result.rebuildAdaptiveExercise(descriptor);
       expect(rebuilt.plan.id).toBe(started.plan.id);
       expect(rebuilt.descriptor).toEqual(descriptor);
@@ -657,10 +668,7 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
 
       const reviewCount = await result.database.reviewLogs.count();
       const decisionCount = await result.database.schedulerDecisions.count();
-      await result.saveSession(
-        interrupted!.state,
-        '2026-08-28T11:50:03.000Z',
-      );
+      await result.saveSession(interrupted!.state, '2026-08-28T11:50:03.000Z');
       expect(await result.database.reviewLogs.count()).toBe(reviewCount);
       expect(await result.database.schedulerDecisions.count()).toBe(decisionCount);
     } finally {
@@ -758,10 +766,7 @@ describe('PHASE-5 scheduler persistence and simulations', () => {
       expect(preview.warnings.join(' ')).toMatch(/not retroactively graded/u);
       expect(preview.backup.data.reviewLogs).toHaveLength(1);
       expect(preview.backup.data.schedulerDecisions).toHaveLength(0);
-      await target.restoreCompleteBackup(
-        preview,
-        '2026-08-28T11:22:00.000Z',
-      );
+      await target.restoreCompleteBackup(preview, '2026-08-28T11:22:00.000Z');
       expect(await target.database.reviewLogs.count()).toBe(1);
       expect(await target.database.schedulerDecisions.count()).toBe(0);
       expect(await target.database.schedulerStates.count()).toBeGreaterThan(0);

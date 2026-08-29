@@ -638,9 +638,8 @@ export function createTrainingSession(
   const start = exerciseStep(plan, plan.startStepId);
   const target = exerciseStep(plan, plan.targetStepId);
   const targetPly = target?.ply ?? stepIndex(plan, plan.targetStepId);
-  const targetStepIds = plan.targetStepIds.length > 0
-    ? [...plan.targetStepIds]
-    : [plan.targetStepId];
+  const targetStepIds =
+    plan.targetStepIds.length > 0 ? [...plan.targetStepIds] : [plan.targetStepId];
   const targetTrainingItemIds = [
     ...new Set(
       targetStepIds
@@ -683,13 +682,7 @@ export function reduceTrainingSession(
     throw new Error('Training state and plan IDs must match.');
   switch (event.type) {
     case 'user-move':
-      return handleUserMove(
-        state,
-        plan,
-        event.move,
-        event.nowMs,
-        event.observedAt,
-      );
+      return handleUserMove(state, plan, event.move, event.nowMs, event.observedAt);
     case 'opponent-tick':
       return applyOpponentMove(state, plan, event.nowMs);
     case 'request-hint':

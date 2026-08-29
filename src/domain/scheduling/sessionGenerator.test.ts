@@ -83,9 +83,7 @@ describe('adaptive session generator v1', () => {
       request,
     );
     expect(selection.selected[0]?.prefixKey).not.toBeUndefined();
-    expect(selection.selected[1]?.prefixKey).not.toBe(
-      selection.selected[0]?.prefixKey,
-    );
+    expect(selection.selected[1]?.prefixKey).not.toBe(selection.selected[0]?.prefixKey);
   });
 
   it('is deterministic for a fixed seed and changes only stable tie breaks with seed', () => {

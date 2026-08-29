@@ -107,10 +107,7 @@ function sessionId(plan: TrainingExercisePlan) {
 }
 
 function adaptiveSessionId(repertoireId: string) {
-  return (
-    globalThis.crypto?.randomUUID?.() ??
-    `adaptive-${repertoireId}-${Date.now()}`
-  );
+  return globalThis.crypto?.randomUUID?.() ?? `adaptive-${repertoireId}-${Date.now()}`;
 }
 
 function applicationDatabaseName(): string {
@@ -314,9 +311,8 @@ export function App({
 
   const currentStep = currentFixtureStep(session, plan);
   const totalPlies = Math.max(1, ...plan.steps.map((step) => step.ply + 1));
-  const adaptiveRepertoireId = session.adaptive?.exercises[
-    session.adaptive.exerciseIndex
-  ]?.repertoireId;
+  const adaptiveRepertoireId =
+    session.adaptive?.exercises[session.adaptive.exerciseIndex]?.repertoireId;
   const selectedRepertoireId =
     adaptiveRepertoireId ??
     repertoireByPlanId.get(plan.id) ??
@@ -686,7 +682,9 @@ export function App({
         const repertoireId =
           recoverySession.state.adaptive.exercises[index]?.repertoireId;
         const selectorPlan = repertoireId
-          ? plans.find((candidate) => repertoireByPlanId.get(candidate.id) === repertoireId)
+          ? plans.find(
+              (candidate) => repertoireByPlanId.get(candidate.id) === repertoireId,
+            )
           : undefined;
         if (selectorPlan) {
           setSelectionId(selectorPlan.id);

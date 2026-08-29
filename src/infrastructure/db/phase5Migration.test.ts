@@ -18,8 +18,7 @@ const PHASE4_STORES = {
   decisionRules:
     'id, repertoireId, contextId, positionId, trainingItemId, [repertoireId+positionId]',
   playlists: 'id, name, colour, updatedAt',
-  playlistEntries:
-    'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
+  playlistEntries: 'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
   trainingItems:
     'id, repertoireId, positionKey, acceptedMoveSetKey, promptMode, status, [repertoireId+status]',
   reviewLogs: 'id, trainingItemId, sessionId, observedAt, outcome, evidenceRole',
@@ -27,8 +26,7 @@ const PHASE4_STORES = {
   settings: 'id, updatedAt',
   imports: 'id, repertoireId, importedAt',
   openingNames: 'id, repertoireId, contextId, updatedAt',
-  confusionRelations:
-    'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
+  confusionRelations: 'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
 } as const;
 
 it('migrates an existing PHASE-4 schema v1 in place without replaying review history', async () => {
@@ -77,7 +75,7 @@ it('migrates an existing PHASE-4 schema v1 in place without replaying review his
     expect(meta?.databaseSchemaVersion).toBe(OPENING_TRAINER_DATABASE_SCHEMA_VERSION);
     expect(meta?.portableSchemaVersion).toBe(OPENING_TRAINER_PORTABLE_SCHEMA_VERSION);
     expect(meta?.schedulerCutoverAt).toBeDefined();
-    expect((await current.reviewLogs.get('legacy-observation'))).toEqual(legacyReview);
+    expect(await current.reviewLogs.get('legacy-observation')).toEqual(legacyReview);
     expect(await current.schedulerDecisions.count()).toBe(0);
     expect((await current.schedulerStates.get('legacy-item'))?.state).toMatchObject({
       stage: 'new',

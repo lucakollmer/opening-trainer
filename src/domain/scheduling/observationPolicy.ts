@@ -27,10 +27,7 @@ const GRADE_RANK: Readonly<Record<SchedulerGrade, number>> = {
   Easy: 3,
 };
 
-function responseBand(
-  responseTimeMs: number,
-  state: SchedulerState,
-): ResponseTimeBand {
+function responseBand(responseTimeMs: number, state: SchedulerState): ResponseTimeBand {
   const fastLimit = state.stage === 'review' ? 3_500 : 5_000;
   const ordinaryLimit = state.stage === 'review' ? 12_000 : 15_000;
   if (responseTimeMs <= fastLimit) return 'fast';
@@ -79,12 +76,9 @@ function isNegative(outcome: ReviewObservation['outcome']): boolean {
 }
 
 function isPositive(outcome: ReviewObservation['outcome']): boolean {
-  return [
-    'instant-correct',
-    'correct',
-    'hesitant-correct',
-    'hinted-correct',
-  ].includes(outcome);
+  return ['instant-correct', 'correct', 'hesitant-correct', 'hinted-correct'].includes(
+    outcome,
+  );
 }
 
 export function mapObservationToSchedulerDecision(

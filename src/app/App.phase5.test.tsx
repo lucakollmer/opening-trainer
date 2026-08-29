@@ -41,7 +41,9 @@ it('starts saved repertoires through bounded scheduled-session controls', async 
   expect(screen.getByLabelText('New limit')).toBeVisible();
   expect(screen.getByLabelText('Opponent delay')).toBeVisible();
   expect(screen.getByText(/due · .* new/u)).toBeVisible();
-  expect(screen.queryByText(/stability|difficulty|retrievability/iu)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(/stability|difficulty|retrievability/iu),
+  ).not.toBeInTheDocument();
 
   rendered.unmount();
   await repository.deleteDatabase();

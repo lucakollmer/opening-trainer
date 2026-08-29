@@ -32,12 +32,7 @@ export interface AdaptiveSessionRequest {
 }
 
 export type AdaptiveCandidateClass =
-  | 'repair'
-  | 'weak-due'
-  | 'due'
-  | 'new'
-  | 'contrast'
-  | 'reinforcement';
+  'repair' | 'weak-due' | 'due' | 'new' | 'contrast' | 'reinforcement';
 
 export interface SelectedTrainingCandidate extends TrainingCandidateSnapshot {
   selectionClass: AdaptiveCandidateClass;
@@ -68,8 +63,10 @@ function stableHash(value: string): number {
 function eligibleContrast(candidate: TrainingCandidateSnapshot, now: Date): boolean {
   if (candidate.confusionCount < CONTRAST_CONFUSION_THRESHOLD) return false;
   if (!candidate.lastConfusionAt) return false;
-  return now.getTime() - new Date(candidate.lastConfusionAt).getTime() <=
-    CONTRAST_WINDOW_DAYS * DAY_MS;
+  return (
+    now.getTime() - new Date(candidate.lastConfusionAt).getTime() <=
+    CONTRAST_WINDOW_DAYS * DAY_MS
+  );
 }
 
 function isNew(candidate: TrainingCandidateSnapshot): boolean {
@@ -77,7 +74,10 @@ function isNew(candidate: TrainingCandidateSnapshot): boolean {
 }
 
 function isDue(candidate: TrainingCandidateSnapshot, now: Date): boolean {
-  return !isNew(candidate) && new Date(candidate.schedulerState.dueAt).getTime() <= now.getTime();
+  return (
+    !isNew(candidate) &&
+    new Date(candidate.schedulerState.dueAt).getTime() <= now.getTime()
+  );
 }
 
 function recentFailure(candidate: TrainingCandidateSnapshot, now: Date): boolean {
@@ -142,27 +142,23 @@ function compareCandidates(
   if (classOrder !== 0) return classOrder;
 
   const leftDue = request.now.getTime() - new Date(left.schedulerState.dueAt).getTime();
-  const rightDue = request.now.getTime() - new Date(right.schedulerState.dueAt).getTime();
+  const rightDue =
+    request.now.getTime() - new Date(right.schedulerState.dueAt).getTime();
   if (leftDue !== rightDue) return rightDue - leftDue;
   if (left.retrievability !== right.retrievability) {
     return left.retrievability - right.retrievability;
   }
-  const failureOrder = compareRecentFirst(
-    left.recentFailureAt,
-    right.recentFailureAt,
-  );
+  const failureOrder = compareRecentFirst(left.recentFailureAt, right.recentFailureAt);
   if (failureOrder !== 0) return failureOrder;
 
   const leftPrefixPenalty = previousPrefix && left.prefixKey === previousPrefix ? 1 : 0;
-  const rightPrefixPenalty = previousPrefix && right.prefixKey === previousPrefix ? 1 : 0;
+  const rightPrefixPenalty =
+    previousPrefix && right.prefixKey === previousPrefix ? 1 : 0;
   if (leftPrefixPenalty !== rightPrefixPenalty) {
     return leftPrefixPenalty - rightPrefixPenalty;
   }
 
-  const cooldownOrder = compareOldestFirst(
-    left.lastTargetedAt,
-    right.lastTargetedAt,
-  );
+  const cooldownOrder = compareOldestFirst(left.lastTargetedAt, right.lastTargetedAt);
   if (cooldownOrder !== 0) return cooldownOrder;
   if (left.depth !== right.depth) return right.depth - left.depth;
 

@@ -26,7 +26,11 @@ it('persists deterministic adaptive exercise metadata and carries evidence forwa
       newItemLimit: 1,
       exercises: [
         { descriptor, plan, targetTrainingItemIds: ['item-a'] },
-        { descriptor: { ...descriptor, targetContextId: 'target-2' }, plan, targetTrainingItemIds: ['item-b'] },
+        {
+          descriptor: { ...descriptor, targetContextId: 'target-2' },
+          plan,
+          targetTrainingItemIds: ['item-b'],
+        },
       ],
     },
     1_000,
@@ -64,7 +68,6 @@ it('persists deterministic adaptive exercise metadata and carries evidence forwa
   expect(advanced.evidence.length).toBe(completed.evidence.length);
   expect(advanced.sessionId).toBe('adaptive-session');
 });
-
 
 it('defers an unready end-of-route retest behind another adaptive exercise', () => {
   const plan = compileTrainingFixture(fix01White);

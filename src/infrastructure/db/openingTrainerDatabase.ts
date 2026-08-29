@@ -80,10 +80,7 @@ export interface PlaylistRecord {
 }
 
 export type PlaylistEntryKind =
-  | 'repertoire'
-  | 'include-context'
-  | 'exclude-context'
-  | 'tag';
+  'repertoire' | 'include-context' | 'exclude-context' | 'tag';
 
 export interface PlaylistEntryRecord {
   id: string;
@@ -200,8 +197,7 @@ const PHASE4_STORES = {
   decisionRules:
     'id, repertoireId, contextId, positionId, trainingItemId, [repertoireId+positionId]',
   playlists: 'id, name, colour, updatedAt',
-  playlistEntries:
-    'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
+  playlistEntries: 'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
   trainingItems:
     'id, repertoireId, positionKey, acceptedMoveSetKey, promptMode, status, [repertoireId+status]',
   reviewLogs: 'id, trainingItemId, sessionId, observedAt, outcome, evidenceRole',
@@ -209,8 +205,7 @@ const PHASE4_STORES = {
   settings: 'id, updatedAt',
   imports: 'id, repertoireId, importedAt',
   openingNames: 'id, repertoireId, contextId, updatedAt',
-  confusionRelations:
-    'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
+  confusionRelations: 'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
 } as const;
 
 const PHASE5_STORES = {
@@ -273,9 +268,8 @@ export class OpeningTrainerDatabase extends Dexie {
         if (schedulerRows.length > 0) {
           await transaction.table('schedulerStates').bulkPut(schedulerRows);
         }
-        const meta = (await transaction
-          .table('meta')
-          .get(DATABASE_META_ID)) as DatabaseMetaRecord | undefined;
+        const meta = (await transaction.table('meta').get(DATABASE_META_ID)) as
+          DatabaseMetaRecord | undefined;
         if (meta) {
           await transaction.table('meta').put({
             ...meta,

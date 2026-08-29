@@ -54,7 +54,7 @@ export function createAdaptiveTrainingSession(
 export function hasNextAdaptiveExercise(state: TrainingSessionState): boolean {
   return Boolean(
     state.adaptive &&
-      state.adaptive.exerciseIndex + 1 < state.adaptive.exercises.length,
+    state.adaptive.exerciseIndex + 1 < state.adaptive.exercises.length,
   );
 }
 
@@ -111,8 +111,8 @@ function planCanReachStep(
     if (!step) continue;
     const nextIds = new Set([
       ...(step.nextStepId ? [step.nextStepId] : []),
-      ...Object.values(step.nextStepByAcceptedUci).filter(
-        (value): value is string => Boolean(value),
+      ...Object.values(step.nextStepByAcceptedUci).filter((value): value is string =>
+        Boolean(value),
       ),
     ]);
     nextIds.forEach((nextId) => stack.push(nextId));
@@ -133,8 +133,7 @@ export function deferAdaptiveRetests(
   if (!hasNextAdaptiveExercise(state)) {
     return { state, descriptors: [] };
   }
-  const currentDescriptor =
-    state.adaptive.exercises[state.adaptive.exerciseIndex];
+  const currentDescriptor = state.adaptive.exercises[state.adaptive.exerciseIndex];
   if (!currentDescriptor) return { state, descriptors: [] };
 
   const targetStepIds = [
@@ -142,9 +141,7 @@ export function deferAdaptiveRetests(
       state.retestQueue
         .map((ticket) => ticket.targetStepId)
         .filter((stepId) =>
-          currentPlan.steps.some(
-            (step) => step.id === stepId && step.actor === 'user',
-          ),
+          currentPlan.steps.some((step) => step.id === stepId && step.actor === 'user'),
         ),
     ),
   ];
@@ -159,10 +156,8 @@ export function deferAdaptiveRetests(
         planCanReachStep(currentPlan, stepId, anchorStepId),
     );
     const targetContextId = [...chain].sort((left, right) => {
-      const leftPly =
-        currentPlan.steps.find((step) => step.id === left)?.ply ?? -1;
-      const rightPly =
-        currentPlan.steps.find((step) => step.id === right)?.ply ?? -1;
+      const leftPly = currentPlan.steps.find((step) => step.id === left)?.ply ?? -1;
+      const rightPly = currentPlan.steps.find((step) => step.id === right)?.ply ?? -1;
       return rightPly - leftPly || left.localeCompare(right);
     })[0]!;
     descriptors.push({
@@ -206,12 +201,11 @@ export function adaptiveSessionSummary(state: TrainingSessionState) {
   ).length;
   const hinted = targeted.filter((observation) => observation.hintLevel > 0).length;
   const failed = targeted.filter((observation) =>
-    ['wrong-variation', 'outside-repertoire', 'revealed'].includes(
-      observation.outcome,
-    ),
+    ['wrong-variation', 'outside-repertoire', 'revealed'].includes(observation.outcome),
   ).length;
-  const confusions = targeted.filter((observation) => observation.confusionContextId)
-    .length;
+  const confusions = targeted.filter(
+    (observation) => observation.confusionContextId,
+  ).length;
   const repaired = targeted.filter(
     (observation) => observation.outcome === 'repair-correct',
   ).length;

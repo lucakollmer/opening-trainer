@@ -66,11 +66,7 @@ import {
 
 const SESSION_POLICY_VERSION = 'phase5-adaptive-session-v1';
 const TERMINAL_SESSION_STATUSES = new Set(['session-complete', 'abandoned']);
-const FAILURE_OUTCOMES = new Set([
-  'wrong-variation',
-  'outside-repertoire',
-  'revealed',
-]);
+const FAILURE_OUTCOMES = new Set(['wrong-variation', 'outside-repertoire', 'revealed']);
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -146,7 +142,8 @@ function chooseContextId(
   seed: string,
 ): string {
   const candidates = contextIds.filter((id) => contexts.has(id));
-  if (candidates.length === 0) throw new Error('Training item has no available context.');
+  if (candidates.length === 0)
+    throw new Error('Training item has no available context.');
   return [...candidates].sort(
     (left, right) =>
       stableHash(`${seed}:${left}`) - stableHash(`${seed}:${right}`) ||
@@ -182,10 +179,7 @@ export class OpeningTrainerRepository {
     await this.operationQueue;
   }
 
-  private schedulerRecord(
-    trainingItemId: string,
-    now: string,
-  ): SchedulerStateRecord {
+  private schedulerRecord(trainingItemId: string, now: string): SchedulerStateRecord {
     return {
       id: trainingItemId,
       trainingItemId,
@@ -312,7 +306,9 @@ export class OpeningTrainerRepository {
     if (playlistId && !playlist) {
       throw new Error(`Missing playlist ${playlistId}.`);
     }
-    const positions = new Map(graph.positions.map((position) => [position.id, position]));
+    const positions = new Map(
+      graph.positions.map((position) => [position.id, position]),
+    );
     const existingRows = await this.database.trainingItems
       .where('repertoireId')
       .equals(repertoireId)
@@ -363,35 +359,39 @@ export class OpeningTrainerRepository {
       const reuseUnscopedItem = Boolean(
         playlistId && prior && (!prior.playlistIds || prior.playlistIds.length === 0),
       );
-      const scopedPlaylists = !playlistId || reuseUnscopedItem
-        ? undefined
-        : [...new Set([...(prior?.playlistIds ?? []), playlistId])].sort();
+      const scopedPlaylists =
+        !playlistId || reuseUnscopedItem
+          ? undefined
+          : [...new Set([...(prior?.playlistIds ?? []), playlistId])].sort();
       if (!itemPrototype.has(trainingItemId)) {
-        itemPrototype.set(trainingItemId, reuseUnscopedItem && prior
-          ? {
-              ...prior,
-              status: 'active',
-              updatedAt: now,
-            }
-          : {
-              id: trainingItemId,
-              repertoireId,
-              contextScopeKey,
-              positionKey: position.key,
-              acceptedMoveSetKey: accepted.normalizedKey,
-              promptMode,
-              contextIds: [],
-              ...(scopedPlaylists && scopedPlaylists.length > 0
-                ? { playlistIds: scopedPlaylists }
-                : {}),
-              status: 'active',
-              createdAt: prior?.createdAt ?? now,
-              updatedAt: now,
-            });
+        itemPrototype.set(
+          trainingItemId,
+          reuseUnscopedItem && prior
+            ? {
+                ...prior,
+                status: 'active',
+                updatedAt: now,
+              }
+            : {
+                id: trainingItemId,
+                repertoireId,
+                contextScopeKey,
+                positionKey: position.key,
+                acceptedMoveSetKey: accepted.normalizedKey,
+                promptMode,
+                contextIds: [],
+                ...(scopedPlaylists && scopedPlaylists.length > 0
+                  ? { playlistIds: scopedPlaylists }
+                  : {}),
+                status: 'active',
+                createdAt: prior?.createdAt ?? now,
+                updatedAt: now,
+              },
+        );
       }
-      const contextSet = itemContexts.get(trainingItemId) ?? new Set<string>(
-        playlistId && prior ? prior.contextIds : [],
-      );
+      const contextSet =
+        itemContexts.get(trainingItemId) ??
+        new Set<string>(playlistId && prior ? prior.contextIds : []);
       contextSet.add(context.id);
       itemContexts.set(trainingItemId, contextSet);
       decisionRules.push({
@@ -469,9 +469,7 @@ export class OpeningTrainerRepository {
             (rule.playlistId ?? undefined) === (playlistId ?? undefined),
         );
         if (oldRules.length > 0) {
-          await this.database.decisionRules.bulkDelete(
-            oldRules.map((rule) => rule.id),
-          );
+          await this.database.decisionRules.bulkDelete(oldRules.map((rule) => rule.id));
         }
         if (decisionRules.length > 0) {
           await this.database.decisionRules.bulkPut(decisionRules);
@@ -489,9 +487,7 @@ export class OpeningTrainerRepository {
         }
         for (const item of activeItems) {
           if (!(await this.database.schedulerStates.get(item.id))) {
-            await this.database.schedulerStates.put(
-              this.schedulerRecord(item.id, now),
-            );
+            await this.database.schedulerStates.put(this.schedulerRecord(item.id, now));
           }
         }
         const meta = await this.database.meta.get(DATABASE_META_ID);
@@ -753,7 +749,9 @@ export class OpeningTrainerRepository {
       this.database.reviewLogs.toArray(),
       this.database.confusionRelations.toArray(),
     ]);
-    const stateByItem = new Map(states.map((record) => [record.trainingItemId, record]));
+    const stateByItem = new Map(
+      states.map((record) => [record.trainingItemId, record]),
+    );
     const contexts = new Map(graph.contexts.map((context) => [context.id, context]));
     const playlist = options.playlistId
       ? graph.playlists.find((candidate) => candidate.id === options.playlistId)
@@ -785,13 +783,13 @@ export class OpeningTrainerRepository {
       const allowedContextIds = item.contextIds.filter((contextId) => {
         const context = contexts.get(contextId);
         return Boolean(
-          context && (!playlist || playlistAllowsRouteContext(graph, playlist, context)),
+          context &&
+          (!playlist || playlistAllowsRouteContext(graph, playlist, context)),
         );
       });
       if (allowedContextIds.length === 0) return [];
       const record =
-        stateByItem.get(item.id) ??
-        this.schedulerRecord(item.id, now.toISOString());
+        stateByItem.get(item.id) ?? this.schedulerRecord(item.id, now.toISOString());
       const contextId = chooseContextId(allowedContextIds, contexts, seed);
       const relatedItemIds =
         item.promptMode === 'contrast'
@@ -810,7 +808,9 @@ export class OpeningTrainerRepository {
       const targeted = itemReviews
         .filter((review) => review.evidenceRole === 'targeted')
         .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
-      const failures = targeted.filter((review) => FAILURE_OUTCOMES.has(review.outcome));
+      const failures = targeted.filter((review) =>
+        FAILURE_OUTCOMES.has(review.outcome),
+      );
       const itemConfusions = relatedItemIds.flatMap(
         (trainingItemId) => confusionByItem.get(trainingItemId) ?? [],
       );
@@ -818,19 +818,21 @@ export class OpeningTrainerRepository {
         .map((row) => row.lastObservedAt)
         .sort()
         .at(-1);
-      return [{
-        trainingItemId: item.id,
-        contextIds: allowedContextIds,
-        promptMode: item.promptMode,
-        schedulerState: record.state,
-        retrievability: this.#scheduler.retrievability(record.state, now),
-        depth: contextPly(contexts.get(contextId)!, contexts),
-        prefixKey: prefixKeyForContext(contextId, contexts),
-        ...(failures[0] ? { recentFailureAt: failures[0].observedAt } : {}),
-        ...(targeted[0] ? { lastTargetedAt: targeted[0].observedAt } : {}),
-        confusionCount: itemConfusions.reduce((total, row) => total + row.count, 0),
-        ...(lastConfusionAt ? { lastConfusionAt } : {}),
-      }];
+      return [
+        {
+          trainingItemId: item.id,
+          contextIds: allowedContextIds,
+          promptMode: item.promptMode,
+          schedulerState: record.state,
+          retrievability: this.#scheduler.retrievability(record.state, now),
+          depth: contextPly(contexts.get(contextId)!, contexts),
+          prefixKey: prefixKeyForContext(contextId, contexts),
+          ...(failures[0] ? { recentFailureAt: failures[0].observedAt } : {}),
+          ...(targeted[0] ? { lastTargetedAt: targeted[0].observedAt } : {}),
+          confusionCount: itemConfusions.reduce((total, row) => total + row.count, 0),
+          ...(lastConfusionAt ? { lastConfusionAt } : {}),
+        },
+      ];
     });
   }
 
@@ -868,11 +870,11 @@ export class OpeningTrainerRepository {
     };
   }
 
-  private async adaptiveExercise(
+  private adaptiveExercise(
     graph: RepertoireGraph,
     descriptor: AdaptiveExerciseDescriptor,
     targetTrainingItemIds: readonly string[],
-  ): Promise<AdaptiveExercisePlan> {
+  ): AdaptiveExercisePlan {
     return {
       descriptor,
       targetTrainingItemIds,
@@ -901,8 +903,7 @@ export class OpeningTrainerRepository {
       const rule = rules.find(
         (candidate) =>
           candidate.promptMode === descriptor.promptMode &&
-          (candidate.playlistId ?? undefined) ===
-            (descriptor.playlistId ?? undefined),
+          (candidate.playlistId ?? undefined) === (descriptor.playlistId ?? undefined),
       );
       if (rule && !trainingItemIds.includes(rule.trainingItemId)) {
         trainingItemIds.push(rule.trainingItemId);
@@ -986,12 +987,13 @@ export class OpeningTrainerRepository {
           (path.includes(anchor.contextId) || anchorPath.includes(row.contextId))
         );
       });
-      const endpoint = [...chainCandidates].sort(
-        (left, right) =>
-          contextPath(right.contextId, contexts).length -
-            contextPath(left.contextId, contexts).length ||
-          left.contextId.localeCompare(right.contextId),
-      )[0] ?? anchor;
+      const endpoint =
+        [...chainCandidates].sort(
+          (left, right) =>
+            contextPath(right.contextId, contexts).length -
+              contextPath(left.contextId, contexts).length ||
+            left.contextId.localeCompare(right.contextId),
+        )[0] ?? anchor;
       const routePath = new Set(contextPath(endpoint.contextId, contexts));
       const batched = remaining
         .filter(
@@ -1009,7 +1011,7 @@ export class OpeningTrainerRepository {
         ...(options.playlistId ? { playlistId: options.playlistId } : {}),
       };
       exercises.push(
-        await this.adaptiveExercise(
+        this.adaptiveExercise(
           graph,
           descriptor,
           batched.map((row) => row.candidate.trainingItemId),
@@ -1162,8 +1164,8 @@ export class OpeningTrainerRepository {
 
           const existingSession = await this.database.sessions.get(state.sessionId);
           const terminal = TERMINAL_SESSION_STATUSES.has(state.status);
-          const targetIds = state.adaptive?.targetTrainingItemIds ??
-            state.targetTrainingItemIds;
+          const targetIds =
+            state.adaptive?.targetTrainingItemIds ?? state.targetTrainingItemIds;
           const record: SessionRecord = {
             id: state.sessionId,
             planId: state.planId,

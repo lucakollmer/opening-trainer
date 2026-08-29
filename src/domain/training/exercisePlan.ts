@@ -27,9 +27,7 @@ export interface TrainingExerciseStep {
   nextStepId?: string;
   nextStepByAcceptedUci: Readonly<Record<string, string | undefined>>;
   treeItemIdByAcceptedUci?: Readonly<Record<string, string>>;
-  targetDispositionByAcceptedUci?: Readonly<
-    Record<string, 'preserved' | 'displaced'>
-  >;
+  targetDispositionByAcceptedUci?: Readonly<Record<string, 'preserved' | 'displaced'>>;
   displacedTargetStepIdsByAcceptedUci?: Readonly<Record<string, readonly string[]>>;
 }
 

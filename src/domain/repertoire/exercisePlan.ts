@@ -145,17 +145,15 @@ function knownSiblingMoves(
     .filter((move) => {
       const context = contexts.get(move.contextId);
       return (
-        context?.repertoireId === repertoireId &&
-        context.entryPositionId === positionId
+        context?.repertoireId === repertoireId && context.entryPositionId === positionId
       );
     })
     .map((move) => ({
       uci: edges.get(move.edgeId)?.uci,
       confusionContextId: move.destinationContextId,
     }))
-    .filter(
-      (item): item is { uci: string; confusionContextId: string } =>
-        Boolean(item.uci && !acceptedUci.has(item.uci)),
+    .filter((item): item is { uci: string; confusionContextId: string } =>
+      Boolean(item.uci && !acceptedUci.has(item.uci)),
     )
     .sort(
       (left, right) =>
@@ -196,9 +194,7 @@ export function createGraphExercisePlan(
     contexts.get(options.targetContextId),
     `Missing target context ${options.targetContextId}`,
   );
-  const targetIds = [
-    ...new Set([...(options.targetContextIds ?? []), target.id]),
-  ];
+  const targetIds = [...new Set([...(options.targetContextIds ?? []), target.id])];
   const targets = targetIds.map((id) =>
     required(contexts.get(id), `Missing target context ${id}`),
   );
@@ -206,7 +202,9 @@ export function createGraphExercisePlan(
     root.repertoireId !== repertoire.id ||
     targets.some((item) => item.repertoireId !== repertoire.id)
   ) {
-    throw new Error('Exercise root and targets must belong to the selected repertoire.');
+    throw new Error(
+      'Exercise root and targets must belong to the selected repertoire.',
+    );
   }
   if (!routeContextAllowed(graph, root, contexts, playlist)) {
     throw new Error('Exercise root is outside the selected playlist route.');
@@ -357,12 +355,7 @@ export function createGraphExercisePlan(
     });
     const siblingMoves =
       actor === 'user'
-        ? knownSiblingMoves(
-            graph,
-            repertoire.id,
-            context.entryPositionId,
-            acceptedUcis,
-          )
+        ? knownSiblingMoves(graph, repertoire.id, context.entryPositionId, acceptedUcis)
         : [];
     compiled.push({
       id: context.id,
@@ -391,7 +384,9 @@ export function createGraphExercisePlan(
   }
 
   for (const targetContext of targets) {
-    if (!compiled.some((step) => step.id === targetContext.id && step.actor === 'user')) {
+    if (
+      !compiled.some((step) => step.id === targetContext.id && step.actor === 'user')
+    ) {
       throw new Error(
         'Every target context must resolve to a user decision with accepted moves.',
       );

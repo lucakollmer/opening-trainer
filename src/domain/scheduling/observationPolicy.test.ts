@@ -2,9 +2,7 @@ import type { ReviewObservation } from '../training/session';
 import { createEmptySchedulerState, type SchedulerState } from './schedulerPort';
 import { mapObservationToSchedulerDecision } from './observationPolicy';
 
-function observation(
-  patch: Partial<ReviewObservation> = {},
-): ReviewObservation {
+function observation(patch: Partial<ReviewObservation> = {}): ReviewObservation {
   return {
     id: 'obs-1',
     trainingItemId: 'item-1',
