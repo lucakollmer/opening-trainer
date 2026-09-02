@@ -1,4 +1,4 @@
-import { moveFromUci } from '../chess/chessAdapter';
+import { moveFromUci, structuralMoveHint } from '../chess/chessAdapter';
 import type {
   TrainingExercisePlan,
   TrainingExerciseStep,
@@ -357,6 +357,8 @@ export function createGraphExercisePlan(
       actor === 'user'
         ? knownSiblingMoves(graph, repertoire.id, context.entryPositionId, acceptedUcis)
         : [];
+    const hint =
+      actor === 'user' ? structuralMoveHint(position.fen, selectedInput) : null;
     compiled.push({
       id: context.id,
       ply: contextPly(context, contexts),
@@ -371,6 +373,7 @@ export function createGraphExercisePlan(
       acceptedMoveSetKey: accepted.normalizedKey,
       trainingItemId,
       positionKey: position.key,
+      ...(hint ? { hint } : {}),
       wrongSiblingUci: siblingMoves.map((move) => move.uci),
       confusionContextIdByWrongUci: Object.fromEntries(
         siblingMoves.map((move) => [move.uci, move.confusionContextId]),

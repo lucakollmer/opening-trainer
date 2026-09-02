@@ -24,12 +24,42 @@ export interface LegalMoveResult {
   fen: string;
 }
 
+export interface StructuralMoveHint {
+  piece: string;
+  candidateDestinations: readonly string[];
+  purpose: string;
+}
+
 export type ApplyMoveResult =
   | { kind: 'applied'; move: AppliedChessMove }
   | { kind: 'illegal-move' }
   | { kind: 'invalid-position'; message: string };
 
 const SQUARE_PATTERN = /^[a-h][1-8]$/u;
+
+function pieceName(type: string): string {
+  switch (type) {
+    case 'k':
+      return 'king';
+    case 'q':
+      return 'queen';
+    case 'r':
+      return 'rook';
+    case 'b':
+      return 'bishop';
+    case 'n':
+      return 'knight';
+    default:
+      return 'pawn';
+  }
+}
+
+function destinationRegion(square: string): 'queenside' | 'centre' | 'kingside' {
+  const file = square.charCodeAt(0) - 'a'.charCodeAt(0);
+  if (file <= 2) return 'queenside';
+  if (file >= 5) return 'kingside';
+  return 'centre';
+}
 
 export function moveToUci(move: ChessMoveInput): string {
   return `${move.from}${move.to}${move.promotion ?? ''}`;
@@ -43,6 +73,34 @@ export function moveFromUci(uci: string): ChessMoveInput | null {
     to: normalized.slice(2, 4),
     ...(normalized.length === 5 ? { promotion: normalized[4] as PromotionPiece } : {}),
   };
+}
+
+export function structuralMoveHint(
+  fen: string,
+  input: ChessMoveInput,
+): StructuralMoveHint | null {
+  if (!SQUARE_PATTERN.test(input.from) || !SQUARE_PATTERN.test(input.to)) return null;
+
+  try {
+    const game = new Chess(fen);
+    const piece = game.get(input.from as Square);
+    if (!piece) return null;
+    const candidateDestinations = [
+      ...new Set(
+        game
+          .moves({ square: input.from as Square, verbose: true })
+          .map((move) => move.to),
+      ),
+    ].sort();
+    if (candidateDestinations.length === 0) return null;
+    return {
+      piece: `${pieceName(piece.type)} on ${input.from}`,
+      candidateDestinations,
+      purpose: `The repertoire move heads toward the ${destinationRegion(input.to)}.`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function tryApplyMove(fen: string, input: ChessMoveInput): ApplyMoveResult {

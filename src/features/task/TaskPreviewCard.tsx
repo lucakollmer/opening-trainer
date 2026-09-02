@@ -8,6 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { useEffect, useState } from 'react';
 import {
   canSubmitUserMove,
   currentFixtureStep,
@@ -16,6 +17,8 @@ import {
   type TrainingSessionState,
 } from '../../domain/training/session';
 import type { TrainingExercisePlan } from '../../domain/training/exercisePlan';
+
+const HINT_NUDGE_DELAY_MS = 10_000;
 
 interface TaskPreviewCardProps {
   session: TrainingSessionState;
@@ -136,6 +139,13 @@ export function TaskPreviewCard({
     session.status !== 'repair-replay' &&
     step?.actor === 'user' &&
     Boolean(step.hint);
+  const hintNudgeKey = [
+    session.sessionId,
+    session.runKind,
+    session.currentStepId ?? 'none',
+  ].join(':');
+  const [offeredHintKey, setOfferedHintKey] = useState<string | null>(null);
+  const hintNudgeVisible = session.hintLevel === 0 && offeredHintKey === hintNudgeKey;
   const readyRetests = readyRetestCount(session);
   const totalPlies = Math.max(1, ...plan.steps.map((item) => item.ply + 1));
   const adaptiveProgress = session.adaptive
@@ -143,6 +153,21 @@ export function TaskPreviewCard({
     : null;
   const promptMode =
     session.adaptive?.exercises[session.adaptive.exerciseIndex]?.promptMode;
+
+  useEffect(() => {
+    if (
+      !hintAllowed ||
+      session.hintLevel !== 0 ||
+      session.status !== 'awaiting-user-move'
+    ) {
+      return undefined;
+    }
+    const timer = globalThis.setTimeout(
+      () => setOfferedHintKey(hintNudgeKey),
+      HINT_NUDGE_DELAY_MS,
+    );
+    return () => globalThis.clearTimeout(timer);
+  }, [hintAllowed, hintNudgeKey, session.hintLevel, session.status]);
 
   return (
     <Card component="section" aria-labelledby="task-heading" variant="outlined">
@@ -224,7 +249,11 @@ export function TaskPreviewCard({
 
       <CardActions sx={{ flexWrap: 'wrap', gap: 0.5 }}>
         {hintAllowed && session.hintLevel < 3 ? (
-          <Button onClick={onHint}>Hint {session.hintLevel + 1}</Button>
+          <Button onClick={onHint} variant={hintNudgeVisible ? 'outlined' : 'text'}>
+            {hintNudgeVisible && session.hintLevel === 0
+              ? 'Need a hint?'
+              : `Hint ${session.hintLevel + 1}`}
+          </Button>
         ) : null}
         {hintAllowed && session.hintLevel < 4 ? (
           <Button onClick={onReveal}>Reveal move</Button>
