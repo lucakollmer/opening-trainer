@@ -17,6 +17,7 @@ import {
 
 export const TS_FSRS_ADAPTER_VERSION = 'ts-fsrs@5.4.1';
 export const TS_FSRS_PARAMETERS_VERSION = 'phase5-default-v1';
+export type TsFsrsParameterProfile = typeof TS_FSRS_PARAMETERS_VERSION;
 
 const STAGE_TO_FSRS: Readonly<Record<SchedulerStage, State>> = {
   new: State.New,
@@ -38,6 +39,13 @@ const GRADE_TO_FSRS = {
   Good: Rating.Good,
   Easy: Rating.Easy,
 } as const;
+
+function parametersForProfile(profile: string): FSRSParameters {
+  if (profile !== TS_FSRS_PARAMETERS_VERSION) {
+    throw new Error(`Unsupported FSRS parameter profile: ${profile}`);
+  }
+  return generatorParameters({ enable_fuzz: false });
+}
 
 function fromCard(card: Card): SchedulerState {
   return {
@@ -72,15 +80,13 @@ function toCard(state: SchedulerState): Card {
 
 export class TsFsrsSchedulerAdapter implements SchedulerPort {
   public readonly adapterVersion = TS_FSRS_ADAPTER_VERSION;
-  public readonly parametersVersion = TS_FSRS_PARAMETERS_VERSION;
+  public readonly parametersVersion: TsFsrsParameterProfile;
   readonly #parameters: FSRSParameters;
   readonly #scheduler: ReturnType<typeof fsrs>;
 
-  public constructor(parameters?: Partial<FSRSParameters>) {
-    this.#parameters = generatorParameters({
-      ...parameters,
-      enable_fuzz: false,
-    });
+  public constructor(profile: TsFsrsParameterProfile = TS_FSRS_PARAMETERS_VERSION) {
+    this.parametersVersion = profile;
+    this.#parameters = parametersForProfile(profile);
     this.#scheduler = fsrs(this.#parameters);
   }
 

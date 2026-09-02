@@ -14,15 +14,13 @@ describe('ts-fsrs infrastructure adapter', () => {
     expect(state.stage).toBe('new');
     expect(configuration.enable_fuzz).toBe(false);
     expect(adapter.adapterVersion).toBe('ts-fsrs@5.4.1');
+    expect(adapter.parametersVersion).toBe('phase5-default-v1');
   });
 
-  it('refuses to re-enable fuzz even when caller parameters request it', () => {
-    const adapter = new TsFsrsSchedulerAdapter({ enable_fuzz: true });
-    const configuration = JSON.parse(adapter.serializeConfiguration()) as Record<
-      string,
-      unknown
-    >;
-    expect(configuration.enable_fuzz).toBe(false);
+  it('rejects unnamed parameter configurations instead of mislabelling them', () => {
+    expect(
+      () => new TsFsrsSchedulerAdapter('phase5-unknown-v1' as never),
+    ).toThrow(/Unsupported FSRS parameter profile/u);
   });
 
   it('round-trips a review without exposing a ts-fsrs Card', () => {

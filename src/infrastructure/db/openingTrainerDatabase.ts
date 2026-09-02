@@ -18,6 +18,7 @@ import {
   type SchedulerObservationAction,
 } from '../../domain/scheduling/observationPolicy';
 import {
+  SCHEDULER_STATE_SCHEMA_VERSION,
   createEmptySchedulerState,
   type SchedulerGrade,
   type SchedulerState,
@@ -216,6 +217,99 @@ const PHASE5_STORES = {
     'id, &observationId, trainingItemId, action, grade, decidedAt, policyVersion',
 } as const;
 
+const ISO_DATE_TIME_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+const SCHEDULER_STAGES = new Set(['new', 'learning', 'review', 'relearning']);
+
+function assertIsoDateTime(value: string | undefined, label: string): void {
+  if (
+    !value ||
+    !ISO_DATE_TIME_PATTERN.test(value) ||
+    Number.isNaN(new Date(value).getTime())
+  ) {
+    throw new Error(`${label} must be a valid ISO date-time.`);
+  }
+}
+
+function assertSchedulerState(state: SchedulerState, label: string): void {
+  if (state.schemaVersion !== SCHEDULER_STATE_SCHEMA_VERSION) {
+    throw new Error(`${label} uses an unsupported scheduler-state schema.`);
+  }
+  assertIsoDateTime(state.dueAt, `${label}.dueAt`);
+  if (state.lastReviewAt !== undefined) {
+    assertIsoDateTime(state.lastReviewAt, `${label}.lastReviewAt`);
+  }
+  for (const [field, value] of [
+    ['stability', state.stability],
+    ['difficulty', state.difficulty],
+    ['elapsedDays', state.elapsedDays],
+    ['scheduledDays', state.scheduledDays],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${label}.${field} must be a finite non-negative number.`);
+    }
+  }
+  for (const [field, value] of [
+    ['learningSteps', state.learningSteps],
+    ['reps', state.reps],
+    ['lapses', state.lapses],
+  ] as const) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error(`${label}.${field} must be a non-negative integer.`);
+    }
+  }
+  if (!SCHEDULER_STAGES.has(state.stage)) {
+    throw new Error(`${label}.stage is unsupported.`);
+  }
+}
+
+export function assertCurrentSchedulerStateRecord(
+  record: SchedulerStateRecord,
+  label = `Scheduler state ${record.id}`,
+): void {
+  if (record.id !== record.trainingItemId) {
+    throw new Error(`${label} has a mismatched training-item identity.`);
+  }
+  if (record.adapterVersion !== TS_FSRS_ADAPTER_VERSION) {
+    throw new Error(
+      `${label} requires unsupported adapter ${record.adapterVersion}; expected ${TS_FSRS_ADAPTER_VERSION}.`,
+    );
+  }
+  if (record.parametersVersion !== TS_FSRS_PARAMETERS_VERSION) {
+    throw new Error(
+      `${label} requires unsupported parameter profile ${record.parametersVersion}; expected ${TS_FSRS_PARAMETERS_VERSION}.`,
+    );
+  }
+  if (record.mappingPolicyVersion !== SCHEDULER_MAPPING_POLICY_VERSION) {
+    throw new Error(
+      `${label} requires unsupported mapping policy ${record.mappingPolicyVersion}; expected ${SCHEDULER_MAPPING_POLICY_VERSION}.`,
+    );
+  }
+  assertIsoDateTime(record.createdAt, `${label}.createdAt`);
+  assertIsoDateTime(record.updatedAt, `${label}.updatedAt`);
+  assertSchedulerState(record.state, `${label}.state`);
+}
+
+function assertReviewLogRecord(record: ReviewLogRecord): void {
+  assertIsoDateTime(record.observedAt, `Review ${record.id}.observedAt`);
+}
+
+function assertSchedulerDecisionRecord(record: SchedulerDecisionRecord): void {
+  assertIsoDateTime(record.decidedAt, `Scheduler decision ${record.id}.decidedAt`);
+  assertIsoDateTime(
+    record.previousDueAt,
+    `Scheduler decision ${record.id}.previousDueAt`,
+  );
+  assertIsoDateTime(
+    record.resultingDueAt,
+    `Scheduler decision ${record.id}.resultingDueAt`,
+  );
+  assertSchedulerState(
+    record.resultingState,
+    `Scheduler decision ${record.id}.resultingState`,
+  );
+}
+
 function migratedSchedulerRecord(
   item: TrainingItemRecord,
   cutoverAt: string,
@@ -280,6 +374,30 @@ export class OpeningTrainerDatabase extends Dexie {
           });
         }
       });
+
+    this.table<SchedulerStateRecord, string>('schedulerStates').hook(
+      'creating',
+      (_primaryKey, record) => assertCurrentSchedulerStateRecord(record),
+    );
+    this.table<ReviewLogRecord, string>('reviewLogs').hook(
+      'creating',
+      (_primaryKey, record) => assertReviewLogRecord(record),
+    );
+    this.table<SchedulerDecisionRecord, string>('schedulerDecisions').hook(
+      'creating',
+      (_primaryKey, record) => assertSchedulerDecisionRecord(record),
+    );
+
+    this.on('ready', async () => {
+      const [schedulerStates, reviewLogs, schedulerDecisions] = await Promise.all([
+        this.table<SchedulerStateRecord, string>('schedulerStates').toArray(),
+        this.table<ReviewLogRecord, string>('reviewLogs').toArray(),
+        this.table<SchedulerDecisionRecord, string>('schedulerDecisions').toArray(),
+      ]);
+      schedulerStates.forEach((record) => assertCurrentSchedulerStateRecord(record));
+      reviewLogs.forEach((record) => assertReviewLogRecord(record));
+      schedulerDecisions.forEach((record) => assertSchedulerDecisionRecord(record));
+    });
   }
 }
 

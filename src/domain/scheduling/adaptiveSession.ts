@@ -191,7 +191,9 @@ export function deferAdaptiveRetests(
 
 export function adaptiveSessionSummary(state: TrainingSessionState) {
   const targeted = state.evidence.filter(
-    (observation) => observation.evidenceRole === 'targeted',
+    (observation) =>
+      observation.evidenceRole === 'targeted' &&
+      observation.outcome !== 'illegal-attempt',
   );
   const correctWithoutHint = targeted.filter(
     (observation) =>

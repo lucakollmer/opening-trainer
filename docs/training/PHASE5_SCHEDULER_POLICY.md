@@ -7,6 +7,13 @@
 ISO timestamps. `enable_fuzz` is disabled so a fixed state/time/grade has a deterministic
 result.
 
+The adapter accepts only named immutable parameter profiles. PHASE-5 supports
+`phase5-default-v1`; callers cannot pass arbitrary `ts-fsrs` parameter overrides while
+retaining that profile identifier. Persisted scheduler-state projections must match the
+current adapter, parameter-profile and mapping-policy versions before they can be opened or
+restored. Unsupported projections fail closed without rewriting data. Historical scheduler
+decisions may retain older version metadata because those rows are immutable audit evidence.
+
 ## Mapping versions
 
 - chess mapping: `chess-fsrs-v1`
@@ -20,7 +27,10 @@ scheduler-decision row records the mapping result.
 ## Response bands
 
 Response duration is measured with the browser monotonic clock and the review timestamp
-is recorded separately from the wall clock.
+is recorded separately from the wall clock. Production evidence-producing UI events supply
+the wall timestamp explicitly. The reducer never converts a monotonic `performance.now()`
+value into a calendar date; legacy/test callers that omit the wall timestamp receive a real
+wall-clock timestamp at evidence creation instead.
 
 | Item stage                  |     fast | ordinary | hesitant |
 | --------------------------- | -------: | -------: | -------: |
@@ -42,6 +52,12 @@ least three days. Only mature, fast, unhinted recall can receive `Easy` from an 
 | ordinary correct             | Good                |
 | mature fast unhinted correct | Easy                |
 | repair-correct               | no scheduler update |
+| illegal-attempt raw event    | no scheduler update |
+
+Illegal attempts are preserved immediately as raw observations so an interruption before
+the eventual answer cannot erase them. Each illegal-attempt row is scheduler-neutral. The
+terminal answer still carries the aggregate illegal-attempt count, and only that terminal
+outcome can advance FSRS.
 
 Hint and illegal-attempt caps can only reduce a positive grade:
 
@@ -56,8 +72,8 @@ Hint and illegal-attempt caps can only reduce a positive grade:
 Positive incidental observations receive a scheduler decision with action `none` and do
 not extend an interval. Incidental failures receive `promote-target`; they create targeted
 repair/retest work but do not apply a scheduler review until that targeted attempt occurs.
-This is the invariant that prevents shared mature prefixes from accumulating artificial
-interval growth.
+Incidental illegal-attempt rows are also scheduler-neutral. This is the invariant that
+prevents shared mature prefixes from accumulating artificial interval growth.
 
 ## Adaptive generator
 
@@ -72,9 +88,13 @@ For Normal, Guided and Strict sessions the order is:
 4. bounded new item;
 5. optional non-due reinforcement.
 
-Within a class the ordering uses overdue duration, lower retrievability, recent failure,
-repeated-prefix penalty, exercise cooldown, depth, then a stable seeded hash. A new-item
-limit is enforced independently of the requested target count.
+The v1 weak threshold is retrievability `< 0.82`; a targeted failure remains recent for 14
+days. Both are named policy constants with boundary tests. Within a class the ordering uses
+overdue duration, lower retrievability, recent failure, repeated-prefix penalty, exercise
+cooldown, depth, then a stable seeded hash. A new-item limit is enforced independently of
+the requested target count. The current prefix key uses the first three contextual path
+occurrences; this transparent bounded approximation is deliberately subordinate to due/weak
+urgency.
 
 Contrast is an explicit bounded session mode in PHASE-5 rather than being silently mixed
 into ordinary recall. It becomes eligible after two recorded confusion events with the
@@ -96,6 +116,15 @@ replacement tickets with the same separation/cap rules as other same-session ret
 A batched target that was already answered is never requeued merely because a later valid
 branch displaces a deeper target. The answered decision is still scored normally.
 
+## Hint disclosure edge case
+
+Generated Hint 2 is the union of legal destinations for the accepted source piece or pieces,
+not the repertoire destination set. In positions where that legal-destination union contains
+only one square, the requested Hint 2 necessarily discloses the destination. PHASE-5 treats
+that as an intentionally strong level-2 hint and therefore caps a subsequent positive grade
+at Hard; it is not silently promoted to level-4 Reveal. Explicit Reveal remains a distinct
+user action that records `Again`, initiates repair and queues delayed retest work.
+
 ## Bounded session settings
 
 The Phase-5 toolbar exposes only bounded session controls: target count, new-item limit,
@@ -106,18 +135,23 @@ mode overrides the visual delay to zero without changing scheduler semantics.
 ## Recovery and idempotency
 
 Adaptive session metadata stores the seed and deterministic exercise descriptors. Reload
-rebuilds the current route from those descriptors instead of re-running candidate
-selection against already-mutated scheduler state.
+rebuilds the current route from those descriptors instead of re-running candidate selection
+against already-mutated scheduler state.
 
 A raw observation, its scheduler decision and any resulting scheduler-state update commit
 in one Dexie transaction using the observation ID as the idempotency key. Re-saving a
-session snapshot cannot advance the same review twice.
+session snapshot cannot advance the same review twice. Scheduling-critical stored timestamps
+are validated as real ISO date-times at the database boundary so malformed restored/local
+scheduler data fails closed instead of entering due-order or FSRS calculations.
 
 ## Same-session retest orchestration
 
 A failure keeps its original negative observation, requires immediate repair, and creates
 a delayed retest ticket with minimum separation one and maximum two returns for that
 decision. If a line ends before the ticket is ready and another scheduled exercise exists,
-the coordinator places that intervening route first and persists a deterministic retest
-exercise descriptor after it. If no intervening work exists, the failure remains explicitly
-unresolved; the session never invents success merely to satisfy the requested target count.
+the coordinator places at least one intervening scheduled route first and persists a
+deterministic retest exercise descriptor. In generator v1, deferred retest descriptors are
+appended after the already-generated scheduled queue, so actual separation may be greater
+than one route; this is intentional bounded behavior, not a promise of exactly-one-route
+spacing. If no intervening work exists, the failure remains explicitly unresolved; the
+session never invents success merely to satisfy the requested target count.

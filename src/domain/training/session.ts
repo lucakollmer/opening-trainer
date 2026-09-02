@@ -190,6 +190,16 @@ function boundedDuration(state: TrainingSessionState, nowMs: number): number {
   return Math.max(0, Math.min(Math.round(elapsed), 10 * 60 * 1000));
 }
 
+function wallClockTimestamp(observedAt: string | undefined): string {
+  if (observedAt !== undefined) {
+    if (Number.isNaN(new Date(observedAt).getTime())) {
+      throw new Error('Review observedAt must be a valid wall-clock timestamp.');
+    }
+    return observedAt;
+  }
+  return new Date().toISOString();
+}
+
 function correctOutcome(state: TrainingSessionState): TrainingOutcome {
   if (state.status === 'repair-replay') return 'repair-correct';
   if (state.hintLevel > 0) return 'hinted-correct';
@@ -211,7 +221,7 @@ function makeObservation(
     id: nextObservationId(state),
     trainingItemId: step.trainingItemId,
     sessionId: state.sessionId,
-    observedAt: options.observedAt ?? new Date(nowMs).toISOString(),
+    observedAt: wallClockTimestamp(options.observedAt),
     evidenceRole: observationRole(state),
     outcome,
     responseTimeMs: boundedDuration(state, nowMs),
@@ -416,10 +426,17 @@ function handleUserMove(
     };
   }
   if (result.kind === 'illegal-move') {
-    return {
+    const attempted = {
       ...state,
-      status: 'illegal-feedback',
       illegalAttemptCount: state.illegalAttemptCount + 1,
+    };
+    const observation = makeObservation(attempted, step, nowMs, 'illegal-attempt', {
+      ...(observedAt ? { observedAt } : {}),
+    });
+    return {
+      ...attempted,
+      status: 'illegal-feedback',
+      evidence: [...state.evidence, observation],
       feedback: {
         kind: 'illegal',
         title: 'Illegal move',

@@ -4,6 +4,8 @@ import type { SchedulerState } from './schedulerPort';
 export const ADAPTIVE_SESSION_GENERATOR_VERSION = 'adaptive-generator-v1';
 export const CONTRAST_CONFUSION_THRESHOLD = 2;
 export const CONTRAST_WINDOW_DAYS = 30;
+export const WEAK_RETRIEVABILITY_THRESHOLD = 0.82;
+export const RECENT_FAILURE_WINDOW_DAYS = 14;
 
 export interface TrainingCandidateSnapshot {
   trainingItemId: string;
@@ -82,7 +84,10 @@ function isDue(candidate: TrainingCandidateSnapshot, now: Date): boolean {
 
 function recentFailure(candidate: TrainingCandidateSnapshot, now: Date): boolean {
   if (!candidate.recentFailureAt) return false;
-  return now.getTime() - new Date(candidate.recentFailureAt).getTime() <= 14 * DAY_MS;
+  return (
+    now.getTime() - new Date(candidate.recentFailureAt).getTime() <=
+    RECENT_FAILURE_WINDOW_DAYS * DAY_MS
+  );
 }
 
 function candidateClass(
@@ -94,7 +99,10 @@ function candidateClass(
   }
   if (candidate.obligation) return 'repair';
   if (isDue(candidate, request.now)) {
-    if (candidate.retrievability < 0.82 || recentFailure(candidate, request.now)) {
+    if (
+      candidate.retrievability < WEAK_RETRIEVABILITY_THRESHOLD ||
+      recentFailure(candidate, request.now)
+    ) {
       return 'weak-due';
     }
     return 'due';

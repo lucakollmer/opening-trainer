@@ -88,28 +88,36 @@ describe('hardened training session reducer', () => {
     expect(playCorrectly(fix02Black).status).toBe('line-complete');
   });
 
-  it('accumulates illegal attempts and records them on the terminal observation', () => {
+  it('persists illegal attempts as scheduler-neutral raw evidence and keeps the aggregate count', () => {
     let state = createTrainingSession(fix01White, 1000, { sessionId: 'illegal' });
     state = reduceTrainingSession(state, fix01White, {
       type: 'user-move',
       move: { from: 'e2', to: 'e5' },
       nowMs: 1100,
+      observedAt: '2026-09-02T12:00:00.100Z',
     });
     state = reduceTrainingSession(state, fix01White, {
       type: 'user-move',
       move: { from: 'e2', to: 'e6' },
       nowMs: 1150,
+      observedAt: '2026-09-02T12:00:00.150Z',
     });
-    expect(state.evidence).toHaveLength(0);
+    expect(state.evidence.map((item) => item.outcome)).toEqual([
+      'illegal-attempt',
+      'illegal-attempt',
+    ]);
+    expect(state.evidence.map((item) => item.illegalAttemptCount)).toEqual([1, 2]);
     expect(state.illegalAttemptCount).toBe(2);
 
     state = reduceTrainingSession(state, fix01White, {
       type: 'user-move',
       move: { from: 'e2', to: 'e4' },
       nowMs: 1200,
+      observedAt: '2026-09-02T12:00:00.200Z',
     });
-    expect(state.evidence).toHaveLength(1);
-    expect(state.evidence[0]?.illegalAttemptCount).toBe(2);
+    expect(state.evidence).toHaveLength(3);
+    expect(state.evidence.at(-1)?.outcome).toBe('correct');
+    expect(state.evidence.at(-1)?.illegalAttemptCount).toBe(2);
   });
 
   it('keeps sibling variation distinct from legal outside-repertoire play', () => {

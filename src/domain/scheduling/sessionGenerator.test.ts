@@ -1,6 +1,8 @@
 import { createEmptySchedulerState } from './schedulerPort';
 import {
   CONTRAST_CONFUSION_THRESHOLD,
+  RECENT_FAILURE_WINDOW_DAYS,
+  WEAK_RETRIEVABILITY_THRESHOLD,
   generateAdaptiveSessionSelection,
   type TrainingCandidateSnapshot,
 } from './sessionGenerator';
@@ -59,6 +61,40 @@ describe('adaptive session generator v1', () => {
       'due',
       'new',
     ]);
+  });
+
+  it('uses documented weak and recent-failure boundaries', () => {
+    const classify = (row: TrainingCandidateSnapshot) =>
+      generateAdaptiveSessionSelection([row], {
+        ...request,
+        targetCount: 1,
+      }).selected[0]?.selectionClass;
+
+    expect(
+      classify(candidate('threshold', { retrievability: WEAK_RETRIEVABILITY_THRESHOLD })),
+    ).toBe('due');
+    expect(
+      classify(
+        candidate('below-threshold', {
+          retrievability: WEAK_RETRIEVABILITY_THRESHOLD - 0.001,
+        }),
+      ),
+    ).toBe('weak-due');
+    expect(RECENT_FAILURE_WINDOW_DAYS).toBe(14);
+    expect(
+      classify(
+        candidate('recent-boundary', {
+          recentFailureAt: '2026-08-14T12:00:00.000Z',
+        }),
+      ),
+    ).toBe('weak-due');
+    expect(
+      classify(
+        candidate('outside-window', {
+          recentFailureAt: '2026-08-14T11:59:59.999Z',
+        }),
+      ),
+    ).toBe('due');
   });
 
   it('does not exceed the new-item limit', () => {

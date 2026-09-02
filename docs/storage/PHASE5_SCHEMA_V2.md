@@ -36,6 +36,10 @@ Positive incidental observations are retained in `reviewLogs` and receive a
 `schedulerDecisions` row with action `none`; they do not extend intervals. Incidental
 failures receive `promote-target` and remain scheduler-neutral until a targeted attempt.
 `repair-correct` is also scheduler-neutral because it must not erase the original lapse.
+Illegal attempts are written immediately as raw `illegal-attempt` observations with a
+scheduler decision of `none`; the eventual terminal observation retains the aggregate
+illegal-attempt count used by the grading cap. This ensures an interruption after an illegal
+first attempt cannot erase the attempt evidence.
 
 ## Scheduler state serialization
 
@@ -51,6 +55,16 @@ Portable state is project-owned and contains:
 - optional last-review timestamp.
 
 No `ts-fsrs` `Card`, enum, or parameter type crosses the infrastructure adapter boundary.
+The active scheduler projection is accepted only when its adapter version, named immutable
+parameter profile and mapping-policy version exactly match a supported current combination.
+PHASE-5 supports `ts-fsrs@5.4.1` + `phase5-default-v1` + `chess-fsrs-v1`. Unsupported
+scheduler-state projections fail closed during database open or restore; the write transaction
+rolls back rather than silently interpreting state under different scheduler semantics.
+Historical scheduler-decision rows may retain older adapter/profile/policy metadata as audit
+evidence because they are not reused as the active scheduler projection.
+
+Scheduling-critical timestamps on raw reviews, scheduler states and scheduler decisions are
+validated as real ISO date-times at the database boundary before persistence/restore.
 
 ## v1 -> v2 IndexedDB migration
 
@@ -76,8 +90,9 @@ then stages a v2 representation with fresh scheduler states and zero scheduler d
 Legacy session snapshots are normalized with explicit target arrays while retaining their
 original evidence and plan identity.
 
-Restore remains atomic across all semantic tables. A failed validation or transaction
-leaves the active database unchanged.
+Restore remains atomic across all semantic tables. A failed validation, unsupported scheduler
+projection, malformed scheduling timestamp, or transaction leaves the active database
+unchanged.
 
 ## Adaptive session persistence
 
