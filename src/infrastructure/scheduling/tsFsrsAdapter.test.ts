@@ -18,9 +18,9 @@ describe('ts-fsrs infrastructure adapter', () => {
   });
 
   it('rejects unnamed parameter configurations instead of mislabelling them', () => {
-    expect(
-      () => new TsFsrsSchedulerAdapter('phase5-unknown-v1' as never),
-    ).toThrow(/Unsupported FSRS parameter profile/u);
+    expect(() => new TsFsrsSchedulerAdapter('phase5-unknown-v1' as never)).toThrow(
+      /Unsupported FSRS parameter profile/u,
+    );
   });
 
   it('round-trips a review without exposing a ts-fsrs Card', () => {

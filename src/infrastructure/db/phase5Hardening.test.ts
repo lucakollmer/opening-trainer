@@ -186,9 +186,9 @@ describe('PHASE-5 scheduler persistence hardening', () => {
       });
       expect(state.evidence.at(-1)?.outcome).toBe('illegal-attempt');
       await repository.saveSession(state, '2026-09-02T12:00:00.110Z');
-      expect(
-        (await db.schedulerDecisions.get(state.evidence[0]!.id))?.action,
-      ).toBe('none');
+      expect((await db.schedulerDecisions.get(state.evidence[0]!.id))?.action).toBe(
+        'none',
+      );
 
       const recovered = await repository.latestInterruptedSession();
       expect(recovered?.state.illegalAttemptCount).toBe(1);
@@ -203,9 +203,9 @@ describe('PHASE-5 scheduler persistence hardening', () => {
       await repository.saveSession(state, '2026-09-02T12:00:00.210Z');
       const terminalObservation = state.evidence.at(-1)!;
       expect(terminalObservation.illegalAttemptCount).toBe(1);
-      expect(
-        (await db.schedulerDecisions.get(terminalObservation.id))?.grade,
-      ).toBe('Good');
+      expect((await db.schedulerDecisions.get(terminalObservation.id))?.grade).toBe(
+        'Good',
+      );
     } finally {
       repository.close();
       await db.delete();

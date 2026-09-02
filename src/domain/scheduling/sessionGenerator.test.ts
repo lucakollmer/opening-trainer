@@ -71,7 +71,9 @@ describe('adaptive session generator v1', () => {
       }).selected[0]?.selectionClass;
 
     expect(
-      classify(candidate('threshold', { retrievability: WEAK_RETRIEVABILITY_THRESHOLD })),
+      classify(
+        candidate('threshold', { retrievability: WEAK_RETRIEVABILITY_THRESHOLD }),
+      ),
     ).toBe('due');
     expect(
       classify(
