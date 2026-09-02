@@ -9,7 +9,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-it('suggests help after hesitation without consuming a hint', () => {
+it('suggests help after hesitation without consuming a hint', async () => {
   vi.useFakeTimers();
   const plan = compileTrainingFixture(fix01White);
   const session = createTrainingSession(plan, 0, { sessionId: 'hint-nudge' });
@@ -30,11 +30,15 @@ it('suggests help after hesitation without consuming a hint', () => {
   );
 
   expect(screen.getByRole('button', { name: 'Hint 1' })).toBeVisible();
-  act(() => vi.advanceTimersByTime(9_999));
+  await act(() => {
+    vi.advanceTimersByTime(9_999);
+  });
   expect(screen.getByRole('button', { name: 'Hint 1' })).toBeVisible();
   expect(onHint).not.toHaveBeenCalled();
 
-  act(() => vi.advanceTimersByTime(1));
+  await act(() => {
+    vi.advanceTimersByTime(1);
+  });
   expect(screen.getByRole('button', { name: 'Need a hint?' })).toBeVisible();
   expect(onHint).not.toHaveBeenCalled();
 });
