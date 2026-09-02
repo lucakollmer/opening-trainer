@@ -357,8 +357,11 @@ export function createGraphExercisePlan(
       actor === 'user'
         ? knownSiblingMoves(graph, repertoire.id, context.entryPositionId, acceptedUcis)
         : [];
-    const hint =
-      actor === 'user' ? structuralMoveHint(position.fen, selectedInput) : null;
+    const hintInputs = accepted.moves.flatMap((move) => {
+      const input = moveFromUci(move.uci);
+      return input ? [input] : [];
+    });
+    const hint = actor === 'user' ? structuralMoveHint(position.fen, hintInputs) : null;
     compiled.push({
       id: context.id,
       ply: contextPly(context, contexts),

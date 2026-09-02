@@ -55,3 +55,39 @@ it(
     expect(state.evidence[0]?.hintLevel).toBe(2);
   },
 );
+
+it('keeps structural hints compatible with multiple accepted repertoire moves', () => {
+  const candidate = previewPgnImport('1. e4 e5 2. Nf3 (2. Nc3) *', {
+    repertoireId: 'alternative-hints',
+    repertoireName: 'Alternative hints',
+    userColour: 'white',
+  });
+  expect(candidate.errors).toEqual([]);
+  const graph = candidate.proposedGraph;
+  const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
+  const branch = graph.contexts.find((context) => {
+    const sans = graph.moves
+      .filter((move) => move.contextId === context.id && move.actor === 'user')
+      .map((move) => edges.get(move.edgeId)?.san)
+      .filter((san): san is string => Boolean(san))
+      .sort();
+    return sans.join('|') === 'Nc3|Nf3';
+  });
+  expect(branch).toBeDefined();
+  const rootContextId = graph.repertoires[0]!.rootContextIds[0]!;
+  const plan = createGraphExercisePlan(graph, {
+    repertoireId: 'alternative-hints',
+    rootContextId,
+    targetContextId: branch!.id,
+  });
+  const branchStep = plan.steps.find((step) => step.id === branch!.id)!;
+
+  expect(branchStep.hint?.piece).toBe('one of: knight on b1 or knight on g1');
+  expect(branchStep.hint?.candidateDestinations).toEqual([
+    'a3',
+    'c3',
+    'e2',
+    'f3',
+    'h3',
+  ]);
+});

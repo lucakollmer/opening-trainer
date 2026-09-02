@@ -77,26 +77,47 @@ export function moveFromUci(uci: string): ChessMoveInput | null {
 
 export function structuralMoveHint(
   fen: string,
-  input: ChessMoveInput,
+  inputs: ChessMoveInput | readonly ChessMoveInput[],
 ): StructuralMoveHint | null {
-  if (!SQUARE_PATTERN.test(input.from) || !SQUARE_PATTERN.test(input.to)) return null;
+  const acceptedInputs: readonly ChessMoveInput[] = Array.isArray(inputs)
+    ? inputs
+    : [inputs];
+  const validInputs = acceptedInputs.filter(
+    (input) => SQUARE_PATTERN.test(input.from) && SQUARE_PATTERN.test(input.to),
+  );
+  if (validInputs.length === 0) return null;
 
   try {
     const game = new Chess(fen);
-    const piece = game.get(input.from as Square);
-    if (!piece) return null;
+    const sourceSquares = [...new Set(validInputs.map((input) => input.from))].sort();
+    const pieceLabels = sourceSquares.flatMap((sourceSquare) => {
+      const piece = game.get(sourceSquare as Square);
+      return piece ? [`${pieceName(piece.type)} on ${sourceSquare}`] : [];
+    });
+    if (pieceLabels.length !== sourceSquares.length) return null;
     const candidateDestinations = [
       ...new Set(
-        game
-          .moves({ square: input.from as Square, verbose: true })
-          .map((move) => move.to),
+        sourceSquares.flatMap((sourceSquare) =>
+          game
+            .moves({ square: sourceSquare as Square, verbose: true })
+            .map((move) => move.to),
+        ),
       ),
     ].sort();
     if (candidateDestinations.length === 0) return null;
+    const regions = [
+      ...new Set(validInputs.map((input) => destinationRegion(input.to))),
+    ].sort();
     return {
-      piece: `${pieceName(piece.type)} on ${input.from}`,
+      piece:
+        pieceLabels.length === 1
+          ? pieceLabels[0]!
+          : `one of: ${pieceLabels.slice(0, -1).join(', ')} or ${pieceLabels.at(-1)}`,
       candidateDestinations,
-      purpose: `The repertoire move heads toward the ${destinationRegion(input.to)}.`,
+      purpose:
+        regions.length === 1
+          ? `The repertoire move heads toward the ${regions[0]}.`
+          : `An accepted repertoire move heads toward the ${regions.join(' or ')}.`,
     };
   } catch {
     return null;
