@@ -85,7 +85,7 @@ describe('training shell with PHASE-3 graph integration', () => {
     expect(screen.getAllByText('2. Nf3').length).toBeGreaterThan(0);
   });
 
-  it('rejects an illegal move without advancing or creating a terminal review observation', async () => {
+  it('rejects an illegal move without advancing while preserving a scheduler-neutral raw observation', async () => {
     const user = userEvent.setup();
     renderApp();
     const initialPosition = screen
@@ -97,7 +97,7 @@ describe('training shell with PHASE-3 graph integration', () => {
       'data-position',
       initialPosition,
     );
-    expect(screen.getAllByText('0 observations').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('1 observations').length).toBeGreaterThan(0);
   });
 
   it('reveals only the responded route item after a correct move', async () => {
