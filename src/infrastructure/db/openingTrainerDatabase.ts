@@ -12,16 +12,33 @@ import type {
   ImportSummary,
   ImportWarning,
 } from '../../domain/repertoire/types';
+import {
+  SCHEDULER_MAPPING_POLICY_VERSION,
+  type ResponseTimeBand,
+  type SchedulerObservationAction,
+} from '../../domain/scheduling/observationPolicy';
+import {
+  SCHEDULER_STATE_SCHEMA_VERSION,
+  createEmptySchedulerState,
+  type SchedulerGrade,
+  type SchedulerState,
+} from '../../domain/scheduling/schedulerPort';
 import type {
   ReviewObservation,
   TrainingSessionState,
   TrainingStatus,
 } from '../../domain/training/session';
+import {
+  TS_FSRS_ADAPTER_VERSION,
+  TS_FSRS_PARAMETERS_VERSION,
+} from '../scheduling/tsFsrsAdapter';
 
 export const OPENING_TRAINER_DATABASE_NAME = 'opening-trainer';
-export const OPENING_TRAINER_DATABASE_SCHEMA_VERSION = 1;
-export const OPENING_TRAINER_PORTABLE_SCHEMA_VERSION = 1;
+export const OPENING_TRAINER_DATABASE_SCHEMA_VERSION = 2;
+export const OPENING_TRAINER_PORTABLE_SCHEMA_VERSION = 2;
 export const DATABASE_META_ID = 'database';
+
+const PHASE4_DATABASE_SCHEMA_VERSION = 1;
 
 export interface DatabaseMetaRecord {
   id: typeof DATABASE_META_ID;
@@ -31,6 +48,7 @@ export interface DatabaseMetaRecord {
   updatedAt: string;
   appVersion?: string;
   lastSuccessfulBackupAt?: string;
+  schedulerCutoverAt?: string;
 }
 
 export type RepertoireRecord = Repertoire;
@@ -48,6 +66,7 @@ export interface DecisionRuleRecord {
   acceptedMoveSetKey: string;
   acceptedUci: readonly string[];
   trainingItemId: string;
+  playlistId?: string;
   updatedAt: string;
 }
 
@@ -80,12 +99,43 @@ export interface TrainingItemRecord {
   acceptedMoveSetKey: string;
   promptMode: PromptMode;
   contextIds: readonly string[];
+  playlistIds?: readonly string[];
   status: 'active' | 'superseded';
   createdAt: string;
   updatedAt: string;
 }
 
 export type ReviewLogRecord = ReviewObservation;
+
+export interface SchedulerStateRecord {
+  id: string;
+  trainingItemId: string;
+  state: SchedulerState;
+  adapterVersion: string;
+  parametersVersion: string;
+  mappingPolicyVersion: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SchedulerDecisionRecord {
+  id: string;
+  observationId: string;
+  trainingItemId: string;
+  action: SchedulerObservationAction;
+  grade?: SchedulerGrade;
+  responseBand: ResponseTimeBand;
+  policyVersion: string;
+  responsePolicyVersion: string;
+  adapterVersion: string;
+  parametersVersion: string;
+  reason: string;
+  decidedAt: string;
+  previousDueAt: string;
+  resultingDueAt: string;
+  resultingState: SchedulerState;
+  resultingRetrievability?: number;
+}
 
 export interface SessionRecord {
   id: string;
@@ -94,6 +144,7 @@ export interface SessionRecord {
   status: TrainingStatus;
   state: TrainingSessionState;
   targetIds: readonly string[];
+  targetIdentityKind?: 'training-item' | 'legacy-step';
   seed: string;
   policyVersion: string;
   pendingRepairIds: readonly string[];
@@ -135,6 +186,146 @@ export interface ConfusionRelationRecord {
   lastObservedAt: string;
 }
 
+const PHASE4_STORES = {
+  meta: 'id',
+  repertoires: 'id, name, userColour, updatedAt, archivedAt',
+  repertoireContexts:
+    'id, repertoireId, parentContextId, entryPositionId, included, &[repertoireId+pathFingerprint]',
+  positions: 'id, &key, createdAt',
+  moveEdges: 'id, fromPositionId, toPositionId, &[fromPositionId+uci]',
+  repertoireMoves:
+    'id, contextId, edgeId, destinationContextId, actor, included, [contextId+order]',
+  decisionRules:
+    'id, repertoireId, contextId, positionId, trainingItemId, [repertoireId+positionId]',
+  playlists: 'id, name, colour, updatedAt',
+  playlistEntries: 'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
+  trainingItems:
+    'id, repertoireId, positionKey, acceptedMoveSetKey, promptMode, status, [repertoireId+status]',
+  reviewLogs: 'id, trainingItemId, sessionId, observedAt, outcome, evidenceRole',
+  sessions: 'id, planId, status, updatedAt',
+  settings: 'id, updatedAt',
+  imports: 'id, repertoireId, importedAt',
+  openingNames: 'id, repertoireId, contextId, updatedAt',
+  confusionRelations: 'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
+} as const;
+
+const PHASE5_STORES = {
+  ...PHASE4_STORES,
+  schedulerStates:
+    'id, &trainingItemId, updatedAt, [trainingItemId+mappingPolicyVersion]',
+  schedulerDecisions:
+    'id, &observationId, trainingItemId, action, grade, decidedAt, policyVersion',
+} as const;
+
+const ISO_DATE_TIME_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/u;
+const SCHEDULER_STAGES = new Set(['new', 'learning', 'review', 'relearning']);
+
+function assertIsoDateTime(value: string | undefined, label: string): void {
+  if (
+    !value ||
+    !ISO_DATE_TIME_PATTERN.test(value) ||
+    Number.isNaN(new Date(value).getTime())
+  ) {
+    throw new Error(`${label} must be a valid ISO date-time.`);
+  }
+}
+
+function assertSchedulerState(state: SchedulerState, label: string): void {
+  if (state.schemaVersion !== SCHEDULER_STATE_SCHEMA_VERSION) {
+    throw new Error(`${label} uses an unsupported scheduler-state schema.`);
+  }
+  assertIsoDateTime(state.dueAt, `${label}.dueAt`);
+  if (state.lastReviewAt !== undefined) {
+    assertIsoDateTime(state.lastReviewAt, `${label}.lastReviewAt`);
+  }
+  for (const [field, value] of [
+    ['stability', state.stability],
+    ['difficulty', state.difficulty],
+    ['elapsedDays', state.elapsedDays],
+    ['scheduledDays', state.scheduledDays],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${label}.${field} must be a finite non-negative number.`);
+    }
+  }
+  for (const [field, value] of [
+    ['learningSteps', state.learningSteps],
+    ['reps', state.reps],
+    ['lapses', state.lapses],
+  ] as const) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error(`${label}.${field} must be a non-negative integer.`);
+    }
+  }
+  if (!SCHEDULER_STAGES.has(state.stage)) {
+    throw new Error(`${label}.stage is unsupported.`);
+  }
+}
+
+export function assertCurrentSchedulerStateRecord(
+  record: SchedulerStateRecord,
+  label = `Scheduler state ${record.id}`,
+): void {
+  if (record.id !== record.trainingItemId) {
+    throw new Error(`${label} has a mismatched training-item identity.`);
+  }
+  if (record.adapterVersion !== TS_FSRS_ADAPTER_VERSION) {
+    throw new Error(
+      `${label} requires unsupported adapter ${record.adapterVersion}; expected ${TS_FSRS_ADAPTER_VERSION}.`,
+    );
+  }
+  if (record.parametersVersion !== TS_FSRS_PARAMETERS_VERSION) {
+    throw new Error(
+      `${label} requires unsupported parameter profile ${record.parametersVersion}; expected ${TS_FSRS_PARAMETERS_VERSION}.`,
+    );
+  }
+  if (record.mappingPolicyVersion !== SCHEDULER_MAPPING_POLICY_VERSION) {
+    throw new Error(
+      `${label} requires unsupported mapping policy ${record.mappingPolicyVersion}; expected ${SCHEDULER_MAPPING_POLICY_VERSION}.`,
+    );
+  }
+  assertIsoDateTime(record.createdAt, `${label}.createdAt`);
+  assertIsoDateTime(record.updatedAt, `${label}.updatedAt`);
+  assertSchedulerState(record.state, `${label}.state`);
+}
+
+function assertReviewLogRecord(record: ReviewLogRecord): void {
+  assertIsoDateTime(record.observedAt, `Review ${record.id}.observedAt`);
+}
+
+function assertSchedulerDecisionRecord(record: SchedulerDecisionRecord): void {
+  assertIsoDateTime(record.decidedAt, `Scheduler decision ${record.id}.decidedAt`);
+  assertIsoDateTime(
+    record.previousDueAt,
+    `Scheduler decision ${record.id}.previousDueAt`,
+  );
+  assertIsoDateTime(
+    record.resultingDueAt,
+    `Scheduler decision ${record.id}.resultingDueAt`,
+  );
+  assertSchedulerState(
+    record.resultingState,
+    `Scheduler decision ${record.id}.resultingState`,
+  );
+}
+
+function migratedSchedulerRecord(
+  item: TrainingItemRecord,
+  cutoverAt: string,
+): SchedulerStateRecord {
+  return {
+    id: item.id,
+    trainingItemId: item.id,
+    state: createEmptySchedulerState(new Date(cutoverAt)),
+    adapterVersion: TS_FSRS_ADAPTER_VERSION,
+    parametersVersion: TS_FSRS_PARAMETERS_VERSION,
+    mappingPolicyVersion: SCHEDULER_MAPPING_POLICY_VERSION,
+    createdAt: cutoverAt,
+    updatedAt: cutoverAt,
+  };
+}
+
 export class OpeningTrainerDatabase extends Dexie {
   public meta!: Table<DatabaseMetaRecord, string>;
   public repertoires!: Table<RepertoireRecord, string>;
@@ -147,6 +338,8 @@ export class OpeningTrainerDatabase extends Dexie {
   public playlistEntries!: Table<PlaylistEntryRecord, string>;
   public trainingItems!: Table<TrainingItemRecord, string>;
   public reviewLogs!: Table<ReviewLogRecord, string>;
+  public schedulerStates!: Table<SchedulerStateRecord, string>;
+  public schedulerDecisions!: Table<SchedulerDecisionRecord, string>;
   public sessions!: Table<SessionRecord, string>;
   public settings!: Table<SettingRecord, string>;
   public imports!: Table<ImportRecord, string>;
@@ -155,29 +348,55 @@ export class OpeningTrainerDatabase extends Dexie {
 
   public constructor(name = OPENING_TRAINER_DATABASE_NAME) {
     super(name);
-    this.version(OPENING_TRAINER_DATABASE_SCHEMA_VERSION).stores({
-      meta: 'id',
-      repertoires: 'id, name, userColour, updatedAt, archivedAt',
-      repertoireContexts:
-        'id, repertoireId, parentContextId, entryPositionId, included, &[repertoireId+pathFingerprint]',
-      positions: 'id, &key, createdAt',
-      moveEdges: 'id, fromPositionId, toPositionId, &[fromPositionId+uci]',
-      repertoireMoves:
-        'id, contextId, edgeId, destinationContextId, actor, included, [contextId+order]',
-      decisionRules:
-        'id, repertoireId, contextId, positionId, trainingItemId, [repertoireId+positionId]',
-      playlists: 'id, name, colour, updatedAt',
-      playlistEntries:
-        'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
-      trainingItems:
-        'id, repertoireId, positionKey, acceptedMoveSetKey, promptMode, status, [repertoireId+status]',
-      reviewLogs: 'id, trainingItemId, sessionId, observedAt, outcome, evidenceRole',
-      sessions: 'id, planId, status, updatedAt',
-      settings: 'id, updatedAt',
-      imports: 'id, repertoireId, importedAt',
-      openingNames: 'id, repertoireId, contextId, updatedAt',
-      confusionRelations:
-        'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
+    this.version(PHASE4_DATABASE_SCHEMA_VERSION).stores(PHASE4_STORES);
+    this.version(OPENING_TRAINER_DATABASE_SCHEMA_VERSION)
+      .stores(PHASE5_STORES)
+      .upgrade(async (transaction) => {
+        const cutoverAt = new Date().toISOString();
+        const trainingItems = (await transaction
+          .table('trainingItems')
+          .toArray()) as TrainingItemRecord[];
+        const schedulerRows = trainingItems
+          .filter((item) => item.status === 'active')
+          .map((item) => migratedSchedulerRecord(item, cutoverAt));
+        if (schedulerRows.length > 0) {
+          await transaction.table('schedulerStates').bulkPut(schedulerRows);
+        }
+        const meta = (await transaction.table('meta').get(DATABASE_META_ID)) as
+          DatabaseMetaRecord | undefined;
+        if (meta) {
+          await transaction.table('meta').put({
+            ...meta,
+            databaseSchemaVersion: OPENING_TRAINER_DATABASE_SCHEMA_VERSION,
+            portableSchemaVersion: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
+            schedulerCutoverAt: meta.schedulerCutoverAt ?? cutoverAt,
+            updatedAt: cutoverAt,
+          });
+        }
+      });
+
+    this.table<SchedulerStateRecord, string>('schedulerStates').hook(
+      'creating',
+      (_primaryKey, record) => assertCurrentSchedulerStateRecord(record),
+    );
+    this.table<ReviewLogRecord, string>('reviewLogs').hook(
+      'creating',
+      (_primaryKey, record) => assertReviewLogRecord(record),
+    );
+    this.table<SchedulerDecisionRecord, string>('schedulerDecisions').hook(
+      'creating',
+      (_primaryKey, record) => assertSchedulerDecisionRecord(record),
+    );
+
+    this.on('ready', async () => {
+      const [schedulerStates, reviewLogs, schedulerDecisions] = await Promise.all([
+        this.table<SchedulerStateRecord, string>('schedulerStates').toArray(),
+        this.table<ReviewLogRecord, string>('reviewLogs').toArray(),
+        this.table<SchedulerDecisionRecord, string>('schedulerDecisions').toArray(),
+      ]);
+      schedulerStates.forEach((record) => assertCurrentSchedulerStateRecord(record));
+      reviewLogs.forEach((record) => assertReviewLogRecord(record));
+      schedulerDecisions.forEach((record) => assertSchedulerDecisionRecord(record));
     });
   }
 }
@@ -189,6 +408,7 @@ export function createDatabaseMeta(now: string): DatabaseMetaRecord {
     portableSchemaVersion: OPENING_TRAINER_PORTABLE_SCHEMA_VERSION,
     createdAt: now,
     updatedAt: now,
+    schedulerCutoverAt: now,
   };
 }
 
@@ -203,6 +423,8 @@ export const USER_DATA_TABLE_NAMES = [
   'playlistEntries',
   'trainingItems',
   'reviewLogs',
+  'schedulerStates',
+  'schedulerDecisions',
   'sessions',
   'settings',
   'imports',

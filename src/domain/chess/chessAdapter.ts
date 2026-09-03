@@ -24,12 +24,42 @@ export interface LegalMoveResult {
   fen: string;
 }
 
+export interface StructuralMoveHint {
+  piece: string;
+  candidateDestinations: readonly string[];
+  purpose: string;
+}
+
 export type ApplyMoveResult =
   | { kind: 'applied'; move: AppliedChessMove }
   | { kind: 'illegal-move' }
   | { kind: 'invalid-position'; message: string };
 
 const SQUARE_PATTERN = /^[a-h][1-8]$/u;
+
+function pieceName(type: string): string {
+  switch (type) {
+    case 'k':
+      return 'king';
+    case 'q':
+      return 'queen';
+    case 'r':
+      return 'rook';
+    case 'b':
+      return 'bishop';
+    case 'n':
+      return 'knight';
+    default:
+      return 'pawn';
+  }
+}
+
+function destinationRegion(square: string): 'queenside' | 'centre' | 'kingside' {
+  const file = square.charCodeAt(0) - 'a'.charCodeAt(0);
+  if (file <= 2) return 'queenside';
+  if (file >= 5) return 'kingside';
+  return 'centre';
+}
 
 export function moveToUci(move: ChessMoveInput): string {
   return `${move.from}${move.to}${move.promotion ?? ''}`;
@@ -43,6 +73,55 @@ export function moveFromUci(uci: string): ChessMoveInput | null {
     to: normalized.slice(2, 4),
     ...(normalized.length === 5 ? { promotion: normalized[4] as PromotionPiece } : {}),
   };
+}
+
+export function structuralMoveHint(
+  fen: string,
+  inputs: ChessMoveInput | readonly ChessMoveInput[],
+): StructuralMoveHint | null {
+  const acceptedInputs: readonly ChessMoveInput[] = Array.isArray(inputs)
+    ? inputs
+    : [inputs];
+  const validInputs = acceptedInputs.filter(
+    (input) => SQUARE_PATTERN.test(input.from) && SQUARE_PATTERN.test(input.to),
+  );
+  if (validInputs.length === 0) return null;
+
+  try {
+    const game = new Chess(fen);
+    const sourceSquares = [...new Set(validInputs.map((input) => input.from))].sort();
+    const pieceLabels = sourceSquares.flatMap((sourceSquare) => {
+      const piece = game.get(sourceSquare as Square);
+      return piece ? [`${pieceName(piece.type)} on ${sourceSquare}`] : [];
+    });
+    if (pieceLabels.length !== sourceSquares.length) return null;
+    const candidateDestinations = [
+      ...new Set(
+        sourceSquares.flatMap((sourceSquare) =>
+          game
+            .moves({ square: sourceSquare as Square, verbose: true })
+            .map((move) => move.to),
+        ),
+      ),
+    ].sort();
+    if (candidateDestinations.length === 0) return null;
+    const regions = [
+      ...new Set(validInputs.map((input) => destinationRegion(input.to))),
+    ].sort();
+    return {
+      piece:
+        pieceLabels.length === 1
+          ? pieceLabels[0]!
+          : `one of: ${pieceLabels.slice(0, -1).join(', ')} or ${pieceLabels.at(-1)}`,
+      candidateDestinations,
+      purpose:
+        regions.length === 1
+          ? `The repertoire move heads toward the ${regions[0]}.`
+          : `An accepted repertoire move heads toward the ${regions.join(' or ')}.`,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function tryApplyMove(fen: string, input: ChessMoveInput): ApplyMoveResult {

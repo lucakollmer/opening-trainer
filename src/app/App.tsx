@@ -34,7 +34,11 @@ import { PgnImportDialog } from '../features/import/PgnImportDialog';
 import { SessionRecoveryDialog } from '../features/session/SessionRecoveryDialog';
 import { RepertoireTreePreview } from '../features/repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../features/task/TaskPreviewCard';
-import { canSubmitUserMove, currentFixtureStep } from '../domain/training/session';
+import {
+  canSubmitUserMove,
+  currentFixtureStep,
+  readyRetestCount,
+} from '../domain/training/session';
 import {
   compileTrainingFixture,
   type TrainingExercisePlan,
@@ -51,6 +55,14 @@ import type {
   RepertoireGraph,
 } from '../domain/repertoire/types';
 import {
+  adaptiveSessionSummary,
+  advanceAdaptiveTrainingSession,
+  deferAdaptiveRetests,
+  createAdaptiveTrainingSession,
+  hasNextAdaptiveExercise,
+  type AdaptiveExercisePlan,
+} from '../domain/scheduling/adaptiveSession';
+import {
   phase2TrainingFixtures,
   type TrainingMode,
   type TrainingTreeItem,
@@ -66,6 +78,11 @@ import { OpeningTrainerRepository } from '../infrastructure/db/openingTrainerRep
 const phase2Plans = phase2TrainingFixtures.map(compileTrainingFixture);
 const defaultPlan = phase2Plans[0]!;
 const basePlans: readonly TrainingExercisePlan[] = [...phase2Plans, phase3DemoPlan];
+const DEFAULT_TARGET_COUNT = 8;
+const DEFAULT_NEW_ITEM_LIMIT = 3;
+const DEFAULT_OPPONENT_DELAY_MS = 300;
+type ScheduledPromptMode = 'guided' | 'normal' | 'strict' | 'contrast';
+const DEFAULT_PROMPT_MODE: ScheduledPromptMode = 'normal';
 
 interface StoredRepertoireSummary {
   id: string;
@@ -73,12 +90,24 @@ interface StoredRepertoireSummary {
   trainable: boolean;
 }
 
-function nowMs() {
-  return Date.now();
+function monotonicNowMs() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function wallNowIso() {
+  return new Date().toISOString();
+}
+
+function isScheduledPromptMode(value: unknown): value is ScheduledPromptMode {
+  return ['guided', 'normal', 'strict', 'contrast'].includes(String(value));
 }
 
 function sessionId(plan: TrainingExercisePlan) {
-  return globalThis.crypto?.randomUUID?.() ?? `${plan.id}-${nowMs()}`;
+  return globalThis.crypto?.randomUUID?.() ?? `${plan.id}-${Date.now()}`;
+}
+
+function adaptiveSessionId(repertoireId: string) {
+  return globalThis.crypto?.randomUUID?.() ?? `adaptive-${repertoireId}-${Date.now()}`;
 }
 
 function applicationDatabaseName(): string {
@@ -242,18 +271,30 @@ export function App({
   const [repertoireByPlanId, setRepertoireByPlanId] = useState<
     ReadonlyMap<string, string>
   >(new Map());
+  const [adaptiveExercises, setAdaptiveExercises] = useState<
+    readonly AdaptiveExercisePlan[]
+  >([]);
+  const [adaptiveExerciseIndex, setAdaptiveExerciseIndex] = useState(0);
+  const [targetCount, setTargetCount] = useState(DEFAULT_TARGET_COUNT);
+  const [newItemLimit, setNewItemLimit] = useState(DEFAULT_NEW_ITEM_LIMIT);
+  const [opponentDelayMs, setOpponentDelayMs] = useState(DEFAULT_OPPONENT_DELAY_MS);
+  const [sessionPromptMode, setSessionPromptMode] =
+    useState<ScheduledPromptMode>(DEFAULT_PROMPT_MODE);
+  const [queueSummary, setQueueSummary] = useState({ due: 0, new: 0, contrast: 0 });
   const [recoverySession, setRecoverySession] = useState<SessionRecord | null>(null);
   const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const hasWorkspace = plans.length > 0;
   const hasSavedRepertoires = storedRepertoires.length > 0;
   const selectedPlan =
     plans.find((candidate) => candidate.id === selectionId) ?? defaultPlan;
-  const plan =
+  const directPlan =
     selectionId === phase3DemoPlan.id && !includeDemoAlternative
       ? phase3DemoFilteredPlan
       : selectedPlan;
+  const activeAdaptiveExercise = adaptiveExercises[adaptiveExerciseIndex];
+  const plan = activeAdaptiveExercise?.plan ?? directPlan;
   const [session, setSession] = useState(() =>
-    createGraphTrainingSession(defaultPlan, nowMs(), {
+    createGraphTrainingSession(defaultPlan, monotonicNowMs(), {
       sessionId: sessionId(defaultPlan),
     }),
   );
@@ -270,8 +311,13 @@ export function App({
 
   const currentStep = currentFixtureStep(session, plan);
   const totalPlies = Math.max(1, ...plan.steps.map((step) => step.ply + 1));
+  const adaptiveRepertoireId =
+    session.adaptive?.exercises[session.adaptive.exerciseIndex]?.repertoireId;
   const selectedRepertoireId =
-    repertoireByPlanId.get(plan.id) ?? storedRepertoires[0]?.id;
+    adaptiveRepertoireId ??
+    repertoireByPlanId.get(plan.id) ??
+    repertoireByPlanId.get(selectionId) ??
+    storedRepertoires[0]?.id;
 
   const refreshPersistedPlans = async (activateFirst = false) => {
     const stored = persistedPlans(await repository.listRepertoireGraphs());
@@ -289,15 +335,60 @@ export function App({
       setSelectionId(first.id);
       setIncludeDemoAlternative(true);
       setMode('train');
+      setAdaptiveExercises([]);
+      setAdaptiveExerciseIndex(0);
       setSession(
-        createGraphTrainingSession(first, nowMs(), {
+        createGraphTrainingSession(first, monotonicNowMs(), {
           sessionId: sessionId(first),
         }),
       );
     } else if (activateFirst && stored.plans.length === 0) {
       setSelectionId('');
+      setAdaptiveExercises([]);
     }
     return { ...stored, allPlans: nextPlans };
+  };
+
+  const startScheduledSession = async (
+    repertoireId: string,
+    options: {
+      seed?: string;
+      target?: number;
+      newLimit?: number;
+      promptMode?: ScheduledPromptMode;
+    } = {},
+  ) => {
+    const requestedTargetCount = options.target ?? targetCount;
+    const requestedNewLimit = options.newLimit ?? newItemLimit;
+    const requestedPromptMode = options.promptMode ?? sessionPromptMode;
+    const sessionPlan = await repository.createAdaptiveSessionPlan(repertoireId, {
+      targetCount: requestedTargetCount,
+      newItemLimit: requestedNewLimit,
+      mode: requestedPromptMode,
+      seed: options.seed ?? `ui-${wallNowIso()}`,
+    });
+    setQueueSummary(await repository.getTrainingQueueSummary(repertoireId));
+    if (sessionPlan.exercises.length === 0) {
+      setPersistenceError(
+        'No due or new decisions are currently eligible for this scheduled session.',
+      );
+      return;
+    }
+    const created = createAdaptiveTrainingSession(
+      sessionPlan,
+      monotonicNowMs(),
+      adaptiveSessionId(repertoireId),
+    );
+    setAdaptiveExercises(sessionPlan.exercises);
+    setAdaptiveExerciseIndex(0);
+    setSession(created.state);
+    setMode('train');
+    setSessionPromptMode(requestedPromptMode);
+    await Promise.all([
+      repository.putSetting('session-target-count', requestedTargetCount),
+      repository.putSetting('new-item-limit', requestedNewLimit),
+      repository.putSetting('session-prompt-mode', requestedPromptMode),
+    ]);
   };
 
   useEffect(() => {
@@ -307,24 +398,81 @@ export function App({
         await repository.initialize();
         const refreshed = await refreshPersistedPlans();
         if (!active) return;
-        const requestedPlanId = await repository.getSetting<string>('active-plan-id');
+        const [
+          requestedPlanId,
+          savedTargetCount,
+          savedNewLimit,
+          savedPromptMode,
+          savedOpponentDelayMs,
+        ] = await Promise.all([
+          repository.getSetting<string>('active-plan-id'),
+          repository.getSetting<number>('session-target-count'),
+          repository.getSetting<number>('new-item-limit'),
+          repository.getSetting<string>('session-prompt-mode'),
+          repository.getSetting<number>('opponent-delay-ms'),
+        ]);
+        const initialTargetCount = savedTargetCount ?? DEFAULT_TARGET_COUNT;
+        const initialNewLimit = savedNewLimit ?? DEFAULT_NEW_ITEM_LIMIT;
+        const initialPromptMode = isScheduledPromptMode(savedPromptMode)
+          ? savedPromptMode
+          : DEFAULT_PROMPT_MODE;
+        setTargetCount(initialTargetCount);
+        setNewItemLimit(initialNewLimit);
+        setSessionPromptMode(initialPromptMode);
+        setOpponentDelayMs(
+          [0, 150, 300, 600].includes(savedOpponentDelayMs ?? -1)
+            ? (savedOpponentDelayMs as number)
+            : DEFAULT_OPPONENT_DELAY_MS,
+        );
         const requestedPlan = requestedPlanId
           ? refreshed.allPlans.find((candidate) => candidate.id === requestedPlanId)
           : undefined;
         const initialPlan = requestedPlan ?? refreshed.plans[0];
         if (initialPlan) {
           setSelectionId(initialPlan.id);
-          setSession(
-            createGraphTrainingSession(initialPlan, nowMs(), {
-              sessionId: sessionId(initialPlan),
-            }),
-          );
+          const repertoireId = refreshed.repertoireByPlanId.get(initialPlan.id);
+          if (repertoireId) {
+            const scheduled = await repository.createAdaptiveSessionPlan(repertoireId, {
+              targetCount: initialTargetCount,
+              newItemLimit: initialNewLimit,
+              mode: initialPromptMode,
+              seed: `bootstrap-${repertoireId}`,
+            });
+            if (!active) return;
+            if (scheduled.exercises.length > 0) {
+              const created = createAdaptiveTrainingSession(
+                scheduled,
+                monotonicNowMs(),
+                adaptiveSessionId(repertoireId),
+              );
+              setAdaptiveExercises(scheduled.exercises);
+              setAdaptiveExerciseIndex(0);
+              setSession(created.state);
+              setQueueSummary(await repository.getTrainingQueueSummary(repertoireId));
+            } else {
+              setAdaptiveExercises([]);
+              setSession(
+                createGraphTrainingSession(initialPlan, monotonicNowMs(), {
+                  sessionId: sessionId(initialPlan),
+                }),
+              );
+              setMode('browse');
+              setQueueSummary(await repository.getTrainingQueueSummary(repertoireId));
+            }
+          } else {
+            setSession(
+              createGraphTrainingSession(initialPlan, monotonicNowMs(), {
+                sessionId: sessionId(initialPlan),
+              }),
+            );
+          }
         }
         const interrupted = await repository.latestInterruptedSession();
         if (
           active &&
           interrupted &&
-          refreshed.allPlans.some((candidate) => candidate.id === interrupted.planId)
+          (Boolean(interrupted.state.adaptive) ||
+            refreshed.allPlans.some((candidate) => candidate.id === interrupted.planId))
         ) {
           setRecoverySession(interrupted);
         }
@@ -354,10 +502,10 @@ export function App({
   }, [repository]);
 
   useEffect(() => {
-    if (
-      !repertoireByPlanId.has(session.planId) ||
-      !hasDurableSessionProgress(session)
-    ) {
+    const persistentSession = Boolean(
+      session.adaptive || repertoireByPlanId.has(session.planId),
+    );
+    if (!persistentSession || !hasDurableSessionProgress(session)) {
       return;
     }
     const snapshot = structuredClone(session);
@@ -378,10 +526,10 @@ export function App({
           setSession((current) =>
             reduceGraphTrainingSession(current, plan, {
               type: 'opponent-tick',
-              nowMs: nowMs(),
+              nowMs: monotonicNowMs(),
             }),
           ),
-        reducedMotion ? 0 : 260,
+        reducedMotion ? 0 : opponentDelayMs,
       );
       return () => window.clearTimeout(timer);
     }
@@ -391,7 +539,7 @@ export function App({
           setSession((current) =>
             reduceGraphTrainingSession(current, plan, {
               type: 'continue',
-              nowMs: nowMs(),
+              nowMs: monotonicNowMs(),
             }),
           ),
         420,
@@ -399,11 +547,13 @@ export function App({
       return () => window.clearTimeout(timer);
     }
     return undefined;
-  }, [mode, plan, reducedMotion, session.status]);
+  }, [mode, opponentDelayMs, plan, reducedMotion, session.status]);
 
   const beginPlan = (nextPlan: TrainingExercisePlan) => {
+    setAdaptiveExercises([]);
+    setAdaptiveExerciseIndex(0);
     setSession(
-      createGraphTrainingSession(nextPlan, nowMs(), {
+      createGraphTrainingSession(nextPlan, monotonicNowMs(), {
         sessionId: sessionId(nextPlan),
       }),
     );
@@ -423,9 +573,16 @@ export function App({
     setSelectionId(nextPlan.id);
     setIncludeDemoAlternative(true);
     setMode('train');
-    beginPlan(nextPlan);
-    if (repertoireByPlanId.has(nextPlan.id)) {
+    const repertoireId = repertoireByPlanId.get(nextPlan.id);
+    if (repertoireId) {
       void repository.putSetting('active-plan-id', nextPlan.id);
+      void startScheduledSession(repertoireId).catch((error: unknown) => {
+        setPersistenceError(
+          error instanceof Error ? error.message : 'Could not start scheduled session.',
+        );
+      });
+    } else {
+      beginPlan(nextPlan);
     }
   };
 
@@ -453,12 +610,29 @@ export function App({
     setSelectionId(refreshedPlan.id);
     setIncludeDemoAlternative(true);
     setMode('train');
-    beginPlan(refreshedPlan);
     await repository.putSetting('active-plan-id', refreshedPlan.id);
+    setSessionPromptMode('normal');
+    await startScheduledSession(storedGraph.repertoires[0]!.id, {
+      promptMode: 'normal',
+    });
   };
 
   const handleModeChange = (nextMode: TrainingMode) => {
     if (nextMode === mode) return;
+    const persistedRepertoireId = repertoireByPlanId.get(selectionId);
+    if (
+      nextMode === 'train' &&
+      mode === 'browse' &&
+      persistedRepertoireId &&
+      !session.adaptive
+    ) {
+      void startScheduledSession(persistedRepertoireId).catch((error: unknown) => {
+        setPersistenceError(
+          error instanceof Error ? error.message : 'Could not start scheduled session.',
+        );
+      });
+      return;
+    }
     if (mode === 'train' && nextMode === 'browse') {
       setSession((current) =>
         ['session-complete', 'abandoned'].includes(current.status)
@@ -478,7 +652,8 @@ export function App({
         to: command.to,
         ...(command.promotion ? { promotion: command.promotion } : {}),
       },
-      nowMs: nowMs(),
+      nowMs: monotonicNowMs(),
+      observedAt: wallNowIso(),
     });
     const advanced = next.fen !== session.fen;
     setSession(next);
@@ -489,32 +664,66 @@ export function App({
     setSession((current) =>
       reduceGraphTrainingSession(current, plan, {
         type: blocked ? 'pause-attempt' : 'resume-attempt',
-        nowMs: nowMs(),
+        nowMs: monotonicNowMs(),
       }),
     );
   };
 
   const resumeInterruptedSession = async () => {
     if (!recoverySession) return;
-    const recoveredPlan = plans.find(
-      (candidate) => candidate.id === recoverySession.planId,
-    );
-    if (!recoveredPlan) {
-      setPersistenceError('The saved session repertoire is not available.');
-      setRecoverySession(null);
-      return;
-    }
     try {
-      await repository.putSetting('active-plan-id', recoveredPlan.id);
-      setSelectionId(recoveredPlan.id);
-      setIncludeDemoAlternative(true);
-      setMode('train');
-      setSession({
-        ...structuredClone(recoverySession.state),
-        attemptStartedAtMs: nowMs(),
-        pausedDurationMs: 0,
-        pauseStartedAtMs: undefined,
-      });
+      if (recoverySession.state.adaptive) {
+        const rebuilt = await Promise.all(
+          recoverySession.state.adaptive.exercises.map((descriptor) =>
+            repository.rebuildAdaptiveExercise(descriptor),
+          ),
+        );
+        const index = recoverySession.state.adaptive.exerciseIndex;
+        const repertoireId =
+          recoverySession.state.adaptive.exercises[index]?.repertoireId;
+        const selectorPlan = repertoireId
+          ? plans.find(
+              (candidate) => repertoireByPlanId.get(candidate.id) === repertoireId,
+            )
+          : undefined;
+        if (selectorPlan) {
+          setSelectionId(selectorPlan.id);
+          await repository.putSetting('active-plan-id', selectorPlan.id);
+        }
+        setAdaptiveExercises(rebuilt);
+        setAdaptiveExerciseIndex(index);
+        setMode('train');
+        setSession({
+          ...structuredClone(recoverySession.state),
+          attemptStartedAtMs: monotonicNowMs(),
+          pausedDurationMs: 0,
+          pauseStartedAtMs: undefined,
+        });
+        if (repertoireId) {
+          setQueueSummary(await repository.getTrainingQueueSummary(repertoireId));
+        }
+      } else {
+        const recoveredPlan = plans.find(
+          (candidate) => candidate.id === recoverySession.planId,
+        );
+        if (!recoveredPlan) {
+          setPersistenceError('The saved session repertoire is not available.');
+          setRecoverySession(null);
+          return;
+        }
+        await repository.putSetting('active-plan-id', recoveredPlan.id);
+        setSelectionId(recoveredPlan.id);
+        setIncludeDemoAlternative(true);
+        setAdaptiveExercises([]);
+        setAdaptiveExerciseIndex(0);
+        setMode('train');
+        setSession({
+          ...structuredClone(recoverySession.state),
+          attemptStartedAtMs: monotonicNowMs(),
+          pausedDurationMs: 0,
+          pauseStartedAtMs: undefined,
+        });
+      }
       setRecoverySession(null);
     } catch (error) {
       setPersistenceError(
@@ -537,6 +746,66 @@ export function App({
     }
   };
 
+  const handleCompleteOrAdvance = async () => {
+    if (session.status === 'line-complete' && hasNextAdaptiveExercise(session)) {
+      if (readyRetestCount(session) > 0) {
+        return;
+      }
+      const deferred = deferAdaptiveRetests(session, plan);
+      let nextExercises = adaptiveExercises;
+      if (deferred.descriptors.length > 0) {
+        const rebuilt = await Promise.all(
+          deferred.descriptors.map((descriptor) =>
+            repository.rebuildAdaptiveExercise(descriptor),
+          ),
+        );
+        nextExercises = [...adaptiveExercises, ...rebuilt];
+        setAdaptiveExercises(nextExercises);
+      }
+      const nextIndex = (deferred.state.adaptive?.exerciseIndex ?? 0) + 1;
+      const nextExercise = nextExercises[nextIndex];
+      if (!nextExercise) {
+        setPersistenceError('The next scheduled exercise could not be reconstructed.');
+        return;
+      }
+      setAdaptiveExerciseIndex(nextIndex);
+      setSession(
+        advanceAdaptiveTrainingSession(
+          deferred.state,
+          nextExercise.plan,
+          monotonicNowMs(),
+        ),
+      );
+      return;
+    }
+    setSession((current) =>
+      reduceGraphTrainingSession(current, plan, { type: 'complete-session' }),
+    );
+    if (selectedRepertoireId) {
+      void repository
+        .getTrainingQueueSummary(selectedRepertoireId)
+        .then(setQueueSummary)
+        .catch(() => undefined);
+    }
+  };
+
+  const handleRestart = () => {
+    if (selectedRepertoireId && session.adaptive) {
+      void startScheduledSession(selectedRepertoireId).catch((error: unknown) => {
+        setPersistenceError(
+          error instanceof Error ? error.message : 'Could not start scheduled session.',
+        );
+      });
+      return;
+    }
+    setSession((current) =>
+      reduceGraphTrainingSession(current, plan, {
+        type: 'restart',
+        nowMs: monotonicNowMs(),
+      }),
+    );
+  };
+
   const hintSquares =
     session.hintLevel >= 2 && session.hintLevel < 4 && currentStep?.actor === 'user'
       ? (currentStep.hint?.candidateDestinations ?? [])
@@ -555,6 +824,12 @@ export function App({
       revealedItemIds={session.treeRevealedItemIds}
       currentItemId={currentStep?.treeItemId}
     />
+  );
+  const summary = adaptiveSessionSummary(session);
+  const hasNextExercise =
+    hasNextAdaptiveExercise(session) && readyRetestCount(session) === 0;
+  const isPersistedSelection = Boolean(
+    selectedRepertoireId && repertoireByPlanId.has(selectionId),
   );
 
   return (
@@ -587,7 +862,10 @@ export function App({
                 size="small"
                 variant="outlined"
                 label={
-                  repertoireByPlanId.has(plan.id) ? 'Saved locally' : 'Demo fixture'
+                  selectedRepertoireId &&
+                  (session.adaptive || repertoireByPlanId.has(plan.id))
+                    ? 'Scheduled locally'
+                    : 'Demo fixture'
                 }
               />
               {selectionId === phase3DemoPlan.id ? (
@@ -606,6 +884,108 @@ export function App({
                   label="Include alternative branch"
                   sx={{ mx: 0 }}
                 />
+              ) : null}
+              {selectedRepertoireId && isPersistedSelection ? (
+                <>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel id="session-prompt-mode-label">Session mode</InputLabel>
+                    <Select
+                      labelId="session-prompt-mode-label"
+                      label="Session mode"
+                      value={sessionPromptMode}
+                      onChange={(event: SelectChangeEvent<string>) => {
+                        const value = String(event.target.value);
+                        if (isScheduledPromptMode(value)) setSessionPromptMode(value);
+                      }}
+                    >
+                      <MenuItem value="normal">Normal</MenuItem>
+                      <MenuItem value="guided">Guided</MenuItem>
+                      <MenuItem value="strict">Strict</MenuItem>
+                      <MenuItem value="contrast">Contrast</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: 110 }}>
+                    <InputLabel id="session-target-count-label">Targets</InputLabel>
+                    <Select
+                      labelId="session-target-count-label"
+                      label="Targets"
+                      value={String(targetCount)}
+                      onChange={(event: SelectChangeEvent<string>) =>
+                        setTargetCount(Number(event.target.value))
+                      }
+                    >
+                      {[3, 5, 8, 12].map((value) => (
+                        <MenuItem key={value} value={String(value)}>
+                          {value} targets
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: 110 }}>
+                    <InputLabel id="new-item-limit-label">New limit</InputLabel>
+                    <Select
+                      labelId="new-item-limit-label"
+                      label="New limit"
+                      value={String(newItemLimit)}
+                      onChange={(event: SelectChangeEvent<string>) =>
+                        setNewItemLimit(Number(event.target.value))
+                      }
+                    >
+                      {[0, 1, 3, 5].map((value) => (
+                        <MenuItem key={value} value={String(value)}>
+                          {value} new
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: 125 }}>
+                    <InputLabel id="opponent-delay-label">Opponent delay</InputLabel>
+                    <Select
+                      labelId="opponent-delay-label"
+                      label="Opponent delay"
+                      value={String(opponentDelayMs)}
+                      onChange={(event: SelectChangeEvent<string>) => {
+                        const value = Number(event.target.value);
+                        setOpponentDelayMs(value);
+                        void repository
+                          .putSetting('opponent-delay-ms', value)
+                          .catch((error: unknown) =>
+                            setPersistenceError(
+                              error instanceof Error
+                                ? error.message
+                                : 'Could not save opponent delay.',
+                            ),
+                          );
+                      }}
+                    >
+                      {[0, 150, 300, 600].map((value) => (
+                        <MenuItem key={value} value={String(value)}>
+                          {value === 0 ? 'No delay' : `${value} ms`}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <Button
+                    color="inherit"
+                    variant="outlined"
+                    onClick={() =>
+                      void startScheduledSession(selectedRepertoireId).catch(
+                        (error: unknown) =>
+                          setPersistenceError(
+                            error instanceof Error
+                              ? error.message
+                              : 'Could not start scheduled session.',
+                          ),
+                      )
+                    }
+                  >
+                    New scheduled session
+                  </Button>
+                  <Chip
+                    size="small"
+                    label={`${queueSummary.due} due · ${queueSummary.new} new${queueSummary.contrast > 0 ? ` · ${queueSummary.contrast} contrast` : ''}`}
+                  />
+                </>
               ) : null}
               <ToggleButtonGroup
                 size="small"
@@ -770,6 +1150,9 @@ export function App({
               <TaskPreviewCard
                 session={session}
                 plan={plan}
+                hasNextExercise={hasNextExercise}
+                queueSummary={queueSummary}
+                sessionSummary={summary}
                 onHint={() =>
                   setSession((current) =>
                     reduceGraphTrainingSession(current, plan, {
@@ -781,7 +1164,8 @@ export function App({
                   setSession((current) =>
                     reduceGraphTrainingSession(current, plan, {
                       type: 'reveal',
-                      nowMs: nowMs(),
+                      nowMs: monotonicNowMs(),
+                      observedAt: wallNowIso(),
                     }),
                   )
                 }
@@ -789,7 +1173,7 @@ export function App({
                   setSession((current) =>
                     reduceGraphTrainingSession(current, plan, {
                       type: 'continue',
-                      nowMs: nowMs(),
+                      nowMs: monotonicNowMs(),
                     }),
                   )
                 }
@@ -797,25 +1181,20 @@ export function App({
                   setSession((current) =>
                     reduceGraphTrainingSession(current, plan, {
                       type: 'start-retest',
-                      nowMs: nowMs(),
+                      nowMs: monotonicNowMs(),
                     }),
                   )
                 }
                 onCompleteSession={() =>
-                  setSession((current) =>
-                    reduceGraphTrainingSession(current, plan, {
-                      type: 'complete-session',
-                    }),
+                  void handleCompleteOrAdvance().catch((error: unknown) =>
+                    setPersistenceError(
+                      error instanceof Error
+                        ? error.message
+                        : 'Could not continue the scheduled session.',
+                    ),
                   )
                 }
-                onRestart={() =>
-                  setSession((current) =>
-                    reduceGraphTrainingSession(current, plan, {
-                      type: 'restart',
-                      nowMs: nowMs(),
-                    }),
-                  )
-                }
+                onRestart={handleRestart}
                 onAbandon={() =>
                   setSession((current) =>
                     reduceGraphTrainingSession(current, plan, { type: 'abandon' }),

@@ -3,6 +3,7 @@ import {
   type AppliedChessMove,
   type ChessMoveInput,
 } from '../chess/chessAdapter';
+import type { PromptMode } from '../repertoire/types';
 import type { TrainingFixture } from '../../fixtures/trainingFixtures';
 import {
   compileTrainingFixture,
@@ -68,6 +69,26 @@ export interface SessionFeedback {
   message: string;
 }
 
+export interface AdaptiveExerciseDescriptor {
+  kind?: 'scheduled' | 'retest';
+  repertoireId: string;
+  rootContextId: string;
+  targetContextId: string;
+  targetContextIds: readonly string[];
+  promptMode: PromptMode;
+  playlistId?: string;
+}
+
+export interface AdaptiveSessionMetadata {
+  generatorVersion: string;
+  seed: string;
+  exerciseIndex: number;
+  exercises: readonly AdaptiveExerciseDescriptor[];
+  targetTrainingItemIds: readonly string[];
+  requestedTargetCount: number;
+  newItemLimit: number;
+}
+
 export interface TrainingSessionState {
   sessionId: string;
   planId: string;
@@ -77,6 +98,8 @@ export interface TrainingSessionState {
   currentStepId?: string;
   plyIndex: number;
   targetStepId: string;
+  targetStepIds: readonly string[];
+  targetTrainingItemIds: readonly string[];
   targetPly: number;
   runKind: 'primary' | 'retest';
   treeRevealedPlyCount: number;
@@ -89,15 +112,21 @@ export interface TrainingSessionState {
   evidence: readonly ReviewObservation[];
   retestQueue: readonly RetestTicket[];
   retestAttemptsByStep: Readonly<Record<string, number>>;
+  adaptive?: AdaptiveSessionMetadata;
   lastMove?: AppliedChessMove;
   feedback?: SessionFeedback;
 }
 
 export type TrainingSessionEvent =
-  | { type: 'user-move'; move: ChessMoveInput; nowMs: number }
+  | {
+      type: 'user-move';
+      move: ChessMoveInput;
+      nowMs: number;
+      observedAt?: string;
+    }
   | { type: 'opponent-tick'; nowMs: number }
   | { type: 'request-hint' }
-  | { type: 'reveal'; nowMs: number }
+  | { type: 'reveal'; nowMs: number; observedAt?: string }
   | { type: 'continue'; nowMs: number }
   | { type: 'start-retest'; nowMs: number }
   | { type: 'pause-attempt'; nowMs: number }
@@ -144,7 +173,9 @@ function statusForStep(step: TrainingExerciseStep | null): TrainingStatus {
 }
 
 function observationRole(state: TrainingSessionState): EvidenceRole {
-  return state.currentStepId === state.targetStepId ? 'targeted' : 'incidental';
+  return state.currentStepId && state.targetStepIds.includes(state.currentStepId)
+    ? 'targeted'
+    : 'incidental';
 }
 
 function nextObservationId(state: TrainingSessionState): string {
@@ -159,18 +190,38 @@ function boundedDuration(state: TrainingSessionState, nowMs: number): number {
   return Math.max(0, Math.min(Math.round(elapsed), 10 * 60 * 1000));
 }
 
+function wallClockTimestamp(observedAt: string | undefined): string {
+  if (observedAt !== undefined) {
+    if (Number.isNaN(new Date(observedAt).getTime())) {
+      throw new Error('Review observedAt must be a valid wall-clock timestamp.');
+    }
+    return observedAt;
+  }
+  return new Date().toISOString();
+}
+
+function correctOutcome(state: TrainingSessionState): TrainingOutcome {
+  if (state.status === 'repair-replay') return 'repair-correct';
+  if (state.hintLevel > 0) return 'hinted-correct';
+  return 'correct';
+}
+
 function makeObservation(
   state: TrainingSessionState,
   step: TrainingExerciseStep,
   nowMs: number,
   outcome: TrainingOutcome,
-  options: { playedUci?: string; confusionContextId?: string } = {},
+  options: {
+    playedUci?: string;
+    confusionContextId?: string;
+    observedAt?: string;
+  } = {},
 ): ReviewObservation {
   return {
     id: nextObservationId(state),
     trainingItemId: step.trainingItemId,
     sessionId: state.sessionId,
-    observedAt: new Date(nowMs).toISOString(),
+    observedAt: wallClockTimestamp(options.observedAt),
     evidenceRole: observationRole(state),
     outcome,
     responseTimeMs: boundedDuration(state, nowMs),
@@ -266,15 +317,13 @@ function acceptedMoveState(
   step: TrainingExerciseStep,
   applied: AppliedChessMove,
   nowMs: number,
+  observedAt?: string,
 ): TrainingSessionState {
   const isRepair = state.status === 'repair-replay';
-  const outcome: TrainingOutcome = isRepair
-    ? 'repair-correct'
-    : state.hintLevel > 0
-      ? 'hinted-correct'
-      : 'correct';
+  const outcome = correctOutcome(state);
   const observation = makeObservation(state, step, nowMs, outcome, {
     playedUci: applied.uci,
+    ...(observedAt ? { observedAt } : {}),
   });
   const followingStepId = nextStepId(step, applied.uci);
   const followingPly = stepPly(plan, followingStepId, step.ply + 1);
@@ -309,6 +358,7 @@ function failedLegalMoveState(
   step: TrainingExerciseStep,
   applied: AppliedChessMove,
   nowMs: number,
+  observedAt?: string,
 ): TrainingSessionState {
   const isWrongVariation = step.wrongSiblingUci?.includes(applied.uci) ?? false;
   const outcome: TrainingOutcome = isWrongVariation
@@ -316,8 +366,13 @@ function failedLegalMoveState(
     : 'outside-repertoire';
   const observation = makeObservation(state, step, nowMs, outcome, {
     playedUci: applied.uci,
+    ...(observedAt ? { observedAt } : {}),
     ...(isWrongVariation
-      ? { confusionContextId: `${state.planId}:sibling:${step.id}` }
+      ? {
+          confusionContextId:
+            step.confusionContextIdByWrongUci?.[applied.uci] ??
+            `${state.planId}:sibling:${step.id}`,
+        }
       : {}),
   });
   const queued = queueRetest(state, step.id, observation.id);
@@ -351,6 +406,7 @@ function handleUserMove(
   plan: TrainingExercisePlan,
   move: ChessMoveInput,
   nowMs: number,
+  observedAt?: string,
 ): TrainingSessionState {
   if (!USER_INPUT_STATUSES.includes(state.status)) return state;
   const step = currentStep(state, plan);
@@ -370,10 +426,17 @@ function handleUserMove(
     };
   }
   if (result.kind === 'illegal-move') {
-    return {
+    const attempted = {
       ...state,
-      status: 'illegal-feedback',
       illegalAttemptCount: state.illegalAttemptCount + 1,
+    };
+    const observation = makeObservation(attempted, step, nowMs, 'illegal-attempt', {
+      ...(observedAt ? { observedAt } : {}),
+    });
+    return {
+      ...attempted,
+      status: 'illegal-feedback',
+      evidence: [...state.evidence, observation],
       feedback: {
         kind: 'illegal',
         title: 'Illegal move',
@@ -383,9 +446,9 @@ function handleUserMove(
   }
 
   if (step.acceptedUci.includes(result.move.uci)) {
-    return acceptedMoveState(state, plan, step, result.move, nowMs);
+    return acceptedMoveState(state, plan, step, result.move, nowMs, observedAt);
   }
-  return failedLegalMoveState(state, step, result.move, nowMs);
+  return failedLegalMoveState(state, step, result.move, nowMs, observedAt);
 }
 
 function requestHint(
@@ -417,6 +480,7 @@ function revealMove(
   state: TrainingSessionState,
   plan: TrainingExercisePlan,
   nowMs: number,
+  observedAt?: string,
 ): TrainingSessionState {
   if (
     !['awaiting-user-move', 'hint-offered', 'illegal-feedback'].includes(state.status)
@@ -426,7 +490,9 @@ function revealMove(
   const step = currentStep(state, plan);
   if (!step || step.actor !== 'user') return state;
   const revealedState = { ...state, hintLevel: 4 as const };
-  const observation = makeObservation(revealedState, step, nowMs, 'revealed');
+  const observation = makeObservation(revealedState, step, nowMs, 'revealed', {
+    ...(observedAt ? { observedAt } : {}),
+  });
   const queued = queueRetest(revealedState, step.id, observation.id);
   return {
     ...revealedState,
@@ -558,6 +624,8 @@ function startRetest(
     currentStepId: plan.startStepId,
     plyIndex: start?.ply ?? 0,
     targetStepId: ticket.targetStepId,
+    targetStepIds: [ticket.targetStepId],
+    targetTrainingItemIds: target ? [target.trainingItemId] : [],
     targetPly: target?.ply ?? stepIndex(plan, ticket.targetStepId),
     runKind: 'retest',
     treeRevealedPlyCount: 0,
@@ -587,6 +655,15 @@ export function createTrainingSession(
   const start = exerciseStep(plan, plan.startStepId);
   const target = exerciseStep(plan, plan.targetStepId);
   const targetPly = target?.ply ?? stepIndex(plan, plan.targetStepId);
+  const targetStepIds =
+    plan.targetStepIds.length > 0 ? [...plan.targetStepIds] : [plan.targetStepId];
+  const targetTrainingItemIds = [
+    ...new Set(
+      targetStepIds
+        .map((stepId) => exerciseStep(plan, stepId)?.trainingItemId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
   return {
     sessionId: options.sessionId ?? `${plan.id}-${nowMs}`,
     planId: plan.id,
@@ -596,6 +673,8 @@ export function createTrainingSession(
     currentStepId: plan.startStepId,
     plyIndex: start?.ply ?? 0,
     targetStepId: plan.targetStepId,
+    targetStepIds,
+    targetTrainingItemIds,
     targetPly,
     runKind: 'primary',
     treeRevealedPlyCount: 0,
@@ -620,13 +699,13 @@ export function reduceTrainingSession(
     throw new Error('Training state and plan IDs must match.');
   switch (event.type) {
     case 'user-move':
-      return handleUserMove(state, plan, event.move, event.nowMs);
+      return handleUserMove(state, plan, event.move, event.nowMs, event.observedAt);
     case 'opponent-tick':
       return applyOpponentMove(state, plan, event.nowMs);
     case 'request-hint':
       return requestHint(state, plan);
     case 'reveal':
-      return revealMove(state, plan, event.nowMs);
+      return revealMove(state, plan, event.nowMs, event.observedAt);
     case 'continue':
       return continueSession(state, plan, event.nowMs);
     case 'start-retest':
@@ -653,7 +732,7 @@ export function reduceTrainingSession(
           message:
             state.retestQueue.length > 0
               ? 'The session ended with unresolved retest work still recorded.'
-              : 'All in-memory repertoire work for this session is complete.',
+              : 'All scheduled repertoire work for this session is complete.',
         },
       };
     case 'abandon':
