@@ -8,10 +8,7 @@ import {
   PHASE6_PORTABLE_SCHEMA_VERSION,
 } from '../db/phase6Database';
 import { Phase6OpeningTrainerRepository } from '../db/phase6Repository';
-import {
-  commitPhase6BackupRestore,
-  previewPhase6BackupJson,
-} from './phase6Backup';
+import { commitPhase6BackupRestore } from './phase6Backup';
 import { exportCompleteBackup } from './backup';
 
 const PGN = `[Event "backup test"]

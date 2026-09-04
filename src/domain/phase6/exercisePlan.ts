@@ -5,6 +5,8 @@ import {
 import type { RepertoireGraph } from '../repertoire/types';
 import type { TrainingExercisePlan } from '../training/exercisePlan';
 
+export type { GraphExercisePlanOptions };
+
 function authoredPurpose(
   graph: RepertoireGraph,
   contextId: string,
