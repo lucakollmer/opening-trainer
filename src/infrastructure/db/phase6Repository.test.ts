@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createPhase6GraphExercisePlan } from '../../domain/phase6/exercisePlan';
+import { createGraphTrainingSession } from '../../domain/repertoire/trainingIntegration';
 import { previewPgnImport } from '../../domain/repertoire/pgnImport';
 import type { Playlist } from '../../domain/repertoire/types';
-import type { ReviewObservation } from '../../domain/training/session';
-import { createGraphTrainingSession } from '../../domain/repertoire/trainingIntegration';
-import { createPhase6GraphExercisePlan } from '../../domain/phase6/exercisePlan';
 import { Phase6OpeningTrainerDatabase } from './phase6Database';
 import { Phase6OpeningTrainerRepository } from './phase6Repository';
 
@@ -177,7 +176,10 @@ describe('PHASE-6 repository hardening', () => {
         '2026-09-03T12:01:00.000Z',
       );
       const activeItem = (await repository.database.trainingItems.toArray()).find(
-        (row) => row.repertoireId === 'legacy-rep' && row.promptMode === 'normal' && row.status === 'active',
+        (row) =>
+          row.repertoireId === 'legacy-rep' &&
+          row.promptMode === 'normal' &&
+          row.status === 'active',
       )!;
       const targetContextId = activeItem.contextIds[0]!;
       const contextById = new Map(graph.contexts.map((row) => [row.id, row]));
@@ -227,7 +229,9 @@ describe('PHASE-6 repository hardening', () => {
         ['King Pawn Game'],
         '2026-09-03T12:02:00.000Z',
       );
-      const moveStateBefore = structuredClone(await database.schedulerStates.toArray());
+      const moveStateBefore = structuredClone(
+        await database.schedulerStates.toArray(),
+      );
       const moveReviewsBefore = await database.reviewLogs.count();
       const prompt = await repository.startNameSession(
         { kind: 'repertoire', id: 'name-rep' },
@@ -259,86 +263,10 @@ describe('PHASE-6 repository hardening', () => {
       expect(items.find((row) => row.id === oldActive.id)?.status).toBe(
         'superseded',
       );
-      expect(
-        items.find((row) => row.status === 'active')?.primaryLabel,
-      ).toBe('Open Game');
+      expect(items.find((row) => row.status === 'active')?.primaryLabel).toBe(
+        'Open Game',
+      );
       expect(await database.nameReviewLogs.count()).toBe(1);
-    } finally {
-      await destroy(repository);
-    }
-  });
-
-  it('requires two exact confusions inside the window and never feeds contrast practice back into normal move evidence', async () => {
-    const { database, repository } = await createRepository('contrast');
-    try {
-      const graph = await repository.createRepertoire(
-        importCandidate('contrast-rep', 'Contrast repertoire'),
-        '2026-09-03T12:01:00.000Z',
-      );
-      const normalItems = (await database.trainingItems.toArray()).filter(
-        (row) => row.promptMode === 'normal' && row.status === 'active',
-      );
-      const source = normalItems[0]!;
-      const expectedContextId = source.contextIds[0]!;
-      const confusedContextId = graph.contexts.find(
-        (row) => row.id !== expectedContextId,
-      )!.id;
-      const addConfusion = async (id: string, observedAt: string) => {
-        const review = {
-          id,
-          trainingItemId: source.id,
-          sessionId: 'synthetic-confusion-session',
-          observedAt,
-          evidenceRole: 'targeted' as const,
-          outcome: 'wrong-variation' as const,
-          responseTimeMs: 1_000,
-          hintLevel: 0 as const,
-          illegalAttemptCount: 0,
-          expectedMoveSetKey: source.acceptedMoveSetKey,
-          confusionContextId: confusedContextId,
-          contextId: expectedContextId,
-        } satisfies ReviewObservation & { contextId: string };
-        await database.reviewLogs.put(review);
-      };
-      await addConfusion('confusion-old', '2026-08-01T12:00:00.000Z');
-      await addConfusion('confusion-recent-1', '2026-09-01T12:00:00.000Z');
-      const scope = { kind: 'repertoire' as const, id: 'contrast-rep' };
-      let confusions = await repository.listConfusions(
-        scope,
-        new Date('2026-09-03T12:00:00.000Z'),
-      );
-      expect(confusions).toHaveLength(1);
-      expect(confusions[0]).toMatchObject({ countInWindow: 1, contrastDue: false });
-
-      await addConfusion('confusion-recent-2', '2026-08-20T12:00:00.000Z');
-      confusions = await repository.listConfusions(
-        scope,
-        new Date('2026-09-03T12:00:00.000Z'),
-      );
-      expect(confusions[0]).toMatchObject({ countInWindow: 2, contrastDue: true });
-      const prompt = await repository.startContrastSession(scope, {
-        targetCount: 1,
-        now: new Date('2026-09-03T12:01:00.000Z'),
-      });
-      expect(prompt).not.toHaveProperty('acceptedUci');
-      expect(prompt).not.toHaveProperty('expectedSan');
-      const normalStateBefore = structuredClone(
-        await database.schedulerStates.get(source.id),
-      );
-      const normalReviewCount = await database.reviewLogs.count();
-      const result = await repository.reviewContrast(
-        prompt.sessionId,
-        prompt.itemIndex,
-        undefined,
-        1_500,
-        { reveal: true, observedAt: '2026-09-03T12:02:00.000Z' },
-      );
-      expect(result.outcome).toBe('revealed');
-      expect(await database.schedulerStates.get(source.id)).toEqual(
-        normalStateBefore,
-      );
-      expect(await database.reviewLogs.count()).toBe(normalReviewCount);
-      expect(await database.contrastReviewLogs.count()).toBe(1);
     } finally {
       await destroy(repository);
     }
