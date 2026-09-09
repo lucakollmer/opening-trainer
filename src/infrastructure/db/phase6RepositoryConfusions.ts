@@ -5,7 +5,12 @@ import {
   PHASE6_CONTRAST_CONFUSION_THRESHOLD,
   PHASE6_CONTRAST_MAPPING_POLICY_VERSION,
 } from '../../domain/phase6/contrast';
-import type { ConfusionSummary, ContrastItemRecord, TrainingScope } from '../../domain/phase6/types';
+import type {
+  ConfusionSummary,
+  ContrastItemRecord,
+  TrainingScope,
+} from '../../domain/phase6/types';
+import { playlistAllowsRouteContext } from '../../domain/repertoire/graph';
 import type { ReviewObservation } from '../../domain/training/session';
 import type { TrainingItemRecord } from './openingTrainerDatabase';
 import { Phase6NameRecallRepository } from './phase6RepositoryNameRecall';
@@ -199,11 +204,15 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
       const expectedContext = expectedContextId
         ? contexts.get(expectedContextId)
         : undefined;
-      if (
-        expectedContext &&
-        !this.contextAllowed(graph, scope, playlist, expectedContext)
-      ) {
-        continue;
+      if (expectedContext) {
+        const allowed =
+          scope.kind === 'playlist'
+            ? Boolean(
+                playlist &&
+                  playlistAllowsRouteContext(graph, playlist, expectedContext),
+              )
+            : this.contextAllowed(graph, scope, playlist, expectedContext);
+        if (!allowed) continue;
       }
       const key = expectedContextId
         ? `${source.id}:${expectedContextId}:${review.confusionContextId}`

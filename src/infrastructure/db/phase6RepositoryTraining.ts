@@ -1,6 +1,9 @@
 import { createPhase6GraphExercisePlan } from '../../domain/phase6/exercisePlan';
 import type { TrainingScope } from '../../domain/phase6/types';
-import { contextPly } from '../../domain/repertoire/graph';
+import {
+  contextPly,
+  playlistAllowsRouteContext,
+} from '../../domain/repertoire/graph';
 import type {
   PromptMode,
   RepertoireContext,
@@ -146,11 +149,14 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
       const eligibleContexts = item.contextIds
         .map((id) => contexts.get(id))
         .filter((row): row is RepertoireContext => Boolean(row))
-        .filter(
-          (row) =>
-            authorizedContexts.has(row.id) &&
-            this.contextAllowed(graph, scope, playlist, row),
-        );
+        .filter((row) => {
+          if (!authorizedContexts.has(row.id)) return false;
+          return scope.kind === 'playlist'
+            ? Boolean(
+                playlist && playlistAllowsRouteContext(graph, playlist, row),
+              )
+            : this.contextAllowed(graph, scope, playlist, row);
+        });
       if (eligibleContexts.length === 0) continue;
       const context = [...eligibleContexts].sort(
         (a, b) =>
