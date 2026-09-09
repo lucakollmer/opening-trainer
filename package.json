@@ -8,8 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "pnpm lint && pnpm test && pnpm build:app && pnpm exec prettier --check .",
-    "build:app": "tsc -b && vite build && node scripts/write-deployment-marker.mjs",
+    "build": "tsc -b && vite build && node scripts/write-deployment-marker.mjs",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -b --pretty false",
@@ -18,7 +17,7 @@
     "test:pwa": "node scripts/check-pwa.mjs",
     "integrity:check": "node scripts/verify-pack.mjs",
     "integrity:update": "node scripts/update-integrity-manifest.mjs",
-    "validate": "pnpm integrity:check && pnpm build && pnpm test:pwa"
+    "validate": "pnpm integrity:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:pwa && pnpm exec prettier --check ."
   },
   "packageManager": "pnpm@11.20.0",
   "dependencies": {
