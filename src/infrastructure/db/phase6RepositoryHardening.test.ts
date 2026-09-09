@@ -39,7 +39,7 @@ async function destroy(repository: Phase6OpeningTrainerRepository) {
 
 function branchingDecision(graph: RepertoireGraph) {
   const edgeById = new Map(graph.edges.map((row) => [row.id, row]));
-  const byContext = new Map<string, typeof graph.moves>();
+  const byContext = new Map<string, Array<(typeof graph.moves)[number]>>();
   for (const move of graph.moves.filter((row) => row.actor === 'user')) {
     const rows = byContext.get(move.contextId) ?? [];
     rows.push(move);
