@@ -2,20 +2,12 @@ import { contextPly } from '../repertoire/graph';
 import type { RepertoireContext, RepertoireGraph } from '../repertoire/types';
 import type { SchedulerState } from '../scheduling/schedulerPort';
 import type { ReviewObservation } from '../training/session';
-import type {
-  BranchProgressSummary,
-  BrowseTreeNode,
-  DecisionProgress,
-} from './types';
+import type { BranchProgressSummary, BrowseTreeNode, DecisionProgress } from './types';
 
 export const PHASE6_WEAK_RETRIEVABILITY_THRESHOLD = 0.82;
 export const PHASE6_RECENT_FAILURE_WINDOW_DAYS = 14;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const FAILURE_OUTCOMES = new Set([
-  'wrong-variation',
-  'outside-repertoire',
-  'revealed',
-]);
+const FAILURE_OUTCOMES = new Set(['wrong-variation', 'outside-repertoire', 'revealed']);
 
 export interface ProgressTrainingItem {
   id: string;
@@ -76,7 +68,11 @@ export function decisionProgress(
     if (!FAILURE_OUTCOMES.has(review.outcome)) return false;
     const observed = new Date(review.observedAt).getTime();
     const age = now.getTime() - observed;
-    return Number.isFinite(observed) && age >= 0 && age <= PHASE6_RECENT_FAILURE_WINDOW_DAYS * DAY_MS;
+    return (
+      Number.isFinite(observed) &&
+      age >= 0 &&
+      age <= PHASE6_RECENT_FAILURE_WINDOW_DAYS * DAY_MS
+    );
   });
   const lifecycle: DecisionProgress['lifecycle'] =
     !state || state.stage === 'new'
@@ -88,15 +84,14 @@ export function decisionProgress(
     lifecycle,
     due: Boolean(
       state &&
-        state.stage !== 'new' &&
-        new Date(state.dueAt).getTime() <= now.getTime(),
+      state.stage !== 'new' &&
+      new Date(state.dueAt).getTime() <= now.getTime(),
     ),
     weak: Boolean(
       state &&
-        state.stage !== 'new' &&
-        ((scheduler?.retrievability ?? 1) <
-          PHASE6_WEAK_RETRIEVABILITY_THRESHOLD ||
-          recentFailure),
+      state.stage !== 'new' &&
+      ((scheduler?.retrievability ?? 1) < PHASE6_WEAK_RETRIEVABILITY_THRESHOLD ||
+        recentFailure),
     ),
     everTrained: targeted.length > 0,
     ...(state ? { nextDueAt: state.dueAt } : {}),
@@ -119,10 +114,7 @@ function mergeDecision(
   };
 }
 
-function scopeRank(
-  item: ProgressTrainingItem,
-  playlistId: string | undefined,
-): number {
+function scopeRank(item: ProgressTrainingItem, playlistId: string | undefined): number {
   const playlistIds = item.playlistIds ?? [];
   if (!playlistId) return playlistIds.length === 0 ? 0 : 99;
   if (playlistIds.includes(playlistId)) return 0;
@@ -184,10 +176,7 @@ export function buildBrowseTreeWithProgress(
 
   const children = new Map<string, RepertoireContext[]>();
   for (const context of inputs.graph.contexts) {
-    if (
-      context.repertoireId !== inputs.repertoireId ||
-      !context.parentContextId
-    ) {
+    if (context.repertoireId !== inputs.repertoireId || !context.parentContextId) {
       continue;
     }
     const list = children.get(context.parentContextId) ?? [];
@@ -216,10 +205,7 @@ export function buildBrowseTreeWithProgress(
     list.push(review);
     reviewsByItem.set(review.trainingItemId, list);
   }
-  const itemIdsByContext = preferredContextItemIds(
-    inputs.items,
-    inputs.playlistId,
-  );
+  const itemIdsByContext = preferredContextItemIds(inputs.items, inputs.playlistId);
   const progressByItem = new Map<string, DecisionProgress>();
   for (const itemId of new Set([...itemIdsByContext.values()].flat())) {
     progressByItem.set(
@@ -245,9 +231,7 @@ export function buildBrowseTreeWithProgress(
     return true;
   };
 
-  const summaryForIds = (
-    itemIds: ReadonlySet<string>,
-  ): BranchProgressSummary => {
+  const summaryForIds = (itemIds: ReadonlySet<string>): BranchProgressSummary => {
     let result = emptySummary();
     for (const itemId of itemIds) {
       const progress = progressByItem.get(itemId);
@@ -286,8 +270,7 @@ export function buildBrowseTreeWithProgress(
         ply: contextPly(context, contexts),
         explicitIncluded: context.included,
         effectiveIncluded: effectiveIncluded(context),
-        playlistEligible:
-          inputs.playlistEligibleContextIds?.has(context.id) ?? true,
+        playlistEligible: inputs.playlistEligibleContextIds?.has(context.id) ?? true,
         transposition: (occurrences.get(context.entryPositionId) ?? 0) > 1,
         current: context.id === inputs.currentContextId,
         progress: summaryForIds(itemIds),

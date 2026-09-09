@@ -30,8 +30,7 @@ const ISO_DATE_TIME_PATTERN =
 const SCHEDULER_STAGES = new Set(['new', 'learning', 'review', 'relearning']);
 
 export const PHASE6_NAME_POLICY_VERSION = OPENING_NAME_MAPPING_POLICY_VERSION;
-export const PHASE6_CONTRAST_POLICY_VERSION =
-  PHASE6_CONTRAST_MAPPING_POLICY_VERSION;
+export const PHASE6_CONTRAST_POLICY_VERSION = PHASE6_CONTRAST_MAPPING_POLICY_VERSION;
 
 export function assertPhase6IsoDateTime(
   value: string | undefined,
@@ -141,19 +140,12 @@ export function assertNameReviewLogRecord(record: NameReviewLogRecord): void {
     throw new Error(`Name review ${record.id}.outcome is invalid.`);
   }
   if (!record.expectedAnswerSetKey) {
-    throw new Error(
-      `Name review ${record.id} is missing its expected answer-set key.`,
-    );
+    throw new Error(`Name review ${record.id} is missing its expected answer-set key.`);
   }
 }
 
-export function assertContrastReviewLogRecord(
-  record: ContrastReviewLogRecord,
-): void {
-  assertPhase6IsoDateTime(
-    record.observedAt,
-    `Contrast review ${record.id}.observedAt`,
-  );
+export function assertContrastReviewLogRecord(record: ContrastReviewLogRecord): void {
+  assertPhase6IsoDateTime(record.observedAt, `Contrast review ${record.id}.observedAt`);
   if (!Number.isInteger(record.itemIndex) || record.itemIndex < 0) {
     throw new Error(`Contrast review ${record.id}.itemIndex is invalid.`);
   }
@@ -165,10 +157,7 @@ export function assertContrastReviewLogRecord(
   }
 }
 
-function assertTrainingScope(
-  scope: NameSessionRecord['scope'],
-  label: string,
-): void {
+function assertTrainingScope(scope: NameSessionRecord['scope'], label: string): void {
   if (!scope.id || !['repertoire', 'playlist'].includes(scope.kind)) {
     throw new Error(`${label} has an invalid training scope.`);
   }
@@ -209,39 +198,24 @@ export function assertNameSessionRecord(session: NameSessionRecord): void {
   assertSessionCore(session, `Name session ${session.id}`);
 }
 
-export function assertContrastSessionRecord(
-  session: ContrastSessionRecord,
-): void {
+export function assertContrastSessionRecord(session: ContrastSessionRecord): void {
   assertSessionCore(session, `Contrast session ${session.id}`);
 }
 
-export function assertManagedOpeningNameRecord(
-  record: ManagedOpeningNameRecord,
-): void {
-  const validated = validateOpeningNameLabels(
-    record.primaryLabel,
-    record.aliases,
-  );
+export function assertManagedOpeningNameRecord(record: ManagedOpeningNameRecord): void {
+  const validated = validateOpeningNameLabels(record.primaryLabel, record.aliases);
   if (validated.answerSetKey !== record.answerSetKey) {
     throw new Error(`Opening name ${record.id} has an inconsistent answer-set key.`);
   }
   assertPhase6IsoDateTime(record.createdAt, `Opening name ${record.id}.createdAt`);
   assertPhase6IsoDateTime(record.updatedAt, `Opening name ${record.id}.updatedAt`);
   if (record.archivedAt !== undefined) {
-    assertPhase6IsoDateTime(
-      record.archivedAt,
-      `Opening name ${record.id}.archivedAt`,
-    );
+    assertPhase6IsoDateTime(record.archivedAt, `Opening name ${record.id}.archivedAt`);
   }
 }
 
-export function assertNameTrainingItemRecord(
-  record: NameTrainingItemRecord,
-): void {
-  const validated = validateOpeningNameLabels(
-    record.primaryLabel,
-    record.aliases,
-  );
+export function assertNameTrainingItemRecord(record: NameTrainingItemRecord): void {
+  const validated = validateOpeningNameLabels(record.primaryLabel, record.aliases);
   if (validated.answerSetKey !== record.answerSetKey) {
     throw new Error(
       `Name training item ${record.id} has an inconsistent answer-set snapshot.`,

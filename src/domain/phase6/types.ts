@@ -1,8 +1,7 @@
 import type { SchedulerGrade, SchedulerState } from '../scheduling/schedulerPort';
 
 export type TrainingScope =
-  | { kind: 'repertoire'; id: string }
-  | { kind: 'playlist'; id: string };
+  { kind: 'repertoire'; id: string } | { kind: 'playlist'; id: string };
 
 export interface RepertoireLifecycleRecord {
   id: string;
@@ -214,10 +213,7 @@ export interface ScopeQueueSummary {
 }
 
 export type PlaylistAvailability =
-  | 'ready'
-  | 'partially-unavailable'
-  | 'unavailable'
-  | 'archived';
+  'ready' | 'partially-unavailable' | 'unavailable' | 'archived';
 
 export interface ManagedRepertoireSummary {
   id: string;

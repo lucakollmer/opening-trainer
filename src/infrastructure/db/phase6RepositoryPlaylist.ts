@@ -1,6 +1,4 @@
-import {
-  SCHEDULER_MAPPING_POLICY_VERSION,
-} from '../../domain/scheduling/observationPolicy';
+import { SCHEDULER_MAPPING_POLICY_VERSION } from '../../domain/scheduling/observationPolicy';
 import { boundedText, validateTags } from '../../domain/phase6/validation';
 import {
   playlistAllowsRouteContext,
@@ -33,8 +31,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
     if (
       unique(playlist.includedContextIds).length !==
         playlist.includedContextIds.length ||
-      unique(playlist.excludedContextIds).length !==
-        playlist.excludedContextIds.length
+      unique(playlist.excludedContextIds).length !== playlist.excludedContextIds.length
     ) {
       throw new Error('Playlist context filters must be unique.');
     }
@@ -78,10 +75,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
         }
       }
       const contexts = new Map(
-        (await this.database.repertoireContexts.toArray()).map((row) => [
-          row.id,
-          row,
-        ]),
+        (await this.database.repertoireContexts.toArray()).map((row) => [row.id, row]),
       );
       const repertoireIds = new Set(playlist.repertoireIds);
       for (const contextId of [
@@ -110,9 +104,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
         id: normalized.id,
         name: normalized.name,
         ...(normalized.colour ? { colour: normalized.colour } : {}),
-        ...(normalized.maxPly !== undefined
-          ? { maxPly: normalized.maxPly }
-          : {}),
+        ...(normalized.maxPly !== undefined ? { maxPly: normalized.maxPly } : {}),
         weighting: structuredClone(normalized.weighting),
         createdAt: existing?.createdAt ?? normalized.createdAt ?? now,
         updatedAt: now,
@@ -121,11 +113,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
 
       await this.database.transaction(
         'rw',
-        [
-          this.database.playlists,
-          this.database.playlistEntries,
-          this.database.meta,
-        ],
+        [this.database.playlists, this.database.playlistEntries, this.database.meta],
         async () => {
           await this.database.playlists.put(record);
           await this.database.playlistEntries
@@ -169,9 +157,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
       if (!playlistAllowsRouteContext(graph, playlist, context)) continue;
       const hasUserMove = graph.moves.some(
         (move) =>
-          move.contextId === context.id &&
-          move.actor === 'user' &&
-          move.included,
+          move.contextId === context.id && move.actor === 'user' && move.included,
       );
       if (!hasUserMove) continue;
       const accepted = queryAcceptedMoves(graph, {
@@ -192,8 +178,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
         promptMode: 'normal',
       });
       const prior = await this.database.trainingItems.get(itemId);
-      const unscoped =
-        prior && (!prior.playlistIds || prior.playlistIds.length === 0);
+      const unscoped = prior && (!prior.playlistIds || prior.playlistIds.length === 0);
       const playlistIds = unscoped
         ? undefined
         : unique([...(prior?.playlistIds ?? []), playlistId]).sort();
@@ -248,8 +233,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
       return {
         ...row,
         playlistIds: remaining,
-        status:
-          remaining.length > 0 ? ('active' as const) : ('superseded' as const),
+        status: remaining.length > 0 ? ('active' as const) : ('superseded' as const),
         updatedAt: now,
       };
     });
@@ -262,9 +246,7 @@ export class Phase6PlaylistRepository extends Phase6LifecycleRepository {
       ],
       async () => {
         if (oldRules.length > 0) {
-          await this.database.decisionRules.bulkDelete(
-            oldRules.map((row) => row.id),
-          );
+          await this.database.decisionRules.bulkDelete(oldRules.map((row) => row.id));
         }
         if (rules.length > 0) await this.database.decisionRules.bulkPut(rules);
         if (items.length > 0 || obsolete.length > 0) {

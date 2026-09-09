@@ -248,22 +248,18 @@ function validatePhase6Data(data: Phase6BackupData): void {
   }
   const nameContexts = new Set<string>();
   for (const name of data.managedOpeningNames) {
-    if (
-      !repertoireIds.has(name.repertoireId) ||
-      !contextIds.has(name.contextId)
-    ) {
+    if (!repertoireIds.has(name.repertoireId) || !contextIds.has(name.contextId)) {
       throw new Error(`Opening name ${name.id} references missing graph state.`);
     }
     if (nameContexts.has(name.contextId)) {
-      throw new Error(`Multiple managed opening names target context ${name.contextId}.`);
+      throw new Error(
+        `Multiple managed opening names target context ${name.contextId}.`,
+      );
     }
     nameContexts.add(name.contextId);
   }
   for (const item of data.nameTrainingItems) {
-    if (
-      !repertoireIds.has(item.repertoireId) ||
-      !contextIds.has(item.contextId)
-    ) {
+    if (!repertoireIds.has(item.repertoireId) || !contextIds.has(item.contextId)) {
       throw new Error(`Name training item ${item.id} references missing graph state.`);
     }
   }
@@ -308,12 +304,16 @@ function validatePhase6Data(data: Phase6BackupData): void {
       !contrastItemIds.has(review.contrastItemId) ||
       !contrastSessionIds.has(review.sessionId)
     ) {
-      throw new Error(`Contrast review ${review.id} references missing session or item.`);
+      throw new Error(
+        `Contrast review ${review.id} references missing session or item.`,
+      );
     }
   }
   for (const state of data.contrastSchedulerStates) {
     if (!contrastItemIds.has(state.itemId)) {
-      throw new Error(`Contrast scheduler state ${state.id} references a missing item.`);
+      throw new Error(
+        `Contrast scheduler state ${state.id} references a missing item.`,
+      );
     }
   }
   for (const decision of data.contrastSchedulerDecisions) {
@@ -532,11 +532,7 @@ export function previewPhase6BackupJson(text: string): Phase6BackupPreview {
   ) {
     throw new Error('Backup PHASE-6 schema metadata is inconsistent.');
   }
-  baseValidationPreview(
-    baseData(backup.data),
-    backup.exportedAt,
-    backup.databaseMeta,
-  );
+  baseValidationPreview(baseData(backup.data), backup.exportedAt, backup.databaseMeta);
   validatePhase6Data(backup.data);
   if (backup.integrity) {
     if (
@@ -586,12 +582,14 @@ async function putData(
   if (data.repertoireMoves.length) {
     await database.repertoireMoves.bulkPut(data.repertoireMoves);
   }
-  if (data.decisionRules.length) await database.decisionRules.bulkPut(data.decisionRules);
+  if (data.decisionRules.length)
+    await database.decisionRules.bulkPut(data.decisionRules);
   if (data.playlists.length) await database.playlists.bulkPut(data.playlists);
   if (data.playlistEntries.length) {
     await database.playlistEntries.bulkPut(data.playlistEntries);
   }
-  if (data.trainingItems.length) await database.trainingItems.bulkPut(data.trainingItems);
+  if (data.trainingItems.length)
+    await database.trainingItems.bulkPut(data.trainingItems);
   if (data.reviewLogs.length) await database.reviewLogs.bulkPut(data.reviewLogs);
   if (data.schedulerStates.length) {
     await database.schedulerStates.bulkPut(data.schedulerStates);
@@ -628,7 +626,8 @@ async function putData(
     await database.nameSchedulerDecisions.bulkPut(data.nameSchedulerDecisions);
   }
   if (data.nameSessions.length) await database.nameSessions.bulkPut(data.nameSessions);
-  if (data.contrastItems.length) await database.contrastItems.bulkPut(data.contrastItems);
+  if (data.contrastItems.length)
+    await database.contrastItems.bulkPut(data.contrastItems);
   if (data.contrastReviewLogs.length) {
     await database.contrastReviewLogs.bulkPut(data.contrastReviewLogs);
   }
@@ -664,7 +663,11 @@ export async function commitPhase6BackupRestore(
   await verifyPhase6BackupIntegrity(preview);
   const restoredAt = options.restoredAt ?? new Date().toISOString();
   const data = structuredClone(preview.backup.data);
-  baseValidationPreview(baseData(data), preview.backup.exportedAt, preview.backup.databaseMeta);
+  baseValidationPreview(
+    baseData(data),
+    preview.backup.exportedAt,
+    preview.backup.databaseMeta,
+  );
   validatePhase6Data(data);
   await database.transaction('rw', database.tables, async () => {
     for (const name of [...USER_DATA_TABLE_NAMES, ...PHASE6_USER_DATA_TABLE_NAMES]) {

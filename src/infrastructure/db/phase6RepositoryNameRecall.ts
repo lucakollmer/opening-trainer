@@ -41,25 +41,23 @@ export class Phase6NameRecallRepository extends Phase6TrainingRepository {
     );
     return (await this.database.nameTrainingItems.toArray())
       .filter(
-        (item) =>
-          item.status === 'active' && availableIds.includes(item.repertoireId),
+        (item) => item.status === 'active' && availableIds.includes(item.repertoireId),
       )
       .filter((item) => {
         const context = contexts.get(item.contextId);
         const name = names.get(item.contextId);
         return Boolean(
           context &&
-            name &&
-            !name.archivedAt &&
-            this.contextAllowed(graph, scope, playlist, context),
+          name &&
+          !name.archivedAt &&
+          this.contextAllowed(graph, scope, playlist, context),
         );
       })
       .filter((item) => {
         const state = states.get(item.id);
         return Boolean(
           state &&
-            (state.state.stage === 'new' ||
-              this.scheduler.isDue(state.state, now)),
+          (state.state.stage === 'new' || this.scheduler.isDue(state.state, now)),
         );
       })
       .sort((a, b) => {
@@ -75,9 +73,7 @@ export class Phase6NameRecallRepository extends Phase6TrainingRepository {
   private async namePrompt(session: NameSessionRecord): Promise<NamePrompt> {
     if (session.status !== 'active') throw new Error('Name session is not active.');
     const itemId = session.itemIds[session.currentIndex];
-    const item = itemId
-      ? await this.database.nameTrainingItems.get(itemId)
-      : undefined;
+    const item = itemId ? await this.database.nameTrainingItems.get(itemId) : undefined;
     if (!item) throw new Error('Name session item is missing.');
     const context = await this.database.repertoireContexts.get(item.contextId);
     const position = context
@@ -112,10 +108,7 @@ export class Phase6NameRecallRepository extends Phase6TrainingRepository {
       if (!Number.isInteger(targetCount) || targetCount < 1) {
         throw new Error('Name targetCount must be a positive integer.');
       }
-      const items = (await this.eligibleNameItems(scope, now)).slice(
-        0,
-        targetCount,
-      );
+      const items = (await this.eligibleNameItems(scope, now)).slice(0, targetCount);
       if (items.length === 0) {
         throw new Error('No opening-name reviews are due or new in this scope.');
       }
@@ -171,9 +164,7 @@ export class Phase6NameRecallRepository extends Phase6TrainingRepository {
         );
         const savedSession = await this.database.nameSessions.get(sessionId);
         if (!item || !savedSession) {
-          throw new Error(
-            'Committed name review references missing durable state.',
-          );
+          throw new Error('Committed name review references missing durable state.');
         }
         return {
           accepted: existing.outcome === 'accepted',
@@ -206,10 +197,7 @@ export class Phase6NameRecallRepository extends Phase6TrainingRepository {
       const grade: SchedulerGrade = accepted ? 'Good' : 'Again';
       const priorState = await this.database.nameSchedulerStates.get(item.id);
       if (!priorState) throw new Error('Name scheduler state is missing.');
-      assertIndependentSchedulerStateRecord(
-        priorState,
-        PHASE6_NAME_POLICY_VERSION,
-      );
+      assertIndependentSchedulerStateRecord(priorState, PHASE6_NAME_POLICY_VERSION);
       if (
         priorState.adapterVersion !== this.scheduler.adapterVersion ||
         priorState.parametersVersion !== this.scheduler.parametersVersion ||
@@ -253,14 +241,9 @@ export class Phase6NameRecallRepository extends Phase6TrainingRepository {
         ...session,
         currentIndex: nextIndex,
         status: nextIndex >= session.itemIds.length ? 'complete' : 'active',
-        committedObservationIds: [
-          ...session.committedObservationIds,
-          observationId,
-        ],
+        committedObservationIds: [...session.committedObservationIds, observationId],
         updatedAt: observedAt,
-        ...(nextIndex >= session.itemIds.length
-          ? { completedAt: observedAt }
-          : {}),
+        ...(nextIndex >= session.itemIds.length ? { completedAt: observedAt } : {}),
       };
       await this.database.transaction(
         'rw',

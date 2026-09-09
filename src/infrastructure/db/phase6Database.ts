@@ -47,8 +47,7 @@ const PHASE6_STORES = {
   decisionRules:
     'id, repertoireId, contextId, positionId, trainingItemId, [repertoireId+positionId]',
   playlists: 'id, name, colour, updatedAt',
-  playlistEntries:
-    'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
+  playlistEntries: 'id, playlistId, kind, value, [playlistId+kind], [playlistId+value]',
   trainingItems:
     'id, repertoireId, positionKey, acceptedMoveSetKey, promptMode, status, [repertoireId+status]',
   reviewLogs: 'id, trainingItemId, sessionId, observedAt, outcome, evidenceRole',
@@ -60,8 +59,7 @@ const PHASE6_STORES = {
   settings: 'id, updatedAt',
   imports: 'id, repertoireId, importedAt',
   openingNames: 'id, repertoireId, contextId, updatedAt',
-  confusionRelations:
-    'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
+  confusionRelations: 'id, expectedTrainingItemId, confusionContextId, lastObservedAt',
   repertoireStates: 'id, archivedAt, updatedAt',
   playlistStates: 'id, archivedAt, updatedAt',
   managedOpeningNames:
@@ -71,8 +69,7 @@ const PHASE6_STORES = {
   nameReviewLogs:
     'id, nameTrainingItemId, sessionId, observedAt, outcome, &[sessionId+itemIndex]',
   nameSchedulerStates: 'id, &itemId, updatedAt, mappingPolicyVersion',
-  nameSchedulerDecisions:
-    'id, &observationId, itemId, grade, decidedAt, policyVersion',
+  nameSchedulerDecisions: 'id, &observationId, itemId, grade, decidedAt, policyVersion',
   nameSessions: 'id, status, updatedAt',
   contrastItems:
     'id, pairId, repertoireId, expectedContextId, confusedContextId, status, [repertoireId+status]',
@@ -155,21 +152,15 @@ export class Phase6OpeningTrainerDatabase extends OpeningTrainerDatabase {
       'creating',
       (_primaryKey, record) => assertNameTrainingItemRecord(record),
     );
-    this.table<IndependentSchedulerStateRecord, string>(
-      'contrastSchedulerStates',
-    ).hook('creating', (_primaryKey, record) =>
-      assertIndependentSchedulerStateRecord(
-        record,
-        PHASE6_CONTRAST_POLICY_VERSION,
-      ),
+    this.table<IndependentSchedulerStateRecord, string>('contrastSchedulerStates').hook(
+      'creating',
+      (_primaryKey, record) =>
+        assertIndependentSchedulerStateRecord(record, PHASE6_CONTRAST_POLICY_VERSION),
     );
     this.table<IndependentSchedulerDecisionRecord, string>(
       'contrastSchedulerDecisions',
     ).hook('creating', (_primaryKey, record) =>
-      assertIndependentSchedulerDecisionRecord(
-        record,
-        PHASE6_CONTRAST_POLICY_VERSION,
-      ),
+      assertIndependentSchedulerDecisionRecord(record, PHASE6_CONTRAST_POLICY_VERSION),
     );
     this.table<ContrastReviewLogRecord, string>('contrastReviewLogs').hook(
       'creating',
@@ -210,15 +201,11 @@ export class Phase6OpeningTrainerDatabase extends OpeningTrainerDatabase {
         table<ManagedOpeningNameRecord>('managedOpeningNames').toArray(),
         table<NameTrainingItemRecord>('nameTrainingItems').toArray(),
         table<IndependentSchedulerStateRecord>('nameSchedulerStates').toArray(),
-        table<IndependentSchedulerDecisionRecord>(
-          'nameSchedulerDecisions',
-        ).toArray(),
+        table<IndependentSchedulerDecisionRecord>('nameSchedulerDecisions').toArray(),
         table<NameReviewLogRecord>('nameReviewLogs').toArray(),
         table<NameSessionRecord>('nameSessions').toArray(),
         table<ContrastItemRecord>('contrastItems').toArray(),
-        table<IndependentSchedulerStateRecord>(
-          'contrastSchedulerStates',
-        ).toArray(),
+        table<IndependentSchedulerStateRecord>('contrastSchedulerStates').toArray(),
         table<IndependentSchedulerDecisionRecord>(
           'contrastSchedulerDecisions',
         ).toArray(),
@@ -237,19 +224,13 @@ export class Phase6OpeningTrainerDatabase extends OpeningTrainerDatabase {
         assertIndependentSchedulerStateRecord(record, PHASE6_NAME_POLICY_VERSION),
       );
       nameDecisions.forEach((record) =>
-        assertIndependentSchedulerDecisionRecord(
-          record,
-          PHASE6_NAME_POLICY_VERSION,
-        ),
+        assertIndependentSchedulerDecisionRecord(record, PHASE6_NAME_POLICY_VERSION),
       );
       nameReviews.forEach(assertNameReviewLogRecord);
       nameSessions.forEach(assertNameSessionRecord);
       contrastItems.forEach(assertContrastItemRecord);
       contrastStates.forEach((record) =>
-        assertIndependentSchedulerStateRecord(
-          record,
-          PHASE6_CONTRAST_POLICY_VERSION,
-        ),
+        assertIndependentSchedulerStateRecord(record, PHASE6_CONTRAST_POLICY_VERSION),
       );
       contrastDecisions.forEach((record) =>
         assertIndependentSchedulerDecisionRecord(

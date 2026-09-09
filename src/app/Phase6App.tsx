@@ -91,7 +91,6 @@ function scopeExists(
     : playlists.some((row) => row.id === scope.id);
 }
 
-
 function findNode(
   nodes: BrowseWorkspaceSnapshot['tree'],
   contextId: string,
@@ -115,17 +114,25 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
   );
   const [booting, setBooting] = useState(true);
   const [mode, setMode] = useState<WorkspaceMode>('browse');
-  const [repertoires, setRepertoires] = useState<readonly ManagedRepertoireSummary[]>([]);
+  const [repertoires, setRepertoires] = useState<readonly ManagedRepertoireSummary[]>(
+    [],
+  );
   const [playlists, setPlaylists] = useState<readonly ManagedPlaylistSummary[]>([]);
   const [scope, setScope] = useState<TrainingScope | null>(null);
   const [browse, setBrowse] = useState<BrowseWorkspaceSnapshot | null>(null);
   const [editor, setEditor] = useState<ContextEditorSnapshot | null>(null);
-  const [playlistFilter, setPlaylistFilter] = useState<'include' | 'exclude' | 'none'>('none');
+  const [playlistFilter, setPlaylistFilter] = useState<'include' | 'exclude' | 'none'>(
+    'none',
+  );
   const [namePrompt, setNamePrompt] = useState<NamePrompt | null>(null);
   const [contrastPrompt, setContrastPrompt] = useState<ContrastPrompt | null>(null);
-  const [moveRecovery, setMoveRecovery] = useState<SessionRecord | undefined>(undefined);
+  const [moveRecovery, setMoveRecovery] = useState<SessionRecord | undefined>(
+    undefined,
+  );
   const [recovery, setRecovery] = useState<Phase6RecoveryDescriptor | null>(null);
-  const [recoveryMoveRecord, setRecoveryMoveRecord] = useState<SessionRecord | null>(null);
+  const [recoveryMoveRecord, setRecoveryMoveRecord] = useState<SessionRecord | null>(
+    null,
+  );
   const [importOpen, setImportOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [dataOpen, setDataOpen] = useState(false);
@@ -232,7 +239,11 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
         }
       } catch (cause) {
         if (active) {
-          setError(cause instanceof Error ? cause.message : 'Opening Trainer initialization failed.');
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : 'Opening Trainer initialization failed.',
+          );
         }
       } finally {
         if (active) setBooting(false);
@@ -257,7 +268,9 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
     try {
       await operation();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Opening Trainer action failed.');
+      setError(
+        cause instanceof Error ? cause.message : 'Opening Trainer action failed.',
+      );
     } finally {
       setBusy(false);
     }
@@ -327,7 +340,8 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
     if (namePrompt) await repository.abandonNameSession(namePrompt.sessionId);
     setNamePrompt(null);
     setMode('browse');
-    if (scope) await refreshBrowse(scope, browse?.repertoireId, browse?.selectedContextId);
+    if (scope)
+      await refreshBrowse(scope, browse?.repertoireId, browse?.selectedContextId);
   };
 
   const exitContrast = async () => {
@@ -336,7 +350,8 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
     }
     setContrastPrompt(null);
     setMode('browse');
-    if (scope) await refreshBrowse(scope, browse?.repertoireId, browse?.selectedContextId);
+    if (scope)
+      await refreshBrowse(scope, browse?.repertoireId, browse?.selectedContextId);
   };
 
   const resumeRecovery = async () => {
@@ -352,7 +367,10 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
       setMode('move');
       return;
     }
-    const recoveredScope = await repository.getAuxSessionScope(recovery.kind, recovery.id);
+    const recoveredScope = await repository.getAuxSessionScope(
+      recovery.kind,
+      recovery.id,
+    );
     setScope(recoveredScope);
     await repository.putSetting(ACTIVE_SCOPE_SETTING, recoveredScope);
     if (recovery.kind === 'name') {
@@ -379,9 +397,7 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
     if (scope) await refreshBrowse(scope);
   };
 
-  const updatePlaylistFilter = async (
-    filter: 'include' | 'exclude' | 'none',
-  ) => {
+  const updatePlaylistFilter = async (filter: 'include' | 'exclude' | 'none') => {
     if (!scope || scope.kind !== 'playlist' || !browse) return;
     const playlist = await repository.getPlaylist(scope.id);
     const contextId = browse.selectedContextId;
@@ -412,14 +428,20 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
         <AppBar position="static" elevation={0}>
           <Toolbar>
-            <Typography component="h1" variant="h6">Opening Trainer</Typography>
+            <Typography component="h1" variant="h6">
+              Opening Trainer
+            </Typography>
           </Toolbar>
         </AppBar>
         <Container sx={{ py: 4 }}>
           <Alert severity="info">
             Browse is withheld until the interrupted recall session is resumed or ended.
           </Alert>
-          {error ? <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert> : null}
+          {error ? (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          ) : null}
         </Container>
         <Phase6RecoveryDialog
           recovery={recovery}
@@ -435,7 +457,9 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
         <AppBar position="static" elevation={0}>
           <Toolbar>
-            <Typography component="h1" variant="h6">Opening Trainer</Typography>
+            <Typography component="h1" variant="h6">
+              Opening Trainer
+            </Typography>
           </Toolbar>
         </AppBar>
         <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -447,7 +471,11 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
             onExit={async () => {
               setMoveRecovery(undefined);
               setMode('browse');
-              await refreshBrowse(scope, browse?.repertoireId, browse?.selectedContextId);
+              await refreshBrowse(
+                scope,
+                browse?.repertoireId,
+                browse?.selectedContextId,
+              );
             }}
           />
         </Container>
@@ -515,9 +543,10 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
   const selectedNode = browse
     ? findNode(browse.tree, browse.selectedContextId)
     : undefined;
-  const scopePlaylist = scope?.kind === 'playlist'
-    ? playlists.find((row) => row.id === scope.id)
-    : undefined;
+  const scopePlaylist =
+    scope?.kind === 'playlist'
+      ? playlists.find((row) => row.id === scope.id)
+      : undefined;
   const playlistBrowseRepertoires = scopePlaylist
     ? [
         ...scopePlaylist.availableRepertoireIds,
@@ -546,12 +575,19 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
                 }}
               >
                 {repertoires.map((repertoire) => (
-                  <MenuItem key={`repertoire:${repertoire.id}`} value={`repertoire:${repertoire.id}`}>
-                    {repertoire.name}{repertoire.archived ? ' (archived)' : ''}
+                  <MenuItem
+                    key={`repertoire:${repertoire.id}`}
+                    value={`repertoire:${repertoire.id}`}
+                  >
+                    {repertoire.name}
+                    {repertoire.archived ? ' (archived)' : ''}
                   </MenuItem>
                 ))}
                 {playlists.map((playlist) => (
-                  <MenuItem key={`playlist:${playlist.id}`} value={`playlist:${playlist.id}`}>
+                  <MenuItem
+                    key={`playlist:${playlist.id}`}
+                    value={`playlist:${playlist.id}`}
+                  >
                     Playlist: {playlist.name} ({playlist.availability})
                   </MenuItem>
                 ))}
@@ -571,7 +607,9 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
           ) : null}
           <Button
             color="inherit"
-            disabled={busy || !scope || !browse || browse.queue.due + browse.queue.new === 0}
+            disabled={
+              busy || !scope || !browse || browse.queue.due + browse.queue.new === 0
+            }
             onClick={() => {
               setMoveRecovery(undefined);
               setMode('move');
@@ -581,7 +619,12 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
           </Button>
           <Button
             color="inherit"
-            disabled={busy || !scope || !browse || browse.queue.namesDue + browse.queue.namesNew === 0}
+            disabled={
+              busy ||
+              !scope ||
+              !browse ||
+              browse.queue.namesDue + browse.queue.namesNew === 0
+            }
             onClick={() => void startName()}
           >
             Name recall
@@ -606,7 +649,11 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
       </AppBar>
 
       <Container maxWidth="xl" sx={{ py: 3 }}>
-        {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+        {error ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        ) : null}
         {!scope || repertoires.length === 0 ? (
           <Stack spacing={2} alignItems="center" sx={{ py: 8 }}>
             <Typography variant="h5">No repertoire is stored locally.</Typography>
@@ -632,7 +679,8 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
                     const repertoire = repertoires.find((row) => row.id === id);
                     return (
                       <MenuItem key={id} value={id}>
-                        {repertoire?.name ?? id}{repertoire?.archived ? ' (archived)' : ''}
+                        {repertoire?.name ?? id}
+                        {repertoire?.archived ? ' (archived)' : ''}
                       </MenuItem>
                     );
                   })}
@@ -664,7 +712,10 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
                 alignItems: 'start',
               }}
             >
-              <Paper variant="outlined" sx={{ p: 1, maxHeight: { lg: '78vh' }, overflow: 'auto' }}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 1, maxHeight: { lg: '78vh' }, overflow: 'auto' }}
+              >
                 <BrowseTree
                   nodes={browse.tree}
                   selectedContextId={browse.selectedContextId}
@@ -680,11 +731,28 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
                   onMove={() => false}
                 />
                 {selectedNode ? (
-                  <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap' }}>
-                    <Chip label={`${selectedNode.progress.due} due below`} size="small" />
-                    <Chip label={`${selectedNode.progress.weak} weak below`} size="small" />
-                    <Chip label={`${selectedNode.progress.neverTrained} never trained`} size="small" />
-                    <Chip label={`${selectedNode.progress.mature} mature`} size="small" />
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    useFlexGap
+                    sx={{ flexWrap: 'wrap' }}
+                  >
+                    <Chip
+                      label={`${selectedNode.progress.due} due below`}
+                      size="small"
+                    />
+                    <Chip
+                      label={`${selectedNode.progress.weak} weak below`}
+                      size="small"
+                    />
+                    <Chip
+                      label={`${selectedNode.progress.neverTrained} never trained`}
+                      size="small"
+                    />
+                    <Chip
+                      label={`${selectedNode.progress.mature} mature`}
+                      size="small"
+                    />
                   </Stack>
                 ) : null}
               </Stack>
@@ -707,7 +775,10 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
                   await refreshBrowse(scope, browse.repertoireId, editor.context.id);
                 }}
                 onSaveContext={async (note, tags) => {
-                  await repository.updateContextMetadata(editor.context.id, { note, tags });
+                  await repository.updateContextMetadata(editor.context.id, {
+                    note,
+                    tags,
+                  });
                   await refreshBrowse(scope, browse.repertoireId, editor.context.id);
                 }}
                 onSaveOpeningName={async (primaryLabel, aliases) => {
@@ -757,7 +828,8 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
                       {confusion.legacyAmbiguous
                         ? 'Legacy expected context is ambiguous'
                         : confusion.expectedLabel}{' '}
-                      - confused with {confusion.confusedLabel ?? confusion.confusedContextId}
+                      - confused with{' '}
+                      {confusion.confusedLabel ?? confusion.confusedContextId}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {confusion.countInWindow} in the last 30 days - last{' '}

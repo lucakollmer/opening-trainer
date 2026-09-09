@@ -1,13 +1,7 @@
 import { createPhase6GraphExercisePlan } from '../../domain/phase6/exercisePlan';
 import type { TrainingScope } from '../../domain/phase6/types';
-import {
-  contextPly,
-  playlistAllowsRouteContext,
-} from '../../domain/repertoire/graph';
-import type {
-  PromptMode,
-  RepertoireContext,
-} from '../../domain/repertoire/types';
+import { contextPly, playlistAllowsRouteContext } from '../../domain/repertoire/graph';
+import type { PromptMode, RepertoireContext } from '../../domain/repertoire/types';
 import {
   generateAdaptiveSessionSelection,
   type SelectedTrainingCandidate,
@@ -21,23 +15,11 @@ import type {
   AdaptiveExerciseDescriptor,
   TrainingSessionState,
 } from '../../domain/training/session';
-import type {
-  SessionRecord,
-  TrainingItemRecord,
-} from './openingTrainerDatabase';
+import type { SessionRecord, TrainingItemRecord } from './openingTrainerDatabase';
 import { Phase6AnnotationsRepository } from './phase6RepositoryAnnotations';
-import {
-  contextPath,
-  nowIso,
-  stableHash,
-  unique,
-} from './phase6RepositoryCore';
+import { contextPath, nowIso, stableHash, unique } from './phase6RepositoryCore';
 
-const FAILURE_OUTCOMES = new Set([
-  'wrong-variation',
-  'outside-repertoire',
-  'revealed',
-]);
+const FAILURE_OUTCOMES = new Set(['wrong-variation', 'outside-repertoire', 'revealed']);
 const CLASS_ORDER: readonly SelectedTrainingCandidate['selectionClass'][] = [
   'repair',
   'weak-due',
@@ -121,9 +103,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
       this.database.trainingItems.toArray(),
       this.database.decisionRules.toArray(),
     ]);
-    const states = new Map(
-      stateRows.map((row) => [row.trainingItemId, row]),
-    );
+    const states = new Map(stateRows.map((row) => [row.trainingItemId, row]));
     const authorizedContextsByItem = new Map<string, Set<string>>();
     for (const rule of decisionRules) {
       if (rule.promptMode !== mode) continue;
@@ -152,9 +132,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
         .filter((row) => {
           if (!authorizedContexts.has(row.id)) return false;
           return scope.kind === 'playlist'
-            ? Boolean(
-                playlist && playlistAllowsRouteContext(graph, playlist, row),
-              )
+            ? Boolean(playlist && playlistAllowsRouteContext(graph, playlist, row))
             : this.contextAllowed(graph, scope, playlist, row);
         });
       if (eligibleContexts.length === 0) continue;
@@ -168,13 +146,10 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
       const targeted = reviews
         .filter(
           (review) =>
-            review.trainingItemId === item.id &&
-            review.evidenceRole === 'targeted',
+            review.trainingItemId === item.id && review.evidenceRole === 'targeted',
         )
         .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
-      const failure = targeted.find((review) =>
-        FAILURE_OUTCOMES.has(review.outcome),
-      );
+      const failure = targeted.find((review) => FAILURE_OUTCOMES.has(review.outcome));
       result.push({
         repertoireId: item.repertoireId,
         contextId: context.id,
@@ -238,8 +213,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
       const selection = generateAdaptiveSessionSelection(
         rows.map((row) => row.snapshot),
         {
-          repertoireId:
-            scope.kind === 'repertoire' ? scope.id : `playlist:${scope.id}`,
+          repertoireId: scope.kind === 'repertoire' ? scope.id : `playlist:${scope.id}`,
           ...(scope.kind === 'playlist' ? { playlistId: scope.id } : {}),
           mode,
           targetCount: Math.max(1, rows.length),
@@ -302,8 +276,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
             (rule) =>
               rule.contextId === contextId &&
               rule.promptMode === descriptor.promptMode &&
-              (rule.playlistId ?? undefined) ===
-                (descriptor.playlistId ?? undefined),
+              (rule.playlistId ?? undefined) === (descriptor.playlistId ?? undefined),
           )
           .map((rule) => rule.trainingItemId),
       ),
@@ -324,9 +297,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
         ? record.targetIds
         : record.state.targetTrainingItemIds;
     const items = (
-      await Promise.all(
-        itemIds.map((id) => this.database.trainingItems.get(id)),
-      )
+      await Promise.all(itemIds.map((id) => this.database.trainingItems.get(id)))
     ).filter((row): row is TrainingItemRecord => Boolean(row));
     const item = items[0];
     if (!item) {
@@ -367,10 +338,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
     return { scope, exercise };
   }
 
-  public saveMoveSession(
-    state: TrainingSessionState,
-    now = nowIso(),
-  ): Promise<void> {
+  public saveMoveSession(state: TrainingSessionState, now = nowIso()): Promise<void> {
     this.assertWritable();
     return this.enqueue(async () => {
       await this.assertNoActiveRecallSession({

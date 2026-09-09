@@ -73,7 +73,9 @@ export function Phase6ManageDialog({
       .listImportHistory()
       .then(setImportHistory)
       .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : 'Could not load import history.'),
+        setError(
+          cause instanceof Error ? cause.message : 'Could not load import history.',
+        ),
       );
   }, [open, repository]);
 
@@ -110,9 +112,7 @@ export function Phase6ManageDialog({
     }
   };
 
-  const selectedRepertoire = repertoires.find(
-    (row) => row.id === selectedRepertoireId,
-  );
+  const selectedRepertoire = repertoires.find((row) => row.id === selectedRepertoireId);
   const selectedPlaylist = playlists.find((row) => row.id === selectedPlaylistId);
 
   const savePlaylist = async () => {
@@ -154,7 +154,8 @@ export function Phase6ManageDialog({
               >
                 {repertoires.map((repertoire) => (
                   <MenuItem key={repertoire.id} value={repertoire.id}>
-                    {repertoire.name}{repertoire.archived ? ' (archived)' : ''}
+                    {repertoire.name}
+                    {repertoire.archived ? ' (archived)' : ''}
                   </MenuItem>
                 ))}
               </Select>
@@ -197,7 +198,9 @@ export function Phase6ManageDialog({
                       );
                     }}
                   >
-                    {selectedRepertoire.archived ? 'Restore repertoire' : 'Archive repertoire'}
+                    {selectedRepertoire.archived
+                      ? 'Restore repertoire'
+                      : 'Archive repertoire'}
                   </Button>
                 </Stack>
               </>
@@ -265,7 +268,12 @@ export function Phase6ManageDialog({
                       });
                     }}
                     renderValue={(selected: string[]) => (
-                      <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        useFlexGap
+                        sx={{ flexWrap: 'wrap' }}
+                      >
                         {selected.map((id: string) => (
                           <Chip
                             size="small"
@@ -278,7 +286,8 @@ export function Phase6ManageDialog({
                   >
                     {repertoires.map((repertoire) => (
                       <MenuItem key={repertoire.id} value={repertoire.id}>
-                        {repertoire.name}{repertoire.archived ? ' (archived)' : ''}
+                        {repertoire.name}
+                        {repertoire.archived ? ' (archived)' : ''}
                       </MenuItem>
                     ))}
                   </Select>
@@ -354,7 +363,9 @@ export function Phase6ManageDialog({
                     }
                   >
                     <MenuItem value="due-first">Due first</MenuItem>
-                    <MenuItem value="balanced">Balanced within scheduler class</MenuItem>
+                    <MenuItem value="balanced">
+                      Balanced within scheduler class
+                    </MenuItem>
                   </Select>
                 </FormControl>
                 <Typography variant="caption" color="text.secondary">
@@ -382,7 +393,9 @@ export function Phase6ManageDialog({
                         )
                       }
                     >
-                      {selectedPlaylist.archived ? 'Restore playlist' : 'Archive playlist'}
+                      {selectedPlaylist.archived
+                        ? 'Restore playlist'
+                        : 'Archive playlist'}
                     </Button>
                   ) : null}
                 </Stack>
@@ -398,7 +411,11 @@ export function Phase6ManageDialog({
               </Typography>
             ) : (
               importHistory.slice(0, 20).map((entry) => (
-                <Stack key={entry.id} spacing={0.25} sx={{ p: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                <Stack
+                  key={entry.id}
+                  spacing={0.25}
+                  sx={{ p: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}
+                >
                   <Typography variant="body2">
                     {entry.source.label} - {new Date(entry.importedAt).toLocaleString()}
                   </Typography>
@@ -407,7 +424,11 @@ export function Phase6ManageDialog({
                     {entry.warnings.length} warnings
                   </Typography>
                   {entry.warnings.map((warning, index) => (
-                    <Typography key={`${warning.code}-${index}`} variant="caption" color="warning.main">
+                    <Typography
+                      key={`${warning.code}-${index}`}
+                      variant="caption"
+                      color="warning.main"
+                    >
                       {warning.message}
                     </Typography>
                   ))}
@@ -419,7 +440,9 @@ export function Phase6ManageDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button disabled={busy} onClick={onClose}>Close</Button>
+        <Button disabled={busy} onClick={onClose}>
+          Close
+        </Button>
       </DialogActions>
     </Dialog>
   );

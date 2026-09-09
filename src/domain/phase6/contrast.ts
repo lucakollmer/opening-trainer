@@ -30,8 +30,7 @@ export function insideContrastWindow(observedAt: string, now: Date): boolean {
   const timestamp = new Date(observedAt).getTime();
   return (
     Number.isFinite(timestamp) &&
-    now.getTime() - timestamp <=
-      PHASE6_CONTRAST_WINDOW_DAYS * 24 * 60 * 60 * 1000 &&
+    now.getTime() - timestamp <= PHASE6_CONTRAST_WINDOW_DAYS * 24 * 60 * 60 * 1000 &&
     timestamp <= now.getTime()
   );
 }

@@ -1,11 +1,6 @@
-import {
-  SCHEDULER_MAPPING_POLICY_VERSION,
-} from '../../domain/scheduling/observationPolicy';
+import { SCHEDULER_MAPPING_POLICY_VERSION } from '../../domain/scheduling/observationPolicy';
 import type { ManagementImpact } from '../../domain/phase6/types';
-import type {
-  RepertoireContext,
-  RepertoireGraph,
-} from '../../domain/repertoire/types';
+import type { RepertoireContext, RepertoireGraph } from '../../domain/repertoire/types';
 import { deriveTrainingRows } from './graphStorage';
 import { Phase6PlaylistRepository } from './phase6RepositoryPlaylist';
 import { nowIso } from './phase6RepositoryCore';
@@ -37,9 +32,7 @@ export class Phase6ManagementRepository extends Phase6PlaylistRepository {
         return false;
       });
       const decisionCount = descendants.filter((row) =>
-        graph.moves.some(
-          (move) => move.contextId === row.id && move.actor === 'user',
-        ),
+        graph.moves.some((move) => move.contextId === row.id && move.actor === 'user'),
       ).length;
       return {
         title: `${included ? 'Include' : 'Exclude'} this branch?`,
@@ -88,9 +81,7 @@ export class Phase6ManagementRepository extends Phase6PlaylistRepository {
     now: string,
   ): Promise<void> {
     const graph = await this.base.loadCompleteGraph();
-    const contexts = graph.contexts.filter(
-      (row) => row.repertoireId === repertoireId,
-    );
+    const contexts = graph.contexts.filter((row) => row.repertoireId === repertoireId);
     const contextIds = new Set(contexts.map((row) => row.id));
     const moves = graph.moves.filter((row) => contextIds.has(row.contextId));
     const edgeIds = new Set(moves.map((row) => row.edgeId));

@@ -83,25 +83,15 @@ describe('PHASE-6 repository hardening', () => {
         new Set(plan.exercises.map((exercise) => exercise.descriptor.repertoireId)),
       ).toEqual(new Set(['rep-one', 'rep-two']));
 
-      await repository.archiveRepertoire(
-        'rep-one',
-        true,
-        '2026-09-03T12:05:00.000Z',
-      );
+      await repository.archiveRepertoire('rep-one', true, '2026-09-03T12:05:00.000Z');
       expect(
-        (await repository.listManagedPlaylists()).find(
-          (row) => row.id === playlist.id,
-        )?.availability,
+        (await repository.listManagedPlaylists()).find((row) => row.id === playlist.id)
+          ?.availability,
       ).toBe('partially-unavailable');
-      await repository.archiveRepertoire(
-        'rep-one',
-        false,
-        '2026-09-03T12:06:00.000Z',
-      );
+      await repository.archiveRepertoire('rep-one', false, '2026-09-03T12:06:00.000Z');
       expect(
-        (await repository.listManagedPlaylists()).find(
-          (row) => row.id === playlist.id,
-        )?.availability,
+        (await repository.listManagedPlaylists()).find((row) => row.id === playlist.id)
+          ?.availability,
       ).toBe('ready');
       expect((await repository.getPlaylist(playlist.id)).repertoireIds).toEqual([
         'rep-one',
@@ -131,30 +121,17 @@ describe('PHASE-6 repository hardening', () => {
         { targetCount: 1, now: new Date('2026-09-03T12:03:00.000Z') },
       );
       await expect(
-        repository.updateBranchInclusion(
-          root,
-          false,
-          '2026-09-03T12:04:00.000Z',
-        ),
+        repository.updateBranchInclusion(root, false, '2026-09-03T12:04:00.000Z'),
       ).rejects.toThrow(/SESSION_SCOPE_LOCKED/u);
-      await repository.abandonNameSession(
-        prompt.sessionId,
-        '2026-09-03T12:04:30.000Z',
-      );
+      await repository.abandonNameSession(prompt.sessionId, '2026-09-03T12:04:30.000Z');
 
       const reviewCount = await database.reviewLogs.count();
-      await repository.updateBranchInclusion(
-        root,
-        false,
-        '2026-09-03T12:05:00.000Z',
-      );
+      await repository.updateBranchInclusion(root, false, '2026-09-03T12:05:00.000Z');
       const browse = await repository.browseWorkspace(
         { kind: 'repertoire', id: 'lock-rep' },
         { contextId: root, now: new Date('2026-09-03T12:06:00.000Z') },
       );
-      const rootNode = flattenTree(browse.tree).find(
-        (node) => node.contextId === root,
-      );
+      const rootNode = flattenTree(browse.tree).find((node) => node.contextId === root);
       expect(rootNode).toMatchObject({
         explicitIncluded: false,
         effectiveIncluded: false,
@@ -229,9 +206,7 @@ describe('PHASE-6 repository hardening', () => {
         ['King Pawn Game'],
         '2026-09-03T12:02:00.000Z',
       );
-      const moveStateBefore = structuredClone(
-        await database.schedulerStates.toArray(),
-      );
+      const moveStateBefore = structuredClone(await database.schedulerStates.toArray());
       const moveReviewsBefore = await database.reviewLogs.count();
       const prompt = await repository.startNameSession(
         { kind: 'repertoire', id: 'name-rep' },
@@ -260,9 +235,7 @@ describe('PHASE-6 repository hardening', () => {
         '2026-09-03T12:05:00.000Z',
       );
       const items = await database.nameTrainingItems.toArray();
-      expect(items.find((row) => row.id === oldActive.id)?.status).toBe(
-        'superseded',
-      );
+      expect(items.find((row) => row.id === oldActive.id)?.status).toBe('superseded');
       expect(items.find((row) => row.status === 'active')?.primaryLabel).toBe(
         'Open Game',
       );

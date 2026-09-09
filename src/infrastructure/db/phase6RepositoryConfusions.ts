@@ -57,12 +57,7 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
         (source.contextIds.length === 1 ? source.contextIds[0] : undefined);
       if (
         !expectedContextId ||
-        !validConfusionPair(
-          graph,
-          source,
-          expectedContextId,
-          review.confusionContextId,
-        )
+        !validConfusionPair(graph, source, expectedContextId, review.confusionContextId)
       ) {
         continue;
       }
@@ -89,10 +84,7 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
       const existing = await this.database.contrastItems.get(id);
       const record: ContrastItemRecord = existing ?? {
         id,
-        pairId: contrastPairId(
-          group.expectedContextId,
-          group.confusedContextId,
-        ),
+        pairId: contrastPairId(group.expectedContextId, group.confusedContextId),
         repertoireId: group.source.repertoireId,
         expectedContextId: group.expectedContextId,
         confusedContextId: group.confusedContextId,
@@ -139,12 +131,8 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
         this.database.reviewLogs.toArray(),
         this.database.decisionRules.toArray(),
       ]);
-    const trainingItems = new Map(
-      trainingItemRows.map((row) => [row.id, row]),
-    );
-    const contrastStates = new Map(
-      contrastStateRows.map((row) => [row.itemId, row]),
-    );
+    const trainingItems = new Map(trainingItemRows.map((row) => [row.id, row]));
+    const contrastStates = new Map(contrastStateRows.map((row) => [row.itemId, row]));
     const confusionReviews = reviews.filter(
       (review) =>
         review.evidenceRole === 'targeted' && Boolean(review.confusionContextId),
@@ -192,12 +180,7 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
       if (!scopeAuthorizes(source, expectedContextId)) continue;
       if (
         expectedContextId &&
-        !validConfusionPair(
-          graph,
-          source,
-          expectedContextId,
-          review.confusionContextId,
-        )
+        !validConfusionPair(graph, source, expectedContextId, review.confusionContextId)
       ) {
         continue;
       }
@@ -209,7 +192,7 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
           scope.kind === 'playlist'
             ? Boolean(
                 playlist &&
-                  playlistAllowsRouteContext(graph, playlist, expectedContext),
+                playlistAllowsRouteContext(graph, playlist, expectedContext),
               )
             : this.contextAllowed(graph, scope, playlist, expectedContext);
         if (!allowed) continue;
@@ -230,18 +213,14 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
               row.status === 'active',
           )
         : undefined;
-      const state = contrastItem
-        ? contrastStates.get(contrastItem.id)
-        : undefined;
+      const state = contrastItem ? contrastStates.get(contrastItem.id) : undefined;
       const qualifies =
-        Boolean(expectedContextId) &&
-        count >= PHASE6_CONTRAST_CONFUSION_THRESHOLD;
+        Boolean(expectedContextId) && count >= PHASE6_CONTRAST_CONFUSION_THRESHOLD;
       const contrastDue = qualifies
         ? contrastItem
           ? Boolean(
               state &&
-                (state.state.stage === 'new' ||
-                  this.scheduler.isDue(state.state, now)),
+              (state.state.stage === 'new' || this.scheduler.isDue(state.state, now)),
             )
           : true
         : false;
@@ -272,8 +251,7 @@ export class Phase6ConfusionRepository extends Phase6NameRecallRepository {
       .filter((row) => row.countInWindow > 0)
       .sort(
         (a, b) =>
-          b.lastObservedAt.localeCompare(a.lastObservedAt) ||
-          a.id.localeCompare(b.id),
+          b.lastObservedAt.localeCompare(a.lastObservedAt) || a.id.localeCompare(b.id),
       );
   }
 }

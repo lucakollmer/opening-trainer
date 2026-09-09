@@ -28,18 +28,14 @@ export class Phase6ContrastRecallRepository extends Phase6ContrastSessionReposit
       const existing = await this.database.contrastReviewLogs.get(observationId);
       const session = await this.database.contrastSessions.get(sessionId);
       if (existing) {
-        const item = await this.database.contrastItems.get(
-          existing.contrastItemId,
-        );
+        const item = await this.database.contrastItems.get(existing.contrastItemId);
         if (!item || !session) {
           throw new Error(
             'Committed contrast review references missing durable state.',
           );
         }
         const graph = await this.base.loadCompleteGraph();
-        const context = graph.contexts.find(
-          (row) => row.id === item.expectedContextId,
-        );
+        const context = graph.contexts.find((row) => row.id === item.expectedContextId);
         if (!context) throw new Error('Contrast expected context is missing.');
         const acceptedMoves = queryAcceptedMoves(graph, {
           repertoireId: item.repertoireId,
@@ -71,21 +67,15 @@ export class Phase6ContrastRecallRepository extends Phase6ContrastSessionReposit
         throw new Error('Contrast review does not match the active session item.');
       }
       const itemId = session.itemIds[itemIndex];
-      const item = itemId
-        ? await this.database.contrastItems.get(itemId)
-        : undefined;
+      const item = itemId ? await this.database.contrastItems.get(itemId) : undefined;
       if (!item) throw new Error('Contrast item is missing.');
       const graph = await this.base.loadCompleteGraph();
-      const context = graph.contexts.find(
-        (row) => row.id === item.expectedContextId,
-      );
+      const context = graph.contexts.find((row) => row.id === item.expectedContextId);
       if (!context) throw new Error('Contrast expected context is missing.');
       const accepted = queryAcceptedMoves(graph, {
         repertoireId: item.repertoireId,
         activeContextIds: [item.expectedContextId],
-        ...(session.scope.kind === 'playlist'
-          ? { playlistId: session.scope.id }
-          : {}),
+        ...(session.scope.kind === 'playlist' ? { playlistId: session.scope.id } : {}),
         positionId: context.entryPositionId,
         promptMode: 'normal',
       });
@@ -98,10 +88,7 @@ export class Phase6ContrastRecallRepository extends Phase6ContrastSessionReposit
       const observedAt = options.observedAt ?? nowIso();
       const priorState = await this.database.contrastSchedulerStates.get(item.id);
       if (!priorState) throw new Error('Contrast scheduler state is missing.');
-      assertIndependentSchedulerStateRecord(
-        priorState,
-        PHASE6_CONTRAST_POLICY_VERSION,
-      );
+      assertIndependentSchedulerStateRecord(priorState, PHASE6_CONTRAST_POLICY_VERSION);
       if (
         priorState.adapterVersion !== this.scheduler.adapterVersion ||
         priorState.parametersVersion !== this.scheduler.parametersVersion ||
@@ -144,14 +131,9 @@ export class Phase6ContrastRecallRepository extends Phase6ContrastSessionReposit
         ...session,
         currentIndex: nextIndex,
         status: nextIndex >= session.itemIds.length ? 'complete' : 'active',
-        committedObservationIds: [
-          ...session.committedObservationIds,
-          observationId,
-        ],
+        committedObservationIds: [...session.committedObservationIds, observationId],
         updatedAt: observedAt,
-        ...(nextIndex >= session.itemIds.length
-          ? { completedAt: observedAt }
-          : {}),
+        ...(nextIndex >= session.itemIds.length ? { completedAt: observedAt } : {}),
       };
       await this.database.transaction(
         'rw',

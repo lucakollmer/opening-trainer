@@ -101,7 +101,11 @@ export function Phase6DataDialog({
     setError(null);
     try {
       const result = await repository.exportRepertoirePgn(selectedRepertoireId);
-      downloadText('opening-trainer-repertoire.pgn', result.pgn, 'application/x-chess-pgn');
+      downloadText(
+        'opening-trainer-repertoire.pgn',
+        result.pgn,
+        'application/x-chess-pgn',
+      );
       if (result.warnings.length > 0) setError(result.warnings.join(' '));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'PGN export failed.');
@@ -135,12 +139,23 @@ export function Phase6DataDialog({
             projection. PGN remains a repertoire interchange format rather than a full
             training backup.
           </Typography>
-          <Button variant="outlined" disabled={busy} onClick={() => void exportBackup()}>
+          <Button
+            variant="outlined"
+            disabled={busy}
+            onClick={() => void exportBackup()}
+          >
             Export complete JSON backup
           </Button>
           <Button component="label" variant="outlined" disabled={busy}>
             Choose backup to restore
-            <input hidden type="file" accept=".json,application/json" onChange={(event: ChangeEvent<HTMLInputElement>) => void loadBackup(event)} />
+            <input
+              hidden
+              type="file"
+              accept=".json,application/json"
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                void loadBackup(event)
+              }
+            />
           </Button>
           {preview ? (
             <Alert severity="warning">
@@ -155,7 +170,9 @@ export function Phase6DataDialog({
           ) : null}
 
           <FormControl size="small" fullWidth>
-            <InputLabel id="phase6-pgn-repertoire-label">Repertoire for PGN export</InputLabel>
+            <InputLabel id="phase6-pgn-repertoire-label">
+              Repertoire for PGN export
+            </InputLabel>
             <Select
               labelId="phase6-pgn-repertoire-label"
               label="Repertoire for PGN export"
@@ -167,12 +184,16 @@ export function Phase6DataDialog({
               <MenuItem value="">Select repertoire</MenuItem>
               {repertoires.map((repertoire) => (
                 <MenuItem key={repertoire.id} value={repertoire.id}>
-                  {repertoire.name}{repertoire.archived ? ' (archived)' : ''}
+                  {repertoire.name}
+                  {repertoire.archived ? ' (archived)' : ''}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          <Button disabled={busy || !selectedRepertoireId} onClick={() => void exportPgn()}>
+          <Button
+            disabled={busy || !selectedRepertoireId}
+            onClick={() => void exportPgn()}
+          >
             Export PGN
           </Button>
 
@@ -180,7 +201,9 @@ export function Phase6DataDialog({
             label="Type RESET LOCAL DATA to clear this browser"
             value={resetText}
             disabled={busy}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setResetText(event.target.value)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              setResetText(event.target.value)
+            }
           />
           <Button
             color="error"
@@ -193,7 +216,9 @@ export function Phase6DataDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button disabled={busy} onClick={onClose}>Close</Button>
+        <Button disabled={busy} onClick={onClose}>
+          Close
+        </Button>
       </DialogActions>
     </Dialog>
   );

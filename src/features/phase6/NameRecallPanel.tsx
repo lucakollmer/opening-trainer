@@ -1,14 +1,6 @@
 import { Alert, Button, Paper, Stack, TextField, Typography } from '@mui/material';
-import {
-  useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
-} from 'react';
-import type {
-  NamePrompt,
-  NameReviewResult,
-} from '../../domain/phase6/types';
+import { useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import type { NamePrompt, NameReviewResult } from '../../domain/phase6/types';
 import { ChessboardPreview } from '../board/ChessboardPreview';
 
 interface NameRecallPanelProps {
@@ -63,7 +55,10 @@ export function NameRecallPanel({
       <Typography variant="body2" color="text.secondary">
         {prompt.breadcrumb}
       </Typography>
-      <Paper variant="outlined" sx={{ p: 1.5, maxWidth: 680, width: '100%', mx: 'auto' }}>
+      <Paper
+        variant="outlined"
+        sx={{ p: 1.5, maxWidth: 680, width: '100%', mx: 'auto' }}
+      >
         <ChessboardPreview
           position={prompt.fen}
           orientation={prompt.orientation}
@@ -79,7 +74,9 @@ export function NameRecallPanel({
             value={answer}
             disabled={busy}
             autoFocus
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setAnswer(event.target.value)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              setAnswer(event.target.value)
+            }
             onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
               if (event.key === 'Enter' && answer.trim()) void review(false);
             }}

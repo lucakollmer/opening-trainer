@@ -8,7 +8,9 @@ import { reduceGraphTrainingSession } from '../repertoire/trainingIntegration';
 
 export type ContextualReviewObservation = ReviewObservation & { contextId?: string };
 
-export function contextualReview(review: ReviewObservation): ContextualReviewObservation {
+export function contextualReview(
+  review: ReviewObservation,
+): ContextualReviewObservation {
   return review;
 }
 

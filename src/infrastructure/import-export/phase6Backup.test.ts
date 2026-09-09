@@ -50,10 +50,7 @@ describe('PHASE-6 complete backup', () => {
       await target.initialize('2026-09-03T10:00:00.000Z');
       const preview = target.previewBackupJson(json);
       expect(preview.warnings.length).toBeGreaterThan(0);
-      await target.restoreCompleteBackup(
-        preview,
-        '2026-09-03T10:01:00.000Z',
-      );
+      await target.restoreCompleteBackup(preview, '2026-09-03T10:01:00.000Z');
       expect((await target.listManagedRepertoires()).map((row) => row.id)).toEqual([
         'legacy-v2-rep',
       ]);
@@ -90,14 +87,8 @@ describe('PHASE-6 complete backup', () => {
         ['QG'],
         '2026-09-03T11:02:00.000Z',
       );
-      await source.archiveRepertoire(
-        'v3-rep',
-        true,
-        '2026-09-03T11:03:00.000Z',
-      );
-      const exported = await source.exportCompleteBackup(
-        '2026-09-03T11:04:00.000Z',
-      );
+      await source.archiveRepertoire('v3-rep', true, '2026-09-03T11:03:00.000Z');
+      const exported = await source.exportCompleteBackup('2026-09-03T11:04:00.000Z');
 
       await target.initialize('2026-09-03T12:00:00.000Z');
       await target.createRepertoire(
@@ -116,10 +107,7 @@ describe('PHASE-6 complete backup', () => {
       expect(await targetDatabase.repertoires.get('preexisting')).toBeDefined();
       expect(await targetDatabase.repertoires.get('v3-rep')).toBeUndefined();
 
-      await target.restoreCompleteBackup(
-        preview,
-        '2026-09-03T12:03:00.000Z',
-      );
+      await target.restoreCompleteBackup(preview, '2026-09-03T12:03:00.000Z');
       expect(await targetDatabase.repertoires.get('preexisting')).toBeUndefined();
       expect(
         (await target.listManagedRepertoires()).find((row) => row.id === 'v3-rep'),

@@ -26,14 +26,8 @@ interface BrowseInspectorProps {
     aliases: readonly string[],
   ) => Promise<void>;
   onArchiveOpeningName: () => Promise<void>;
-  onSaveMove: (
-    moveId: string,
-    note: string,
-    purpose: string,
-  ) => Promise<void>;
-  onSetPlaylistFilter?: (
-    filter: 'include' | 'exclude' | 'none',
-  ) => Promise<void>;
+  onSaveMove: (moveId: string, note: string, purpose: string) => Promise<void>;
+  onSetPlaylistFilter?: (filter: 'include' | 'exclude' | 'none') => Promise<void>;
 }
 
 export function BrowseInspector({
@@ -68,11 +62,19 @@ export function BrowseInspector({
   const [error, setError] = useState<string | null>(null);
 
   const parsedTags = useMemo(
-    () => tags.split(',').map((value) => value.trim()).filter(Boolean),
+    () =>
+      tags
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
     [tags],
   );
   const parsedAliases = useMemo(
-    () => aliases.split(/\r?\n/u).map((value) => value.trim()).filter(Boolean),
+    () =>
+      aliases
+        .split(/\r?\n/u)
+        .map((value) => value.trim())
+        .filter(Boolean),
     [aliases],
   );
 
@@ -100,7 +102,11 @@ export function BrowseInspector({
               }
             />
           }
-          label={snapshot.context.included ? 'Included in training' : 'Excluded from training'}
+          label={
+            snapshot.context.included
+              ? 'Included in training'
+              : 'Excluded from training'
+          }
         />
       </Stack>
 
@@ -182,17 +188,12 @@ export function BrowseInspector({
         <Button
           variant="outlined"
           disabled={busy || !primaryLabel.trim()}
-          onClick={() =>
-            void run(() => onSaveOpeningName(primaryLabel, parsedAliases))
-          }
+          onClick={() => void run(() => onSaveOpeningName(primaryLabel, parsedAliases))}
         >
           Save opening name
         </Button>
         {snapshot.openingName ? (
-          <Button
-            disabled={busy}
-            onClick={() => void run(onArchiveOpeningName)}
-          >
+          <Button disabled={busy} onClick={() => void run(onArchiveOpeningName)}>
             Remove name
           </Button>
         ) : null}
@@ -205,7 +206,11 @@ export function BrowseInspector({
           {snapshot.moves.map((move) => {
             const draft = moveDrafts[move.id] ?? { note: '', purpose: '' };
             return (
-              <Stack key={move.id} spacing={1} sx={{ p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+              <Stack
+                key={move.id}
+                spacing={1}
+                sx={{ p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1 }}
+              >
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   {move.san}
                 </Typography>

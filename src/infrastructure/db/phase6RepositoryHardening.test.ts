@@ -100,11 +100,7 @@ describe('PHASE-6 second-pass hardening', () => {
         updatedAt: now,
       };
       await repository.savePlaylist(playlist, now);
-      await repository.archiveRepertoire(
-        'archive-a',
-        true,
-        '2026-09-04T09:11:00.000Z',
-      );
+      await repository.archiveRepertoire('archive-a', true, '2026-09-04T09:11:00.000Z');
 
       await repository.savePlaylist(
         {
@@ -120,9 +116,7 @@ describe('PHASE-6 second-pass hardening', () => {
         'archive-b',
       ]);
       expect(
-        (await repository.listManagedPlaylists()).find(
-          (row) => row.id === playlist.id,
-        ),
+        (await repository.listManagedPlaylists()).find((row) => row.id === playlist.id),
       ).toMatchObject({
         name: 'Edited while degraded',
         availability: 'partially-unavailable',
@@ -230,9 +224,7 @@ describe('PHASE-6 second-pass hardening', () => {
           row.playlistId === playlist.id,
       );
       expect(sourceRule).toBeDefined();
-      const sourceItem = await database.trainingItems.get(
-        sourceRule!.trainingItemId,
-      );
+      const sourceItem = await database.trainingItems.get(sourceRule!.trainingItemId);
       expect(sourceItem).toBeDefined();
 
       for (const [index, observedAt] of [
@@ -386,7 +378,9 @@ describe('PHASE-6 second-pass hardening', () => {
 
       await repository.initialize('2026-09-04T09:56:00.000Z');
 
-      expect((await database.repertoires.get('legacy-archive-rep'))?.archivedAt).toBeUndefined();
+      expect(
+        (await database.repertoires.get('legacy-archive-rep'))?.archivedAt,
+      ).toBeUndefined();
       expect(
         (await database.repertoireStates.get('legacy-archive-rep'))?.archivedAt,
       ).toBe('2026-09-04T09:55:00.000Z');
@@ -404,5 +398,4 @@ describe('PHASE-6 second-pass hardening', () => {
       await destroy(repository);
     }
   });
-
 });

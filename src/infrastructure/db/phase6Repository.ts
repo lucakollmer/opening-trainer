@@ -9,10 +9,7 @@ import type {
 } from '../../domain/phase6/types';
 import { playlistAllowsContext } from '../../domain/repertoire/graph';
 import type { ImportRecord } from './openingTrainerDatabase';
-import {
-  DATABASE_META_ID,
-  USER_DATA_TABLE_NAMES,
-} from './openingTrainerDatabase';
+import { DATABASE_META_ID, USER_DATA_TABLE_NAMES } from './openingTrainerDatabase';
 import {
   PHASE6_DATABASE_SCHEMA_VERSION,
   PHASE6_PORTABLE_SCHEMA_VERSION,
@@ -103,9 +100,7 @@ export class Phase6OpeningTrainerRepository extends Phase6ContrastRecallReposito
           ? options.repertoireId
           : allScopeIds[0];
       if (!repertoireId) throw new Error('Browse scope contains no repertoire.');
-      const repertoire = graph.repertoires.find(
-        (row) => row.id === repertoireId,
-      );
+      const repertoire = graph.repertoires.find((row) => row.id === repertoireId);
       if (!repertoire) throw new Error(`Missing repertoire ${repertoireId}.`);
       const contexts = graph.contexts.filter(
         (row) => row.repertoireId === repertoireId,
@@ -119,9 +114,7 @@ export class Phase6OpeningTrainerRepository extends Phase6ContrastRecallReposito
         (row) => row.id === selectedContextId,
       );
       const selectedPosition = selectedContext
-        ? graph.positions.find(
-            (row) => row.id === selectedContext.entryPositionId,
-          )
+        ? graph.positions.find((row) => row.id === selectedContext.entryPositionId)
         : undefined;
       if (!selectedContext || !selectedPosition) {
         throw new Error('Selected Browse position is missing.');
@@ -159,9 +152,7 @@ export class Phase6OpeningTrainerRepository extends Phase6ContrastRecallReposito
         now,
         currentContextId: selectedContextId,
         ...(scope.kind === 'playlist' ? { playlistId: scope.id } : {}),
-        ...(playlistEligible
-          ? { playlistEligibleContextIds: playlistEligible }
-          : {}),
+        ...(playlistEligible ? { playlistEligibleContextIds: playlistEligible } : {}),
       });
       return {
         scope,
@@ -179,8 +170,7 @@ export class Phase6OpeningTrainerRepository extends Phase6ContrastRecallReposito
   public async listImportHistory(): Promise<ImportRecord[]> {
     await this.awaitPendingOperations();
     return (await this.database.imports.toArray()).sort(
-      (a, b) =>
-        b.importedAt.localeCompare(a.importedAt) || a.id.localeCompare(b.id),
+      (a, b) => b.importedAt.localeCompare(a.importedAt) || a.id.localeCompare(b.id),
     );
   }
 
@@ -251,10 +241,7 @@ export class Phase6OpeningTrainerRepository extends Phase6ContrastRecallReposito
     });
   }
 
-  public clearUserData(
-    confirmation: string,
-    now = nowIso(),
-  ): Promise<void> {
+  public clearUserData(confirmation: string, now = nowIso()): Promise<void> {
     this.assertWritable();
     if (confirmation !== 'RESET LOCAL DATA') {
       return Promise.reject(new Error('Reset confirmation did not match.'));

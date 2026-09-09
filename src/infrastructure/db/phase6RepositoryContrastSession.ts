@@ -1,4 +1,8 @@
-import type { ContrastPrompt, ContrastSessionRecord, TrainingScope } from '../../domain/phase6/types';
+import type {
+  ContrastPrompt,
+  ContrastSessionRecord,
+  TrainingScope,
+} from '../../domain/phase6/types';
 import { Phase6ConfusionRepository } from './phase6RepositoryConfusions';
 import { nowIso, randomId } from './phase6RepositoryCore';
 
@@ -10,13 +14,9 @@ export class Phase6ContrastSessionRepository extends Phase6ConfusionRepository {
       throw new Error('Contrast session is not active.');
     }
     const itemId = session.itemIds[session.currentIndex];
-    const item = itemId
-      ? await this.database.contrastItems.get(itemId)
-      : undefined;
+    const item = itemId ? await this.database.contrastItems.get(itemId) : undefined;
     if (!item) throw new Error('Contrast session item is missing.');
-    const context = await this.database.repertoireContexts.get(
-      item.expectedContextId,
-    );
+    const context = await this.database.repertoireContexts.get(item.expectedContextId);
     const position = context
       ? await this.database.positions.get(context.entryPositionId)
       : undefined;
@@ -120,10 +120,7 @@ export class Phase6ContrastSessionRepository extends Phase6ConfusionRepository {
       updatedAt: row.updatedAt,
     }));
     const contrasts = (
-      await this.database.contrastSessions
-        .where('status')
-        .equals('active')
-        .toArray()
+      await this.database.contrastSessions.where('status').equals('active').toArray()
     ).map((row) => ({
       kind: 'contrast' as const,
       id: row.id,

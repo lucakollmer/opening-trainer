@@ -32,9 +32,7 @@ export function nowIso(): string {
 }
 
 export function randomId(prefix: string): string {
-  return (
-    globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now().toString(36)}`
-  );
+  return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now().toString(36)}`;
 }
 
 export function stableHash(value: string): number {
@@ -146,9 +144,7 @@ export function validConfusionPair(
   ) {
     return false;
   }
-  const acceptedUci = new Set(
-    source.acceptedMoveSetKey.split('|').filter(Boolean),
-  );
+  const acceptedUci = new Set(source.acceptedMoveSetKey.split('|').filter(Boolean));
   return graph.moves.some((move) => {
     if (move.actor !== 'user' || move.destinationContextId !== confusedContextId) {
       return false;
@@ -157,10 +153,10 @@ export function validConfusionPair(
     const edge = edges.get(move.edgeId);
     return Boolean(
       candidateContext &&
-        edge &&
-        candidateContext.repertoireId === source.repertoireId &&
-        candidateContext.entryPositionId === expected.entryPositionId &&
-        !acceptedUci.has(edge.uci),
+      edge &&
+      candidateContext.repertoireId === source.repertoireId &&
+      candidateContext.entryPositionId === expected.entryPositionId &&
+      !acceptedUci.has(edge.uci),
     );
   });
 }
@@ -194,9 +190,7 @@ export class Phase6RepositoryCore {
 
   protected assertWritable(): void {
     if (this.restoreRequested) {
-      throw new Error(
-        'RESTORE_IN_PROGRESS: local writes are temporarily blocked.',
-      );
+      throw new Error('RESTORE_IN_PROGRESS: local writes are temporarily blocked.');
     }
   }
 
@@ -252,12 +246,8 @@ export class Phase6RepositoryCore {
         this.database.repertoireStates.toArray(),
         this.database.playlistStates.toArray(),
       ]);
-    const repertoireStateById = new Map(
-      repertoireStates.map((row) => [row.id, row]),
-    );
-    const playlistStateById = new Map(
-      playlistStates.map((row) => [row.id, row]),
-    );
+    const repertoireStateById = new Map(repertoireStates.map((row) => [row.id, row]));
+    const playlistStateById = new Map(playlistStates.map((row) => [row.id, row]));
     const changedRepertoireStates: RepertoireLifecycleRecord[] = [];
     const normalizedRepertoires: typeof repertoires = [];
 
@@ -318,9 +308,7 @@ export class Phase6RepositoryCore {
     return [...(await this.getPlaylistUnsafe(scope.id)).repertoireIds];
   }
 
-  protected async scopeAvailableRepertoireIds(
-    scope: TrainingScope,
-  ): Promise<string[]> {
+  protected async scopeAvailableRepertoireIds(scope: TrainingScope): Promise<string[]> {
     if (scope.kind === 'playlist' && (await this.playlistArchived(scope.id))) {
       return [];
     }
@@ -346,17 +334,16 @@ export class Phase6RepositoryCore {
       try {
         result.push(await this.getMoveSessionScopeUnsafe(session));
       } catch {
-        return [
-          { kind: 'playlist', id: '__unknown-active-move-session__' },
-        ];
+        return [{ kind: 'playlist', id: '__unknown-active-move-session__' }];
       }
     }
     return result;
   }
 
-  protected async assertNoActiveRecallSession(
-    except?: { kind: RecallKind; id: string },
-  ): Promise<void> {
+  protected async assertNoActiveRecallSession(except?: {
+    kind: RecallKind;
+    id: string;
+  }): Promise<void> {
     const moveSessions = (await this.database.sessions.toArray()).filter(
       (row) => !TERMINAL_MOVE_STATUSES.has(row.status),
     );
@@ -392,14 +379,12 @@ export class Phase6RepositoryCore {
     const affectedPlaylists = new Set(playlistIds);
     const moveScopes = await this.activeMoveScopes();
     const auxScopes = [
-      ...(await this.database.nameSessions
-        .where('status')
-        .equals('active')
-        .toArray()).map((row) => row.scope),
-      ...(await this.database.contrastSessions
-        .where('status')
-        .equals('active')
-        .toArray()).map((row) => row.scope),
+      ...(
+        await this.database.nameSessions.where('status').equals('active').toArray()
+      ).map((row) => row.scope),
+      ...(
+        await this.database.contrastSessions.where('status').equals('active').toArray()
+      ).map((row) => row.scope),
     ];
     for (const scope of [...moveScopes, ...auxScopes]) {
       if (scope.kind === 'repertoire' && affectedRepertoires.has(scope.id)) {

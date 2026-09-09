@@ -58,9 +58,7 @@ export class Phase6LifecycleRepository extends Phase6RepositoryCore {
     return rows
       .map((row) => {
         const state = stateById.get(row.id);
-        const archived = state
-          ? Boolean(state.archivedAt)
-          : Boolean(row.archivedAt);
+        const archived = state ? Boolean(state.archivedAt) : Boolean(row.archivedAt);
         return {
           id: row.id,
           name: row.name,
@@ -73,9 +71,9 @@ export class Phase6LifecycleRepository extends Phase6RepositoryCore {
               const context = contextById.get(move.contextId);
               return Boolean(
                 move.actor === 'user' &&
-                  move.included &&
-                  context?.repertoireId === row.id &&
-                  effectivelyIncluded(move.contextId),
+                move.included &&
+                context?.repertoireId === row.id &&
+                effectivelyIncluded(move.contextId),
               );
             }),
         };
@@ -143,11 +141,7 @@ export class Phase6LifecycleRepository extends Phase6RepositoryCore {
     return this.getPlaylistUnsafe(id);
   }
 
-  public renameRepertoire(
-    id: string,
-    name: string,
-    now = nowIso(),
-  ): Promise<void> {
+  public renameRepertoire(id: string, name: string, now = nowIso()): Promise<void> {
     this.assertWritable();
     return this.enqueue(async () => {
       const nextName = boundedText(name, 'Repertoire name', 120);
@@ -207,11 +201,7 @@ export class Phase6LifecycleRepository extends Phase6RepositoryCore {
     });
   }
 
-  public archivePlaylist(
-    id: string,
-    archived: boolean,
-    now = nowIso(),
-  ): Promise<void> {
+  public archivePlaylist(id: string, archived: boolean, now = nowIso()): Promise<void> {
     this.assertWritable();
     return this.enqueue(async () => {
       const playlist = await this.getPlaylistUnsafe(id);

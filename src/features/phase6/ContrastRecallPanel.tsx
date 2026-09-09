@@ -1,13 +1,7 @@
 import { Alert, Button, Paper, Stack, Typography } from '@mui/material';
 import { useRef, useState } from 'react';
-import type {
-  ContrastPrompt,
-  ContrastReviewResult,
-} from '../../domain/phase6/types';
-import {
-  ChessboardPreview,
-  type BoardMoveCommand,
-} from '../board/ChessboardPreview';
+import type { ContrastPrompt, ContrastReviewResult } from '../../domain/phase6/types';
+import { ChessboardPreview, type BoardMoveCommand } from '../board/ChessboardPreview';
 
 interface ContrastRecallPanelProps {
   prompt: ContrastPrompt;
@@ -72,7 +66,10 @@ export function ContrastRecallPanel({
         Play the repertoire move for this position. The sibling you recently confused it
         with stays hidden until after your response.
       </Typography>
-      <Paper variant="outlined" sx={{ p: 1.5, maxWidth: 680, width: '100%', mx: 'auto' }}>
+      <Paper
+        variant="outlined"
+        sx={{ p: 1.5, maxWidth: 680, width: '100%', mx: 'auto' }}
+      >
         <ChessboardPreview
           position={prompt.fen}
           orientation={prompt.orientation}
@@ -82,7 +79,11 @@ export function ContrastRecallPanel({
         />
       </Paper>
       {!result ? (
-        <Stack direction="row" spacing={1} sx={{ maxWidth: 680, width: '100%', mx: 'auto' }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ maxWidth: 680, width: '100%', mx: 'auto' }}
+        >
           <Button
             disabled={busy || localBusy}
             onClick={() => void review(undefined, true)}
@@ -96,7 +97,9 @@ export function ContrastRecallPanel({
       ) : (
         <Stack spacing={1.5} sx={{ maxWidth: 680, width: '100%', mx: 'auto' }}>
           <Alert severity={result.accepted ? 'success' : 'warning'}>
-            {result.accepted ? 'Correct distinction.' : 'Contrast this with the sibling branch.'}
+            {result.accepted
+              ? 'Correct distinction.'
+              : 'Contrast this with the sibling branch.'}
           </Alert>
           <Typography variant="body1">
             Expected here: {result.expectedSan.join(' or ')}

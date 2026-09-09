@@ -23,10 +23,7 @@ describe('PHASE-6 pure contracts', () => {
       'sicilian defence\u001fsicilian defense',
     );
     expect(
-      openingNameMatches(
-        'SICILIAN DEFENCE',
-        'sicilian defence\u001fsicilian defense',
-      ),
+      openingNameMatches('SICILIAN DEFENCE', 'sicilian defence\u001fsicilian defense'),
     ).toBe(true);
     expect(openingNameMatches('Sicilian-Defence', 'sicilian defence')).toBe(false);
     expect(() =>
@@ -35,9 +32,7 @@ describe('PHASE-6 pure contracts', () => {
   });
 
   it('uses a directional contrast identity and an exact thirty-day boundary', () => {
-    expect(contrastPairId('expected', 'sibling')).toBe(
-      'contrast:expected->sibling',
-    );
+    expect(contrastPairId('expected', 'sibling')).toBe('contrast:expected->sibling');
     const now = new Date('2026-09-03T12:00:00.000Z');
     expect(insideContrastWindow('2026-08-04T12:00:00.000Z', now)).toBe(true);
     expect(insideContrastWindow('2026-08-04T11:59:59.999Z', now)).toBe(false);
@@ -93,7 +88,11 @@ describe('PHASE-6 pure contracts', () => {
     const step = plan.steps.find((candidate) => candidate.id === state.currentStepId)!;
     const next = reducePhase6TrainingSession(state, plan, {
       type: 'user-move',
-      move: { from: step.from, to: step.to, ...(step.promotion ? { promotion: step.promotion } : {}) },
+      move: {
+        from: step.from,
+        to: step.to,
+        ...(step.promotion ? { promotion: step.promotion } : {}),
+      },
       nowMs: 1_500,
       observedAt: '2026-09-03T12:00:00.000Z',
     });

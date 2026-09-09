@@ -23,10 +23,7 @@ import type {
   MoveSessionOptions,
   Phase6OpeningTrainerRepository,
 } from '../../infrastructure/db/phase6Repository';
-import {
-  ChessboardPreview,
-  type BoardMoveCommand,
-} from '../board/ChessboardPreview';
+import { ChessboardPreview, type BoardMoveCommand } from '../board/ChessboardPreview';
 import { RepertoireTreePreview } from '../repertoire-tree/RepertoireTreePreview';
 import { TaskPreviewCard } from '../task/TaskPreviewCard';
 
@@ -102,14 +99,19 @@ export function MoveWorkspace({
   const [error, setError] = useState<string | null>(null);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
 
-  const queueSave = useCallback((snapshot: TrainingSessionState) => {
-    saveChainRef.current = saveChainRef.current
-      .then(() => repository.saveMoveSession(structuredClone(snapshot)))
-      .catch((cause: unknown) => {
-        setError(cause instanceof Error ? cause.message : 'Move-session persistence failed.');
-      });
-    return saveChainRef.current;
-  }, [repository]);
+  const queueSave = useCallback(
+    (snapshot: TrainingSessionState) => {
+      saveChainRef.current = saveChainRef.current
+        .then(() => repository.saveMoveSession(structuredClone(snapshot)))
+        .catch((cause: unknown) => {
+          setError(
+            cause instanceof Error ? cause.message : 'Move-session persistence failed.',
+          );
+        });
+      return saveChainRef.current;
+    },
+    [repository],
+  );
 
   useEffect(() => {
     let active = true;
@@ -163,7 +165,9 @@ export function MoveWorkspace({
         if (active) setQueueSummary(summary);
       } catch (cause) {
         if (active) {
-          setError(cause instanceof Error ? cause.message : 'Could not start move session.');
+          setError(
+            cause instanceof Error ? cause.message : 'Could not start move session.',
+          );
         }
       } finally {
         if (active) setLoading(false);
@@ -349,7 +353,12 @@ export function MoveWorkspace({
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="center">
+      <Stack
+        direction="row"
+        spacing={1}
+        justifyContent="space-between"
+        alignItems="center"
+      >
         <Typography component="h2" variant="h5">
           Move recall
         </Typography>
