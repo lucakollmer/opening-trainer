@@ -188,7 +188,8 @@ export class Phase6OpeningTrainerDatabase extends OpeningTrainerDatabase {
       (_primaryKey, record) => assertManagedOpeningNameRecord(record),
     );
 
-    this.on('ready', async () => {
+    this.on('ready', async (vipDb) => {
+      const table = <T>(name: string) => vipDb.table<T, string>(name);
       const [
         repertoireStates,
         playlistStates,
@@ -204,19 +205,25 @@ export class Phase6OpeningTrainerDatabase extends OpeningTrainerDatabase {
         contrastReviews,
         contrastSessions,
       ] = await Promise.all([
-        this.repertoireStates.toArray(),
-        this.playlistStates.toArray(),
-        this.managedOpeningNames.toArray(),
-        this.nameTrainingItems.toArray(),
-        this.nameSchedulerStates.toArray(),
-        this.nameSchedulerDecisions.toArray(),
-        this.nameReviewLogs.toArray(),
-        this.nameSessions.toArray(),
-        this.contrastItems.toArray(),
-        this.contrastSchedulerStates.toArray(),
-        this.contrastSchedulerDecisions.toArray(),
-        this.contrastReviewLogs.toArray(),
-        this.contrastSessions.toArray(),
+        table<RepertoireLifecycleRecord>('repertoireStates').toArray(),
+        table<PlaylistLifecycleRecord>('playlistStates').toArray(),
+        table<ManagedOpeningNameRecord>('managedOpeningNames').toArray(),
+        table<NameTrainingItemRecord>('nameTrainingItems').toArray(),
+        table<IndependentSchedulerStateRecord>('nameSchedulerStates').toArray(),
+        table<IndependentSchedulerDecisionRecord>(
+          'nameSchedulerDecisions',
+        ).toArray(),
+        table<NameReviewLogRecord>('nameReviewLogs').toArray(),
+        table<NameSessionRecord>('nameSessions').toArray(),
+        table<ContrastItemRecord>('contrastItems').toArray(),
+        table<IndependentSchedulerStateRecord>(
+          'contrastSchedulerStates',
+        ).toArray(),
+        table<IndependentSchedulerDecisionRecord>(
+          'contrastSchedulerDecisions',
+        ).toArray(),
+        table<ContrastReviewLogRecord>('contrastReviewLogs').toArray(),
+        table<ContrastSessionRecord>('contrastSessions').toArray(),
       ]);
       repertoireStates.forEach((record) =>
         assertLifecycleRecord(record, `Repertoire state ${record.id}`),
