@@ -28,8 +28,8 @@ describe('PHASE-6 name recall disclosure', () => {
       <NameRecallPanel
         prompt={prompt}
         onReview={onReview}
-        onNext={async () => undefined}
-        onEnd={async () => undefined}
+        onNext={() => Promise.resolve()}
+        onEnd={() => Promise.resolve()}
       />,
     );
 

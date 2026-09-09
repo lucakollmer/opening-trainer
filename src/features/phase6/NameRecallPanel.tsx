@@ -1,6 +1,5 @@
 import { Alert, Button, Paper, Stack, TextField, Typography } from '@mui/material';
 import {
-  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -39,13 +38,6 @@ export function NameRecallPanel({
   const [result, setResult] = useState<NameReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const startedAtRef = useRef(monotonicNow());
-
-  useEffect(() => {
-    setAnswer('');
-    setResult(null);
-    setError(null);
-    startedAtRef.current = monotonicNow();
-  }, [prompt.itemId, prompt.itemIndex]);
 
   const review = async (reveal: boolean) => {
     if (result || busy) return;

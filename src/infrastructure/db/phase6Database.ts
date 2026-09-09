@@ -15,6 +15,7 @@ import type {
 import {
   DATABASE_META_ID,
   OpeningTrainerDatabase,
+  type DatabaseMetaRecord,
 } from './openingTrainerDatabase';
 import {
   assertContrastItemRecord,
@@ -120,9 +121,10 @@ export class Phase6OpeningTrainerDatabase extends OpeningTrainerDatabase {
       .stores(PHASE6_STORES)
       .upgrade(async (transaction) => {
         const now = new Date().toISOString();
-        const meta = await transaction.table('meta').get(DATABASE_META_ID);
-        if (meta && typeof meta === 'object') {
-          await transaction.table('meta').put({
+        const metaTable = transaction.table<DatabaseMetaRecord, string>('meta');
+        const meta = await metaTable.get(DATABASE_META_ID);
+        if (meta) {
+          await metaTable.put({
             ...meta,
             databaseSchemaVersion: PHASE6_DATABASE_SCHEMA_VERSION,
             portableSchemaVersion: PHASE6_PORTABLE_SCHEMA_VERSION,

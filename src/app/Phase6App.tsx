@@ -246,6 +246,8 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
         repository.close();
       }
     };
+    // Bootstrap intentionally follows the repository lifecycle rather than helper identities.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownsRepository, repository]);
 
   const run = async (operation: () => Promise<void>) => {
@@ -457,6 +459,7 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
     return (
       <Container maxWidth="lg" sx={{ py: 3 }}>
         <NameRecallPanel
+          key={`${namePrompt.sessionId}:${namePrompt.itemIndex}:${namePrompt.itemId}`}
           prompt={namePrompt}
           busy={busy}
           onReview={(answer, responseTimeMs, reveal) =>
@@ -483,6 +486,7 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
     return (
       <Container maxWidth="lg" sx={{ py: 3 }}>
         <ContrastRecallPanel
+          key={`${contrastPrompt.sessionId}:${contrastPrompt.itemIndex}:${contrastPrompt.itemId}`}
           prompt={contrastPrompt}
           busy={busy}
           onReview={(playedUci, responseTimeMs, reveal) =>
@@ -685,6 +689,7 @@ export function Phase6App({ repository: suppliedRepository }: Phase6AppProps = {
                 ) : null}
               </Stack>
               <BrowseInspector
+                key={JSON.stringify(editor)}
                 snapshot={editor}
                 busy={busy}
                 playlistFilter={playlistFilter}

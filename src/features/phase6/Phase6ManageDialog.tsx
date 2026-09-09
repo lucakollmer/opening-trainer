@@ -77,23 +77,23 @@ export function Phase6ManageDialog({
       );
   }, [open, repository]);
 
-  useEffect(() => {
-    const repertoire = repertoires.find((row) => row.id === selectedRepertoireId);
-    setRepertoireName(repertoire?.name ?? '');
-  }, [repertoires, selectedRepertoireId]);
+  const selectRepertoire = (id: string) => {
+    setSelectedRepertoireId(id);
+    setRepertoireName(repertoires.find((row) => row.id === id)?.name ?? '');
+  };
 
-  useEffect(() => {
-    if (!selectedPlaylistId) {
+  const selectPlaylist = async (id: string) => {
+    setSelectedPlaylistId(id);
+    if (!id) {
       setPlaylistDraft(null);
       return;
     }
-    void repository
-      .getPlaylist(selectedPlaylistId)
-      .then(setPlaylistDraft)
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : 'Could not load playlist.'),
-      );
-  }, [repository, selectedPlaylistId]);
+    try {
+      setPlaylistDraft(await repository.getPlaylist(id));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not load playlist.');
+    }
+  };
 
   const run = async (operation: () => Promise<void>) => {
     if (busy) return;
@@ -149,7 +149,7 @@ export function Phase6ManageDialog({
                 label="Repertoire"
                 value={selectedRepertoireId}
                 onChange={(event: SelectChangeEvent<string>) =>
-                  setSelectedRepertoireId(String(event.target.value))
+                  selectRepertoire(String(event.target.value))
                 }
               >
                 {repertoires.map((repertoire) => (
@@ -217,7 +217,7 @@ export function Phase6ManageDialog({
                   label="Playlist"
                   value={selectedPlaylistId}
                   onChange={(event: SelectChangeEvent<string>) =>
-                    setSelectedPlaylistId(String(event.target.value))
+                    void selectPlaylist(String(event.target.value))
                   }
                 >
                   {playlists.map((playlist) => (
@@ -257,7 +257,7 @@ export function Phase6ManageDialog({
                     value={[...playlistDraft.repertoireIds]}
                     disabled={busy}
                     onChange={(event: SelectChangeEvent<string[]>) => {
-                      const value = event.target.value as string | string[];
+                      const value = event.target.value;
                       setPlaylistDraft({
                         ...playlistDraft,
                         repertoireIds:

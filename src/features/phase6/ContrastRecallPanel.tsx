@@ -1,5 +1,5 @@
 import { Alert, Button, Paper, Stack, Typography } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type {
   ContrastPrompt,
   ContrastReviewResult,
@@ -36,13 +36,6 @@ export function ContrastRecallPanel({
   const [localBusy, setLocalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const startedAtRef = useRef(monotonicNow());
-
-  useEffect(() => {
-    setResult(null);
-    setError(null);
-    setLocalBusy(false);
-    startedAtRef.current = monotonicNow();
-  }, [prompt.itemId, prompt.itemIndex]);
 
   const review = async (playedUci: string | undefined, reveal: boolean) => {
     if (result || busy || localBusy) return;

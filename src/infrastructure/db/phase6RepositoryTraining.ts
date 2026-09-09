@@ -1,7 +1,4 @@
-import {
-  createPhase6GraphExercisePlan,
-  type GraphExercisePlanOptions,
-} from '../../domain/phase6/exercisePlan';
+import { createPhase6GraphExercisePlan } from '../../domain/phase6/exercisePlan';
 import type { TrainingScope } from '../../domain/phase6/types';
 import { contextPly } from '../../domain/repertoire/graph';
 import type {
@@ -273,10 +270,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
         return {
           descriptor,
           targetTrainingItemIds: [row.item.id],
-          plan: createPhase6GraphExercisePlan(
-            graph,
-            descriptor as GraphExercisePlanOptions,
-          ),
+          plan: createPhase6GraphExercisePlan(graph, descriptor),
         };
       });
       return {
@@ -311,10 +305,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
     return {
       descriptor,
       targetTrainingItemIds,
-      plan: createPhase6GraphExercisePlan(
-        graph,
-        descriptor as GraphExercisePlanOptions,
-      ),
+      plan: createPhase6GraphExercisePlan(graph, descriptor),
     };
   }
 
@@ -360,10 +351,7 @@ export class Phase6TrainingRepository extends Phase6AnnotationsRepository {
     const exercise: AdaptiveExercisePlan = {
       descriptor,
       targetTrainingItemIds: [item.id],
-      plan: createPhase6GraphExercisePlan(
-        graph,
-        descriptor as GraphExercisePlanOptions,
-      ),
+      plan: createPhase6GraphExercisePlan(graph, descriptor),
     };
     if (exercise.plan.id !== record.planId) {
       throw new Error(

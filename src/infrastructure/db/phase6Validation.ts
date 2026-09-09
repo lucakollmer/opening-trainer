@@ -166,7 +166,7 @@ export function assertContrastReviewLogRecord(
 }
 
 function assertTrainingScope(
-  scope: NameSessionRecord['scope'] | ContrastSessionRecord['scope'],
+  scope: NameSessionRecord['scope'],
   label: string,
 ): void {
   if (!scope.id || !['repertoire', 'playlist'].includes(scope.kind)) {

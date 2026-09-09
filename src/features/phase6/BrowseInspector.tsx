@@ -8,7 +8,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import type { Phase6OpeningTrainerRepository } from '../../infrastructure/db/phase6Repository';
 
 export type ContextEditorSnapshot = Awaited<
@@ -47,30 +47,25 @@ export function BrowseInspector({
   onSaveMove,
   onSetPlaylistFilter,
 }: BrowseInspectorProps) {
-  const [note, setNote] = useState('');
-  const [tags, setTags] = useState('');
-  const [primaryLabel, setPrimaryLabel] = useState('');
-  const [aliases, setAliases] = useState('');
+  const [note, setNote] = useState(snapshot.context.note ?? '');
+  const [tags, setTags] = useState(snapshot.context.tags.join(', '));
+  const [primaryLabel, setPrimaryLabel] = useState(
+    snapshot.openingName?.primaryLabel ?? '',
+  );
+  const [aliases, setAliases] = useState(
+    snapshot.openingName?.aliases.join('\n') ?? '',
+  );
   const [moveDrafts, setMoveDrafts] = useState<
     Record<string, { note: string; purpose: string }>
-  >({});
+  >(() =>
+    Object.fromEntries(
+      snapshot.moves.map((move) => [
+        move.id,
+        { note: move.note ?? '', purpose: move.purpose ?? '' },
+      ]),
+    ),
+  );
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setNote(snapshot.context.note ?? '');
-    setTags(snapshot.context.tags.join(', '));
-    setPrimaryLabel(snapshot.openingName?.primaryLabel ?? '');
-    setAliases(snapshot.openingName?.aliases.join('\n') ?? '');
-    setMoveDrafts(
-      Object.fromEntries(
-        snapshot.moves.map((move) => [
-          move.id,
-          { note: move.note ?? '', purpose: move.purpose ?? '' },
-        ]),
-      ),
-    );
-    setError(null);
-  }, [snapshot]);
 
   const parsedTags = useMemo(
     () => tags.split(',').map((value) => value.trim()).filter(Boolean),

@@ -9,7 +9,7 @@ import { reduceGraphTrainingSession } from '../repertoire/trainingIntegration';
 export type ContextualReviewObservation = ReviewObservation & { contextId?: string };
 
 export function contextualReview(review: ReviewObservation): ContextualReviewObservation {
-  return review as ContextualReviewObservation;
+  return review;
 }
 
 export function reducePhase6TrainingSession(
@@ -26,7 +26,7 @@ export function reducePhase6TrainingSession(
   return {
     ...next,
     evidence: next.evidence.map((review, index) =>
-      index < before ? review : ({ ...review, contextId } as ContextualReviewObservation),
+      index < before ? review : { ...review, contextId },
     ),
   };
 }
